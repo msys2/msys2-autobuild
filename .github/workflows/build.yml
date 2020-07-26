@@ -34,9 +34,11 @@ jobs:
         mkdir assets
 
     - name: Process build queue
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
         python -m pip install -r requirements.txt
-        GITHUB_TOKEN="${{ secrets.GITHUB_TOKEN }}" python get_assets.py
+        python get_assets.py
         python -m pytest -v -s -ra buildqueue.py --timeout=18000
 
     - if: ${{ always() }}
