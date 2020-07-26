@@ -3,6 +3,7 @@ from json import loads
 from pathlib import Path
 from subprocess import check_call
 from sys import stdout
+import shutil
 import pytest
 
 PKGEXT='.pkg.tar.zst'
@@ -19,7 +20,7 @@ def test_file(pkg):
     stdout.flush()
 
     def run_cmd(args):
-        check_call(['bash', '-c'] + [' '.join(args)], cwd=str(ROOT.parent/pkg['repo']/pkg['repo_path']))
+        check_call([shutil.which('msys2'), '-c'] + [' '.join(args)], cwd=str(ROOT.parent/pkg['repo']/pkg['repo_path']))
 
     try:
         run_cmd([

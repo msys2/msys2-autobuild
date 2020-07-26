@@ -14,18 +14,17 @@ jobs:
   build:
     runs-on: windows-latest
     continue-on-error: true
-    defaults:
-      run:
-        shell: msys2 {0}
     steps:
 
     - uses: actions/checkout@v2
+
+    - uses: actions/setup-python@v2
 
     - uses: msys2/setup-msys2@v2
       with:
         msystem: MSYS
         update: true
-        install: base-devel msys2-devel mingw-w64-x86_64-toolchain mingw-w64-i686-toolchain git python python-pip
+        install: base-devel msys2-devel mingw-w64-x86_64-toolchain mingw-w64-i686-toolchain
 
     - name: Clone MINGW and MSYS2 packages repos
       run: |
@@ -36,7 +35,8 @@ jobs:
     - name: Process build queue
       run: |
         python -m pip install -r requirements.txt
-        GITHUB_TOKEN="${{ secrets.GITHUB_TOKEN }}" python get_assets.py
+        $env:GITHUB_TOKEN="${{ secrets.GITHUB_TOKEN }}"
+        python get_assets.py
         python -m pytest -v -s -ra buildqueue.py --timeout=18000
 
     - if: ${{ always() }}
@@ -47,6 +47,7 @@ jobs:
   staging:
     needs: [ build ]
     runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/master'
     steps:
 
     - uses: actions/download-artifact@v2
