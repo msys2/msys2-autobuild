@@ -13,7 +13,7 @@ print(tabulate(
         asset.size,
         asset.created_at,
         asset.updated_at,
-        asset.browser_download_url
+        #asset.browser_download_url
     ] for asset in assets],
-    headers=["name", "size", "created", "updated", "url"]
+    headers=["name", "size", "created", "updated"] #, "url"]
 ))
