@@ -1,3 +1,6 @@
+import sys
+import os
+import argparse
 from os import environ
 from github import Github
 from urllib.request import urlopen
@@ -7,10 +10,27 @@ from subprocess import check_call
 from sys import stdout
 import fnmatch
 import pytest
+from tabulate import tabulate
 
-ROOT = Path(__file__).resolve().parent
+
+# Packages that take too long to build, and should be handled manually
+SKIP = [
+    'mingw-w64-clang',
+]
+
+
+def ensure_git_repo(url, path):
+    if not os.path.exists(path):
+        check_call(["git", "clone", url, path])
+
 
 def test_file(pkg):
+    builddir = environ["MSYS2_BUILDIR"]
+    assert os.path.isabs(builddir)
+    os.makedirs(builddir, exist_ok=True)
+    assetdir = os.path.join(builddir, "assets")
+    os.makedirs(assetdir, exist_ok=True)
+
     pkg['repo'] = pkg['repo_url'].split('/')[-1]
 
     isMSYS = pkg['repo'][0:5] == 'MSYS2'
@@ -19,7 +39,10 @@ def test_file(pkg):
     stdout.flush()
 
     def run_cmd(args):
-        check_call(['bash', '-c'] + [' '.join(args)], cwd=str(ROOT.parent/pkg['repo']/pkg['repo_path']))
+        repo_dir = os.path.join(builddir, pkg['repo'])
+        ensure_git_repo(pkg['repo_url'], repo_dir)
+        pkg_dir = os.path.join(repo_dir, pkg['repo_path'])
+        check_call(['bash', '-c'] + [' '.join(args)], cwd=pkg_dir)
 
     try:
         run_cmd([
@@ -39,7 +62,7 @@ def test_file(pkg):
             '--skippgpcheck',
             '--allsource'
         ] + ([] if isMSYS else ['--config', '/etc/makepkg_mingw64.conf']))
-        run_cmd(['mv', '*.pkg.tar.*', '*.src.tar.gz', '../../msys2-devtools/assets/'])
+        run_cmd(['mv', '*.pkg.tar.*', '*.src.tar.gz', assetdir])
         print('::endgroup::')
         stdout.flush()
     except:
@@ -47,9 +70,9 @@ def test_file(pkg):
         stdout.flush()
         pytest.fail()
 
-def pytest_generate_tests(metafunc):
-    gh = Github(environ["GITHUB_TOKEN"])
-    #gh = Github(environ["GITHUB_USER"], environ["GITHUB_PASS"])
+
+def get_packages_to_build():
+    gh = Github(*get_credentials())
 
     assets = [
         asset.name
@@ -74,13 +97,60 @@ def pytest_generate_tests(metafunc):
         else:
             tasks.append(pkg)
 
-    print("\nSKIPPED packages; already in 'staging':")
-    for pkg in done:
-        print(" -", pkg['repo_path'])
+    skipped = [pkg for pkg in tasks if pkg['repo_path'] in SKIP]
+    todo = [pkg for pkg in tasks if pkg['repo_path'] not in SKIP]
 
-    # Packages that take too long to build, and should be handled manually
-    skip = ['mingw-w64-clang']
+    return done, skipped, todo
 
-    metafunc.parametrize("pkg", [
-        pkg for pkg in tasks if pkg['repo_path'] not in skip
-    ])
+
+def pytest_generate_tests(metafunc):
+    metafunc.parametrize("pkg", get_packages_to_build()[2])
+
+
+def show_build(args):
+    done, skipped, todo = get_packages_to_build()
+
+    def print_packages(title, pkgs):
+        print()
+        print(title)
+        print(tabulate([(p["repo_path"], p["version"]) for p in pkgs], headers=["Package", "Version"]))
+
+    print_packages("TODO:", todo)
+    print_packages("SKIPPED:", skipped)
+    print_packages("DONE:", done)
+
+
+def run_build(args):
+    environ["MSYS2_BUILDIR"] = os.path.abspath(args.builddir)
+    return pytest.main(["-v", "-s", "-ra", "--timeout=18000", __file__])
+
+
+def get_credentials():
+    if "GITHUB_TOKEN" in environ:
+        return [environ["GITHUB_TOKEN"]]
+    elif "GITHUB_USER" in environ and "GITHUB_PASS" in environ:
+        return [environ["GITHUB_USER"], environ["GITHUB_PASS"]]
+    else:
+        raise Exception("'GITHUB_TOKEN' or 'GITHUB_USER'/'GITHUB_PASS' env vars not set")
+
+
+def main(argv):
+    parser = argparse.ArgumentParser(description="Build packages")
+    parser.set_defaults(func=lambda *x: parser.print_help())
+    subparser = parser.add_subparsers(title="subcommands")
+
+    sub = subparser.add_parser("build")
+    sub.add_argument("builddir")
+    sub.set_defaults(func=run_build)
+
+    sub = subparser.add_parser("show")
+    sub.set_defaults(func=show_build)
+
+    get_credentials()
+
+    args = parser.parse_args(argv[1:])
+    return args.func(args)
+
+
+if __name__ == "__main__":
+    main(sys.argv)
