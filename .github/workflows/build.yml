@@ -35,7 +35,7 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
-        python get_assets.py
+        python buildqueue.py show-assets
         python buildqueue.py show
 
     - name: Process build queue

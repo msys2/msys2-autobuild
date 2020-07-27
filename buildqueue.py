@@ -127,6 +127,24 @@ def show_build(args):
     print_packages("DONE:", done)
 
 
+def show_assets(args):
+    gh = Github(*get_credentials())
+
+    for name in ["msys", "mingw"]:
+        assets = gh.get_repo('msys2/msys2-devtools').get_release('staging-' + name).get_assets()
+
+        print(tabulate(
+            [[
+                asset.name,
+                asset.size,
+                asset.created_at,
+                asset.updated_at,
+                #asset.browser_download_url
+            ] for asset in assets],
+            headers=["name", "size", "created", "updated"] #, "url"]
+        ))
+
+
 def run_build(args):
     environ["MSYS2_BUILDIR"] = os.path.abspath(args.builddir)
     return pytest.main(["-v", "-s", "-ra", "--timeout=18000", __file__])
@@ -152,6 +170,9 @@ def main(argv):
 
     sub = subparser.add_parser("show")
     sub.set_defaults(func=show_build)
+
+    sub = subparser.add_parser("show-assets")
+    sub.set_defaults(func=show_assets)
 
     get_credentials()
 
