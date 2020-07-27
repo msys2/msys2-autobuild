@@ -11,6 +11,7 @@ from subprocess import check_call
 from sys import stdout
 import fnmatch
 import pytest
+import traceback
 from tabulate import tabulate
 
 
@@ -37,14 +38,14 @@ def test_file(pkg):
     pkg['repo'] = pkg['repo_url'].split('/')[-1]
 
     isMSYS = pkg['repo'][0:5] == 'MSYS2'
+    repo_dir = os.path.join(builddir, pkg['repo'])
+    pkg_dir = os.path.join(repo_dir, pkg['repo_path'])
+    ensure_git_repo(pkg['repo_url'], repo_dir)
 
     print('\n::group::[%s] %s...' % (pkg['repo'], pkg['repo_path']))
     stdout.flush()
 
     def run_cmd(args):
-        repo_dir = os.path.join(builddir, pkg['repo'])
-        ensure_git_repo(pkg['repo_url'], repo_dir)
-        pkg_dir = os.path.join(repo_dir, pkg['repo_path'])
         check_call(['bash', '-c'] + [' '.join(args)], cwd=pkg_dir)
 
     try:
@@ -67,12 +68,13 @@ def test_file(pkg):
         ] + ([] if isMSYS else ['--config', '/etc/makepkg_mingw64.conf']))
 
         for entry in os.listdir(pkg_dir):
-            if fnmatch(entry, '*.pkg.tar.*') or fnmatch(entry, '*.src.tar.*'):
-                shutil.move(entry, assetdir_msys if isMSYS else assetdir_mingw)
+            if fnmatch.fnmatch(entry, '*.pkg.tar.*') or fnmatch.fnmatch(entry, '*.src.tar.*'):
+                shutil.move(os.path.join(pkg_dir, entry), assetdir_msys if isMSYS else assetdir_mingw)
 
         print('::endgroup::')
         stdout.flush()
-    except:
+    except Exception:
+        traceback.print_exc()
         print('::endgroup::')
         stdout.flush()
         pytest.fail()
