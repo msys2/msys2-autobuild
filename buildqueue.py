@@ -1,6 +1,7 @@
 import sys
 import os
 import argparse
+import shutil
 from os import environ
 from github import Github
 from urllib.request import urlopen
@@ -28,8 +29,10 @@ def test_file(pkg):
     builddir = environ["MSYS2_BUILDIR"]
     assert os.path.isabs(builddir)
     os.makedirs(builddir, exist_ok=True)
-    assetdir = os.path.join(builddir, "assets")
-    os.makedirs(assetdir, exist_ok=True)
+    assetdir_msys = os.path.join(builddir, "assets", "msys")
+    os.makedirs(assetdir_msys, exist_ok=True)
+    assetdir_mingw = os.path.join(builddir, "assets", "mingw")
+    os.makedirs(assetdir_mingw, exist_ok=True)
 
     pkg['repo'] = pkg['repo_url'].split('/')[-1]
 
@@ -62,7 +65,11 @@ def test_file(pkg):
             '--skippgpcheck',
             '--allsource'
         ] + ([] if isMSYS else ['--config', '/etc/makepkg_mingw64.conf']))
-        run_cmd(['mv', '*.pkg.tar.*', '*.src.tar.gz', assetdir])
+
+        for entry in os.listdir(pkg_dir):
+            if fnmatch(entry, '*.pkg.tar.*') or fnmatch(entry, '*.src.tar.*'):
+                shutil.move(entry, assetdir_msys if isMSYS else assetdir_mingw)
+
         print('::endgroup::')
         stdout.flush()
     except:
@@ -74,10 +81,10 @@ def test_file(pkg):
 def get_packages_to_build():
     gh = Github(*get_credentials())
 
-    assets = [
-        asset.name
-        for asset in gh.get_repo('msys2/msys2-devtools').get_release('staging').get_assets()
-    ]
+    repo = gh.get_repo('msys2/msys2-devtools')
+    assets = []
+    for name in ["msys", "mingw"]:
+        assets.extend(repo.get_release('staging-' + name).get_assets())
 
     tasks = []
     done = []

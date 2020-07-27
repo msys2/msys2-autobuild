@@ -60,5 +60,11 @@ jobs:
     - uses: eine/tip@master
       with:
         token: ${{ secrets.GITHUB_TOKEN }}
-        tag: 'staging'
-        files: artifact/*.tar.*
+        tag: 'staging-msys'
+        files: artifact/msys/*.tar.*
+
+    - uses: eine/tip@master
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+        tag: 'staging-mingw'
+        files: artifact/mingw/*.tar.*
