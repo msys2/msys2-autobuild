@@ -13,6 +13,7 @@ import fnmatch
 import pytest
 import traceback
 from tabulate import tabulate
+from concurrent.futures import ThreadPoolExecutor
 
 
 # Packages that take too long to build, and should be handled manually
@@ -147,6 +148,59 @@ def show_assets(args):
         ))
 
 
+def fetch_assets(args):
+    gh = Github(*get_credentials())
+    repo = gh.get_repo('msys2/msys2-devtools')
+
+    todo = []
+
+    def get_subdir(type_, entry):
+        if type_ == "msys":
+            if fnmatch.fnmatch(entry, '*.pkg.tar.*'):
+                return "x86_64"
+            elif fnmatch.fnmatch(entry, '*.src.tar.*'):
+                return "sources"
+            else:
+                raise Exception("unknown file type")
+        elif type_ == "mingw":
+            if fnmatch.fnmatch(entry, '*.src.tar.*'):
+                return "sources"
+            elif entry.startswith("mingw-w64-x86_64-"):
+                return "x86_64"
+            elif entry.startswith("mingw-w64-i686-"):
+                return "i686"
+            else:
+                raise Exception("unknown file type")
+
+    skipped = []
+    for name in ["msys", "mingw"]:
+        p = Path(args.targetdir) / name
+        assets = repo.get_release('staging-' + name).get_assets()
+        for asset in assets:
+            asset_dir = p / get_subdir(name, asset.name)
+            asset_dir.mkdir(parents=True, exist_ok=True)
+            asset_path = asset_dir / asset.name
+            if asset_path.exists() and asset_path.stat().st_size == asset.size:
+                skipped.append(asset)
+                continue
+            todo.append((asset, asset_path))
+
+    print(f"downloading: {len(todo)}, skipped: {len(skipped)}")
+
+    def fetch_item(item):
+        with urlopen(item[0].browser_download_url, timeout=10) as conn:
+            data = conn.read()
+        return (item, data)
+
+    with ThreadPoolExecutor(4) as executor:
+        for i, (item, data) in enumerate(executor.map(fetch_item, todo)):
+            print(f"[{i + 1}/{len(todo)}] {item[0].name}")
+            with open(item[1], "wb") as h:
+                h.write(data)
+
+    print("done")
+
+
 def run_build(args):
     environ["MSYS2_BUILDIR"] = os.path.abspath(args.builddir)
     return pytest.main(["-v", "-s", "-ra", "--timeout=18000", __file__])
@@ -175,6 +229,10 @@ def main(argv):
 
     sub = subparser.add_parser("show-assets")
     sub.set_defaults(func=show_assets)
+
+    sub = subparser.add_parser("fetch-assets")
+    sub.add_argument("targetdir")
+    sub.set_defaults(func=fetch_assets)
 
     get_credentials()
 
