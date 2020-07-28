@@ -87,7 +87,7 @@ def get_packages_to_build():
     repo = gh.get_repo('msys2/msys2-devtools')
     assets = []
     for name in ["msys", "mingw"]:
-        assets.extend(repo.get_release('staging-' + name).get_assets())
+        assets.extend([a.name for a in repo.get_release('staging-' + name).get_assets()])
 
     tasks = []
     done = []
