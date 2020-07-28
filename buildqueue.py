@@ -220,17 +220,17 @@ def main(argv):
     parser.set_defaults(func=lambda *x: parser.print_help())
     subparser = parser.add_subparsers(title="subcommands")
 
-    sub = subparser.add_parser("build")
+    sub = subparser.add_parser("build", help="Build all packages")
     sub.add_argument("builddir")
     sub.set_defaults(func=run_build)
 
-    sub = subparser.add_parser("show")
+    sub = subparser.add_parser("show", help="Show all packages to be built")
     sub.set_defaults(func=show_build)
 
-    sub = subparser.add_parser("show-assets")
+    sub = subparser.add_parser("show-assets", help="Show all staging packages")
     sub.set_defaults(func=show_assets)
 
-    sub = subparser.add_parser("fetch-assets")
+    sub = subparser.add_parser("fetch-assets", help="Download all staging packages")
     sub.add_argument("targetdir")
     sub.set_defaults(func=fetch_assets)
 
