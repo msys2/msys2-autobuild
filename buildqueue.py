@@ -65,8 +65,11 @@ def build_package(pkg, builddir):
     os.makedirs(assetdir_msys, exist_ok=True)
     assetdir_mingw = os.path.join(builddir, "assets", "mingw")
     os.makedirs(assetdir_mingw, exist_ok=True)
+    assetdir_failed = os.path.join(builddir, "assets", "failed")
+    os.makedirs(assetdir_failed, exist_ok=True)
 
-    isMSYS = pkg['repo'][0:5] == 'MSYS2'
+    isMSYS = pkg['repo'].startswith('MSYS2')
+    assetdir = assetdir_msys if isMSYS else assetdir_mingw
     repo_dir = os.path.join(builddir, pkg['repo'])
     pkg_dir = os.path.join(repo_dir, pkg['repo_path'])
     ensure_git_repo(pkg['repo_url'], repo_dir)
@@ -85,6 +88,7 @@ def build_package(pkg, builddir):
             '--rmdeps',
             '--cleanbuild'
         ])
+
         run_cmd([
             'makepkg',
             '--noconfirm',
@@ -94,26 +98,33 @@ def build_package(pkg, builddir):
         ] + ([] if isMSYS else ['--config', '/etc/makepkg_mingw64.conf']))
     except subprocess.TimeoutExpired as e:
         raise BuildTimeoutError(e)
-    except Exception as e:
+    except subprocess.CalledProcessError as e:
+
+        for item in pkg['packages']:
+            with open(os.path.join(assetdir_failed, f"{item}-{pkg['version']}.failed"), 'wb'):
+                pass
+
         raise BuildError(e)
     else:
         for entry in os.listdir(pkg_dir):
             if fnmatch.fnmatch(entry, '*.pkg.tar.*') or fnmatch.fnmatch(entry, '*.src.tar.*'):
-                shutil.move(os.path.join(pkg_dir, entry), assetdir_msys if isMSYS else assetdir_mingw)
+                shutil.move(os.path.join(pkg_dir, entry), assetdir)
 
 
 def run_build(args):
     builddir = os.path.abspath(args.builddir)
 
     for pkg in get_packages_to_build()[2]:
-        with gha_group(f"[{ pkg['repo'] }] { pkg['repo_path'] }..."):
-            try:
+        try:
+            with gha_group(f"[{ pkg['repo'] }] { pkg['repo_path'] }..."):
                 build_package(pkg, builddir)
-            except BuildTimeoutError:
-                print("timeout")
-            except BuildError:
-                print("failed")
-                traceback.print_exc()
+        except BuildTimeoutError:
+            print("timeout")
+            break
+        except BuildError:
+            print("failed")
+            traceback.print_exc()
+            break
 
 
 def get_packages_to_build():
@@ -123,28 +134,32 @@ def get_packages_to_build():
     assets = []
     for name in ["msys", "mingw"]:
         assets.extend([a.name for a in repo.get_release('staging-' + name).get_assets()])
+    assets_failed = [a.name for a in repo.get_release('staging-failed').get_assets()]
 
-    tasks = []
+    def pkg_is_done(pkg):
+        for item in pkg['packages']:
+            if not fnmatch.filter(assets, f"{item}-{pkg['version']}-*.pkg.tar.*"):
+                return False
+        return True
+
+    def pkg_has_failed(pkg):
+        for item in pkg['packages']:
+            if f"{item}-{pkg['version']}.failed" in assets_failed:
+                return True
+        return False
+
+    todo = []
     done = []
-
+    skipped = []
     for pkg in loads(urlopen("https://packages.msys2.org/api/buildqueue").read()):
         pkg['repo'] = pkg['repo_url'].split('/')[-1]
-        isMSYS = pkg['repo'].startswith('MSYS2')
-        isDone = True
-        for item in pkg['packages']:
-            if not fnmatch.filter(assets, '%s-%s-*.pkg.tar.*' % (
-                item,
-                pkg['version']
-            )):
-                isDone = False
-                break
-        if isDone:
-            done.append(pkg)
-        else:
-            tasks.append(pkg)
 
-    skipped = [pkg for pkg in tasks if pkg['repo_path'] in SKIP]
-    todo = [pkg for pkg in tasks if pkg['repo_path'] not in SKIP]
+        if pkg_is_done(pkg):
+            done.append(pkg)
+        elif pkg_has_failed(pkg) or pkg['repo_path'] in SKIP:
+            skipped.append(pkg)
+        else:
+            todo.append(pkg)
 
     return done, skipped, todo
 

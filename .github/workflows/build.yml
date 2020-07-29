@@ -68,3 +68,9 @@ jobs:
         token: ${{ secrets.GITHUB_TOKEN }}
         tag: 'staging-mingw'
         files: artifact/mingw/*.tar.*
+
+    - uses: eine/tip@master
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+        tag: 'staging-failed'
+        files: artifact/failed/*.failed
