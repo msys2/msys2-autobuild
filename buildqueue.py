@@ -11,7 +11,6 @@ from subprocess import check_call
 import subprocess
 from sys import stdout
 import fnmatch
-import pytest
 import traceback
 from tabulate import tabulate
 from concurrent.futures import ThreadPoolExecutor
@@ -52,16 +51,20 @@ def gha_group(title):
         stdout.flush()
 
 
-def test_file(pkg):
-    builddir = environ["MSYS2_BUILDIR"]
+class BuildError(Exception):
+    pass
+
+class BuildTimeoutError(BuildError):
+    pass
+
+
+def build_package(pkg, builddir):
     assert os.path.isabs(builddir)
     os.makedirs(builddir, exist_ok=True)
     assetdir_msys = os.path.join(builddir, "assets", "msys")
     os.makedirs(assetdir_msys, exist_ok=True)
     assetdir_mingw = os.path.join(builddir, "assets", "mingw")
     os.makedirs(assetdir_mingw, exist_ok=True)
-
-    pkg['repo'] = pkg['repo_url'].split('/')[-1]
 
     isMSYS = pkg['repo'][0:5] == 'MSYS2'
     repo_dir = os.path.join(builddir, pkg['repo'])
@@ -71,37 +74,46 @@ def test_file(pkg):
     def run_cmd(args):
         check_call(['bash', '-c'] + [' '.join(args)], cwd=pkg_dir, timeout=get_timeout())
 
-    with gha_group(f"[{ pkg['repo'] }] { pkg['repo_path'] }..."):
+    try:
+        run_cmd([
+            'makepkg' if isMSYS else 'makepkg-mingw',
+            '--noconfirm',
+            '--noprogressbar',
+            '--skippgpcheck',
+            '--nocheck',
+            '--syncdeps',
+            '--rmdeps',
+            '--cleanbuild'
+        ])
+        run_cmd([
+            'makepkg',
+            '--noconfirm',
+            '--noprogressbar',
+            '--skippgpcheck',
+            '--allsource'
+        ] + ([] if isMSYS else ['--config', '/etc/makepkg_mingw64.conf']))
+    except subprocess.TimeoutExpired as e:
+        raise BuildTimeoutError(e)
+    except Exception as e:
+        raise BuildError(e)
+    else:
+        for entry in os.listdir(pkg_dir):
+            if fnmatch.fnmatch(entry, '*.pkg.tar.*') or fnmatch.fnmatch(entry, '*.src.tar.*'):
+                shutil.move(os.path.join(pkg_dir, entry), assetdir_msys if isMSYS else assetdir_mingw)
 
-        try:
-            run_cmd([
-                'makepkg' if isMSYS else 'makepkg-mingw',
-                '--noconfirm',
-                '--noprogressbar',
-                '--skippgpcheck',
-                '--nocheck',
-                '--syncdeps',
-                '--rmdeps',
-                '--cleanbuild'
-            ])
-            run_cmd([
-                'makepkg',
-                '--noconfirm',
-                '--noprogressbar',
-                '--skippgpcheck',
-                '--allsource'
-            ] + ([] if isMSYS else ['--config', '/etc/makepkg_mingw64.conf']))
 
-            for entry in os.listdir(pkg_dir):
-                if fnmatch.fnmatch(entry, '*.pkg.tar.*') or fnmatch.fnmatch(entry, '*.src.tar.*'):
-                    shutil.move(os.path.join(pkg_dir, entry), assetdir_msys if isMSYS else assetdir_mingw)
+def run_build(args):
+    builddir = os.path.abspath(args.builddir)
 
-        except subprocess.TimeoutExpired:
-            print("timeout")
-            pytest.fail()
-        except Exception:
-            traceback.print_exc()
-            pytest.fail()
+    for pkg in get_packages_to_build()[2]:
+        with gha_group(f"[{ pkg['repo'] }] { pkg['repo_path'] }..."):
+            try:
+                build_package(pkg, builddir)
+            except BuildTimeoutError:
+                print("timeout")
+            except BuildError:
+                print("failed")
+                traceback.print_exc()
 
 
 def get_packages_to_build():
@@ -116,7 +128,8 @@ def get_packages_to_build():
     done = []
 
     for pkg in loads(urlopen("https://packages.msys2.org/api/buildqueue").read()):
-        isMSYS = pkg['repo_url'].split('/')[-1][0:5] == 'MSYS2'
+        pkg['repo'] = pkg['repo_url'].split('/')[-1]
+        isMSYS = pkg['repo'].startswith('MSYS2')
         isDone = True
         for item in pkg['packages']:
             if not fnmatch.filter(assets, '%s-%s-*.pkg.tar.*' % (
@@ -134,10 +147,6 @@ def get_packages_to_build():
     todo = [pkg for pkg in tasks if pkg['repo_path'] not in SKIP]
 
     return done, skipped, todo
-
-
-def pytest_generate_tests(metafunc):
-    metafunc.parametrize("pkg", get_packages_to_build()[2])
 
 
 def show_build(args):
@@ -222,11 +231,6 @@ def fetch_assets(args):
                 h.write(data)
 
     print("done")
-
-
-def run_build(args):
-    environ["MSYS2_BUILDIR"] = os.path.abspath(args.builddir)
-    return pytest.main(["-v", "-s", "-ra", __file__])
 
 
 def get_credentials():
