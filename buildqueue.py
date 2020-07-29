@@ -101,8 +101,9 @@ def build_package(pkg, builddir):
     except subprocess.CalledProcessError as e:
 
         for item in pkg['packages']:
-            with open(os.path.join(assetdir_failed, f"{item}-{pkg['version']}.failed"), 'wb'):
-                pass
+            with open(os.path.join(assetdir_failed, f"{item}-{pkg['version']}.failed"), 'wb') as h:
+                # github doesn't allow empty assets
+                h.write(b'oh no')
 
         raise BuildError(e)
     else:
