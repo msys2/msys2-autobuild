@@ -124,7 +124,6 @@ def run_build(args):
         except BuildError:
             print("failed")
             traceback.print_exc()
-            break
 
 
 def get_packages_to_build():
