@@ -8,13 +8,18 @@ from urllib.request import urlopen
 from json import loads
 from pathlib import Path
 from subprocess import check_call
+import subprocess
 from sys import stdout
 import fnmatch
 import pytest
 import traceback
 from tabulate import tabulate
 from concurrent.futures import ThreadPoolExecutor
+from contextlib import contextmanager
+import time
 
+# After which overall time it should stop building (in seconds)
+BUILD_TIMEOUT = 18000
 
 # Packages that take too long to build, and should be handled manually
 SKIP = [
@@ -22,9 +27,29 @@ SKIP = [
 ]
 
 
+def timeoutgen(timeout):
+    end = time.time() + timeout
+    def new():
+        return max(end - time.time(), 0)
+    return new
+
+get_timeout = timeoutgen(BUILD_TIMEOUT)
+
+
 def ensure_git_repo(url, path):
     if not os.path.exists(path):
         check_call(["git", "clone", url, path])
+
+
+@contextmanager
+def gha_group(title):
+    print(f'\n::group::{title}')
+    stdout.flush()
+    try:
+        yield
+    finally:
+        print('::endgroup::')
+        stdout.flush()
 
 
 def test_file(pkg):
@@ -43,42 +68,40 @@ def test_file(pkg):
     pkg_dir = os.path.join(repo_dir, pkg['repo_path'])
     ensure_git_repo(pkg['repo_url'], repo_dir)
 
-    print('\n::group::[%s] %s...' % (pkg['repo'], pkg['repo_path']))
-    stdout.flush()
-
     def run_cmd(args):
-        check_call(['bash', '-c'] + [' '.join(args)], cwd=pkg_dir)
+        check_call(['bash', '-c'] + [' '.join(args)], cwd=pkg_dir, timeout=get_timeout())
 
-    try:
-        run_cmd([
-            'makepkg' if isMSYS else 'makepkg-mingw',
-            '--noconfirm',
-            '--noprogressbar',
-            '--skippgpcheck',
-            '--nocheck',
-            '--syncdeps',
-            '--rmdeps',
-            '--cleanbuild'
-        ])
-        run_cmd([
-            'makepkg',
-            '--noconfirm',
-            '--noprogressbar',
-            '--skippgpcheck',
-            '--allsource'
-        ] + ([] if isMSYS else ['--config', '/etc/makepkg_mingw64.conf']))
+    with gha_group(f"[{ pkg['repo'] }] { pkg['repo_path'] }..."):
 
-        for entry in os.listdir(pkg_dir):
-            if fnmatch.fnmatch(entry, '*.pkg.tar.*') or fnmatch.fnmatch(entry, '*.src.tar.*'):
-                shutil.move(os.path.join(pkg_dir, entry), assetdir_msys if isMSYS else assetdir_mingw)
+        try:
+            run_cmd([
+                'makepkg' if isMSYS else 'makepkg-mingw',
+                '--noconfirm',
+                '--noprogressbar',
+                '--skippgpcheck',
+                '--nocheck',
+                '--syncdeps',
+                '--rmdeps',
+                '--cleanbuild'
+            ])
+            run_cmd([
+                'makepkg',
+                '--noconfirm',
+                '--noprogressbar',
+                '--skippgpcheck',
+                '--allsource'
+            ] + ([] if isMSYS else ['--config', '/etc/makepkg_mingw64.conf']))
 
-        print('::endgroup::')
-        stdout.flush()
-    except Exception:
-        traceback.print_exc()
-        print('::endgroup::')
-        stdout.flush()
-        pytest.fail()
+            for entry in os.listdir(pkg_dir):
+                if fnmatch.fnmatch(entry, '*.pkg.tar.*') or fnmatch.fnmatch(entry, '*.src.tar.*'):
+                    shutil.move(os.path.join(pkg_dir, entry), assetdir_msys if isMSYS else assetdir_mingw)
+
+        except subprocess.TimeoutExpired:
+            print("timeout")
+            pytest.fail()
+        except Exception:
+            traceback.print_exc()
+            pytest.fail()
 
 
 def get_packages_to_build():
@@ -203,7 +226,7 @@ def fetch_assets(args):
 
 def run_build(args):
     environ["MSYS2_BUILDIR"] = os.path.abspath(args.builddir)
-    return pytest.main(["-v", "-s", "-ra", "--timeout=18000", __file__])
+    return pytest.main(["-v", "-s", "-ra", __file__])
 
 
 def get_credentials():
