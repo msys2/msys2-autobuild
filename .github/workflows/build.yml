@@ -58,21 +58,21 @@ jobs:
     - uses: actions/download-artifact@v2
 
     - uses: eine/tip@master
-      if: ${{ always() }}
+      continue-on-error: true
       with:
         token: ${{ secrets.GITHUB_TOKEN }}
         tag: 'staging-msys'
         files: artifact/msys/*.tar.*
 
     - uses: eine/tip@master
-      if: ${{ always() }}
+      continue-on-error: true
       with:
         token: ${{ secrets.GITHUB_TOKEN }}
         tag: 'staging-mingw'
         files: artifact/mingw/*.tar.*
 
     - uses: eine/tip@master
-      if: ${{ always() }}
+      continue-on-error: true
       with:
         token: ${{ secrets.GITHUB_TOKEN }}
         tag: 'staging-failed'
