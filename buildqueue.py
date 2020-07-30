@@ -35,6 +35,25 @@ def timeoutgen(timeout):
 get_timeout = timeoutgen(BUILD_TIMEOUT)
 
 
+def get_repo_checkout_dir(repo):
+    # some tools can't handle long paths, so try to have the build root near the disk root
+    nick = ""
+    if repo == "MINGW-packages":
+        nick = "_MINGW"
+    elif repo == "MSYS2-packages":
+        nick = "_MSYS"
+    else:
+        raise ValueError("unknown repo: " + repo)
+
+    if sys.platform == "msys":
+        # root dir on the same drive
+        win_path = subprocess.check_output(["cygpath", "-m", "/"], text=True).strip()
+        posix_drive = subprocess.check_output(["cygpath", "-u", win_path[:3]], text=True).strip()
+        return os.path.join(posix_drive, nick)
+    else:
+        raise NotImplementedError("fixme")
+
+
 def ensure_git_repo(url, path):
     if not os.path.exists(path):
         check_call(["git", "clone", url, path])
@@ -70,7 +89,7 @@ def build_package(pkg, builddir):
 
     isMSYS = pkg['repo'].startswith('MSYS2')
     assetdir = assetdir_msys if isMSYS else assetdir_mingw
-    repo_dir = os.path.join(builddir, pkg['repo'])
+    repo_dir = get_repo_checkout_dir(pkg['repo'])
     pkg_dir = os.path.join(repo_dir, pkg['repo_path'])
     ensure_git_repo(pkg['repo_url'], repo_dir)
 
