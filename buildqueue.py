@@ -248,6 +248,15 @@ def fetch_assets(args):
     print("done")
 
 
+def trigger_gha_build(args):
+    gh = Github(*get_credentials())
+    repo = gh.get_repo('msys2/msys2-devtools')
+    if repo.create_repository_dispatch('manual-build'):
+        print("Build triggered")
+    else:
+        raise Exception("trigger failed")
+
+
 def get_credentials():
     if "GITHUB_TOKEN" in environ:
         return [environ["GITHUB_TOKEN"]]
@@ -275,6 +284,9 @@ def main(argv):
     sub = subparser.add_parser("fetch-assets", help="Download all staging packages")
     sub.add_argument("targetdir")
     sub.set_defaults(func=fetch_assets)
+
+    sub = subparser.add_parser("trigger", help="Trigger a GHA build")
+    sub.set_defaults(func=trigger_gha_build)
 
     get_credentials()
 

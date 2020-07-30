@@ -3,7 +3,7 @@ name: 'build'
 on:
   workflow_dispatch:
   repository_dispatch:
-    types: [start-build]
+    types: [manual-build]
   schedule:
     - cron: '0 0/4 * * *'
 
