@@ -37,20 +37,20 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
-        python buildqueue.py show
+        python autobuild.py show
 
     - name: Clean up assets
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
-        python buildqueue.py clean-assets
+        python autobuild.py clean-assets
 
     - name: Process build queue
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
         mkdir -p _tmp/assets
-        python buildqueue.py build _tmp
+        python autobuild.py build _tmp
 
     - if: ${{ always() }}
       uses: actions/upload-artifact@v2
