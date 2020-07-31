@@ -4,7 +4,6 @@ import argparse
 import shutil
 from os import environ
 from github import Github
-from urllib.request import urlopen
 from json import loads
 from pathlib import Path
 from subprocess import check_call
@@ -15,6 +14,7 @@ import traceback
 from tabulate import tabulate
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
+import requests
 import time
 
 # After which overall time it should stop building (in seconds)
@@ -148,7 +148,9 @@ def run_build(args):
 
 def get_buildqueue():
     pkgs = []
-    for pkg in loads(urlopen("https://packages.msys2.org/api/buildqueue").read()):
+    r = requests.get("https://packages.msys2.org/api/buildqueue")
+    r.raise_for_status()
+    for pkg in r.json():
         pkg['repo'] = pkg['repo_url'].split('/')[-1]
         pkgs.append(pkg)
     return pkgs
@@ -260,9 +262,9 @@ def fetch_assets(args):
     print(f"downloading: {len(todo)}, skipped: {len(skipped)}")
 
     def fetch_item(item):
-        with urlopen(item[0].browser_download_url, timeout=10) as conn:
-            data = conn.read()
-        return (item, data)
+        r = requests.get(item[0].browser_download_url, timeout=10)
+        r.raise_for_status()
+        return (item, r.content)
 
     with ThreadPoolExecutor(4) as executor:
         for i, (item, data) in enumerate(executor.map(fetch_item, todo)):
