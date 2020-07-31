@@ -146,6 +146,14 @@ def run_build(args):
             traceback.print_exc()
 
 
+def get_buildqueue():
+    pkgs = []
+    for pkg in loads(urlopen("https://packages.msys2.org/api/buildqueue").read()):
+        pkg['repo'] = pkg['repo_url'].split('/')[-1]
+        pkgs.append(pkg)
+    return pkgs
+
+
 def get_packages_to_build():
     gh = Github(*get_credentials())
 
@@ -170,9 +178,7 @@ def get_packages_to_build():
     todo = []
     done = []
     skipped = []
-    for pkg in loads(urlopen("https://packages.msys2.org/api/buildqueue").read()):
-        pkg['repo'] = pkg['repo_url'].split('/')[-1]
-
+    for pkg in get_buildqueue():
         if pkg_is_done(pkg):
             done.append(pkg)
         elif pkg_has_failed(pkg) or pkg['repo_path'] in SKIP:
@@ -276,6 +282,37 @@ def trigger_gha_build(args):
         raise Exception("trigger failed")
 
 
+def clean_gha_assets(args):
+    gh = Github(*get_credentials())
+
+    print("Fetching packages to build...")
+    patterns = []
+    for pkg in get_buildqueue():
+        patterns.append(f"{pkg['name']}-{pkg['version']}*")
+        for item in pkg['packages']:
+            patterns.append(f"{item}-{pkg['version']}*")
+
+    print("Fetching assets...")
+    assets = {}
+    repo = gh.get_repo('msys2/msys2-devtools')
+    for release in ['staging-msys', 'staging-mingw', 'staging-failed']:
+        for asset in repo.get_release(release).get_assets():
+            assets.setdefault(asset.name, []).append(asset)
+
+    for pattern in patterns:
+        for key in fnmatch.filter(assets.keys(), pattern):
+            del assets[key]
+
+    for items in assets.values():
+        for asset in items:
+            print(f"Deleting {asset.name}...")
+            if not args.dry_run:
+                asset.delete_asset()
+
+    if not assets:
+        print("Nothing to delete")
+
+
 def get_credentials():
     if "GITHUB_TOKEN" in environ:
         return [environ["GITHUB_TOKEN"]]
@@ -286,7 +323,7 @@ def get_credentials():
 
 
 def main(argv):
-    parser = argparse.ArgumentParser(description="Build packages")
+    parser = argparse.ArgumentParser(description="Build packages", allow_abbrev=False)
     parser.set_defaults(func=lambda *x: parser.print_help())
     subparser = parser.add_subparsers(title="subcommands")
 
@@ -294,18 +331,22 @@ def main(argv):
     sub.add_argument("builddir")
     sub.set_defaults(func=run_build)
 
-    sub = subparser.add_parser("show", help="Show all packages to be built")
+    sub = subparser.add_parser("show", help="Show all packages to be built", allow_abbrev=False)
     sub.set_defaults(func=show_build)
 
-    sub = subparser.add_parser("show-assets", help="Show all staging packages")
+    sub = subparser.add_parser("show-assets", help="Show all staging packages", allow_abbrev=False)
     sub.set_defaults(func=show_assets)
 
-    sub = subparser.add_parser("fetch-assets", help="Download all staging packages")
+    sub = subparser.add_parser("fetch-assets", help="Download all staging packages", allow_abbrev=False)
     sub.add_argument("targetdir")
     sub.set_defaults(func=fetch_assets)
 
-    sub = subparser.add_parser("trigger", help="Trigger a GHA build")
+    sub = subparser.add_parser("trigger", help="Trigger a GHA build", allow_abbrev=False)
     sub.set_defaults(func=trigger_gha_build)
+
+    sub = subparser.add_parser("clean-assets", help="Clean up GHA assets", allow_abbrev=False)
+    sub.add_argument("--dry-run", action="store_true", help="Only show what is going to be deleted")
+    sub.set_defaults(func=clean_gha_assets)
 
     get_credentials()
 

@@ -40,6 +40,12 @@ jobs:
         python buildqueue.py show-assets
         python buildqueue.py show
 
+    - name: Clean up assets
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        python buildqueue.py clean-assets
+
     - name: Process build queue
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
