@@ -254,7 +254,9 @@ def fetch_assets(args):
             asset_dir = p / get_subdir(name, asset.name)
             asset_dir.mkdir(parents=True, exist_ok=True)
             asset_path = asset_dir / asset.name
-            if asset_path.exists() and asset_path.stat().st_size == asset.size:
+            if asset_path.exists():
+                if asset_path.stat().st_size != asset.size:
+                    print(f"Warning: {asset_path} already exists but has a different size")
                 skipped.append(asset)
                 continue
             todo.append((asset, asset_path))
