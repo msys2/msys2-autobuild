@@ -1,7 +1,6 @@
 import sys
 import os
 import argparse
-import shutil
 from os import environ
 from github import Github
 from json import loads
@@ -17,6 +16,7 @@ from contextlib import contextmanager
 import requests
 import shlex
 import time
+import tempfile
 
 # After which overall time it should stop building (in seconds)
 BUILD_TIMEOUT = 18000
@@ -87,18 +87,24 @@ class BuildTimeoutError(BuildError):
     pass
 
 
+def upload_asset(type_: str, path: os.PathLike, replace=True):
+    # type_: msys/mingw/failed
+    path = Path(path)
+    gh = Github(*get_credentials())
+    repo = gh.get_repo('msys2/msys2-devtools')
+    release = repo.get_release("staging-" + type_)
+    if replace:
+        for asset in release.get_assets():
+            if path.name == asset.name:
+                asset.delete_asset()
+    release.upload_asset(str(path))
+
+
 def build_package(pkg, builddir):
     assert os.path.isabs(builddir)
     os.makedirs(builddir, exist_ok=True)
-    assetdir_msys = os.path.join(builddir, "assets", "msys")
-    os.makedirs(assetdir_msys, exist_ok=True)
-    assetdir_mingw = os.path.join(builddir, "assets", "mingw")
-    os.makedirs(assetdir_mingw, exist_ok=True)
-    assetdir_failed = os.path.join(builddir, "assets", "failed")
-    os.makedirs(assetdir_failed, exist_ok=True)
 
     isMSYS = pkg['repo'].startswith('MSYS2')
-    assetdir = assetdir_msys if isMSYS else assetdir_mingw
     repo_dir = get_repo_checkout_dir(pkg['repo'])
     pkg_dir = os.path.join(repo_dir, pkg['repo_path'])
     ensure_git_repo(pkg['repo_url'], repo_dir)
@@ -135,15 +141,19 @@ def build_package(pkg, builddir):
     except subprocess.CalledProcessError as e:
 
         for item in pkg['packages']:
-            with open(os.path.join(assetdir_failed, f"{item}-{pkg['version']}.failed"), 'wb') as h:
-                # github doesn't allow empty assets
-                h.write(b'oh no')
+            with tempfile.TemporaryDirectory() as tempdir:
+                failed_path = os.path.join(tempdir, f"{item}-{pkg['version']}.failed")
+                with open(failed_path, 'wb') as h:
+                    # github doesn't allow empty assets
+                    h.write(b'oh no')
+                upload_asset("failed", failed_path)
 
         raise BuildError(e)
     else:
         for entry in os.listdir(pkg_dir):
             if fnmatch.fnmatch(entry, '*.pkg.tar.*') or fnmatch.fnmatch(entry, '*.src.tar.*'):
-                shutil.move(os.path.join(pkg_dir, entry), assetdir)
+                path = os.path.join(pkg_dir, entry)
+                upload_asset("msys" if isMSYS else "mingw", path)
     finally:
         # remove built artifacts
         reset_git_repo(repo_dir)

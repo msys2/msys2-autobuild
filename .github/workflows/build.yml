@@ -50,38 +50,4 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
         export PACKAGER="CI (msys2-devtools/${GITHUB_SHA::8}/${GITHUB_RUN_ID})"
-        mkdir -p _tmp/assets
         python autobuild.py build _tmp
-
-    - if: ${{ always() }}
-      uses: actions/upload-artifact@v2
-      with:
-        path: _tmp/assets/*
-
-  staging:
-    needs: [ build ]
-    runs-on: ubuntu-latest
-    steps:
-
-    - uses: actions/download-artifact@v2
-
-    - uses: eine/tip@master
-      continue-on-error: true
-      with:
-        token: ${{ secrets.GITHUB_TOKEN }}
-        tag: 'staging-msys'
-        files: artifact/msys/*.tar.*
-
-    - uses: eine/tip@master
-      continue-on-error: true
-      with:
-        token: ${{ secrets.GITHUB_TOKEN }}
-        tag: 'staging-mingw'
-        files: artifact/mingw/*.tar.*
-
-    - uses: eine/tip@master
-      continue-on-error: true
-      with:
-        token: ${{ secrets.GITHUB_TOKEN }}
-        tag: 'staging-failed'
-        files: artifact/failed/*.failed
