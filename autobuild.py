@@ -15,6 +15,7 @@ from tabulate import tabulate
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
 import requests
+import shlex
 import time
 
 # After which overall time it should stop building (in seconds)
@@ -94,7 +95,7 @@ def build_package(pkg, builddir):
     ensure_git_repo(pkg['repo_url'], repo_dir)
 
     def run_cmd(args, **kwargs):
-        check_call(['bash', '-c'] + [' '.join(args)], cwd=pkg_dir, timeout=get_timeout(), **kwargs)
+        check_call(['bash', '-c'] + [shlex.join(args)], cwd=pkg_dir, timeout=get_timeout(), **kwargs)
 
     makepkg = 'makepkg' if isMSYS else 'makepkg-mingw'
 
