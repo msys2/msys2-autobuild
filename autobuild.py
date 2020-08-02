@@ -93,12 +93,14 @@ def build_package(pkg, builddir):
     pkg_dir = os.path.join(repo_dir, pkg['repo_path'])
     ensure_git_repo(pkg['repo_url'], repo_dir)
 
-    def run_cmd(args):
-        check_call(['bash', '-c'] + [' '.join(args)], cwd=pkg_dir, timeout=get_timeout())
+    def run_cmd(args, **kwargs):
+        check_call(['bash', '-c'] + [' '.join(args)], cwd=pkg_dir, timeout=get_timeout(), **kwargs)
+
+    makepkg = 'makepkg' if isMSYS else 'makepkg-mingw'
 
     try:
         run_cmd([
-            'makepkg' if isMSYS else 'makepkg-mingw',
+            makepkg,
             '--noconfirm',
             '--noprogressbar',
             '--skippgpcheck',
@@ -108,13 +110,16 @@ def build_package(pkg, builddir):
             '--cleanbuild'
         ])
 
+        env = environ.copy()
+        if not isMSYS:
+            env['MINGW_INSTALLS'] = 'mingw64'
         run_cmd([
-            'makepkg',
+            makepkg,
             '--noconfirm',
             '--noprogressbar',
             '--skippgpcheck',
             '--allsource'
-        ] + ([] if isMSYS else ['--config', '/etc/makepkg_mingw64.conf']))
+        ], env=env)
     except subprocess.TimeoutExpired as e:
         raise BuildTimeoutError(e)
     except subprocess.CalledProcessError as e:
