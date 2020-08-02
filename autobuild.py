@@ -58,6 +58,15 @@ def get_repo_checkout_dir(repo):
 def ensure_git_repo(url, path):
     if not os.path.exists(path):
         check_call(["git", "clone", url, path])
+    else:
+        check_call(["git", "fetch", "origin"], cwd=path)
+        check_call(["git", "reset", "--hard", "origin/master"], cwd=path)
+
+
+def reset_git_repo(path):
+    assert os.path.exists(path)
+    check_call(["git", "clean", "-xfdf"], cwd=path)
+    check_call(["git", "reset", "--hard", "HEAD"], cwd=path)
 
 
 @contextmanager
@@ -135,6 +144,9 @@ def build_package(pkg, builddir):
         for entry in os.listdir(pkg_dir):
             if fnmatch.fnmatch(entry, '*.pkg.tar.*') or fnmatch.fnmatch(entry, '*.src.tar.*'):
                 shutil.move(os.path.join(pkg_dir, entry), assetdir)
+    finally:
+        # remove built artifacts
+        reset_git_repo(repo_dir)
 
 
 def run_build(args):
