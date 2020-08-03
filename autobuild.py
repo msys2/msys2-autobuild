@@ -174,7 +174,8 @@ def build_package(pkg, builddir):
     assert os.path.isabs(builddir)
     os.makedirs(builddir, exist_ok=True)
 
-    repo_dir = os.path.join(builddir, pkg['repo'].replace("-packages", ""))
+    repo_name = {"MINGW-packages": "M", "MSYS2-packages": "S"}.get(pkg['repo'], pkg['repo'])
+    repo_dir = os.path.join(builddir, repo_name)
     is_msys = pkg['repo'].startswith('MSYS2')
 
     with staging_dependencies(pkg, builddir), fresh_git_repo(pkg['repo_url'], repo_dir):

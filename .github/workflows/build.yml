@@ -50,4 +50,4 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
         export PACKAGER="CI (msys2-devtools/${GITHUB_SHA::8}/${GITHUB_RUN_ID})"
-        python autobuild.py build "$(cygpath -u "$(powershell -c '(get-location).Drive.Root')/_M")"
+        python autobuild.py build "$(cygpath -u "$(powershell -c '(get-location).Drive.Root')/_")"
