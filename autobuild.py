@@ -3,7 +3,6 @@ import os
 import argparse
 from os import environ
 from github import Github
-from json import loads
 from pathlib import Path
 from subprocess import check_call
 import subprocess
@@ -17,6 +16,7 @@ import requests
 import shlex
 import time
 import tempfile
+import shutil
 
 # After which overall time it should stop building (in seconds)
 BUILD_TIMEOUT = 18000
@@ -36,37 +36,23 @@ def timeoutgen(timeout):
 get_timeout = timeoutgen(BUILD_TIMEOUT)
 
 
-def get_repo_checkout_dir(repo):
-    # some tools can't handle long paths, so try to have the build root near the disk root
-    nick = ""
-    if repo == "MINGW-packages":
-        nick = "_MINGW"
-    elif repo == "MSYS2-packages":
-        nick = "_MSYS"
-    else:
-        raise ValueError("unknown repo: " + repo)
-
-    if sys.platform == "msys":
-        # root dir on the same drive
-        win_path = subprocess.check_output(["cygpath", "-m", "/"], text=True).strip()
-        posix_drive = subprocess.check_output(["cygpath", "-u", win_path[:3]], text=True).strip()
-        return os.path.join(posix_drive, nick)
-    else:
-        raise NotImplementedError("fixme")
+def run_cmd(args, **kwargs):
+    check_call(['bash', '-c'] + [shlex.join(args)], **kwargs)
 
 
-def ensure_git_repo(url, path):
+@contextmanager
+def fresh_git_repo(url, path):
     if not os.path.exists(path):
         check_call(["git", "clone", url, path])
     else:
         check_call(["git", "fetch", "origin"], cwd=path)
         check_call(["git", "reset", "--hard", "origin/master"], cwd=path)
-
-
-def reset_git_repo(path):
-    assert os.path.exists(path)
-    check_call(["git", "clean", "-xfdf"], cwd=path)
-    check_call(["git", "reset", "--hard", "HEAD"], cwd=path)
+    try:
+        yield
+    finally:
+        assert os.path.exists(path)
+        check_call(["git", "clean", "-xfdf"], cwd=path)
+        check_call(["git", "reset", "--hard", "HEAD"], cwd=path)
 
 
 @contextmanager
@@ -83,8 +69,21 @@ def gha_group(title):
 class BuildError(Exception):
     pass
 
+class MissingDependencyError(BuildError):
+    pass
+
 class BuildTimeoutError(BuildError):
     pass
+
+
+def dowload_asset(asset, target_dir: str) -> str:
+    with requests.get(asset.browser_download_url, stream=True) as r:
+        r.raise_for_status()
+        target_path = os.path.join(target_dir, asset.name)
+        with open(target_path, 'wb') as h:
+            for chunk in r.iter_content(4096):
+                h.write(chunk)
+    return target_path
 
 
 def upload_asset(type_: str, path: os.PathLike, replace=True):
@@ -100,87 +99,160 @@ def upload_asset(type_: str, path: os.PathLike, replace=True):
     release.upload_asset(str(path))
 
 
+@contextmanager
+def backup_pacman_conf():
+    shutil.copyfile("/etc/pacman.conf", "/etc/pacman.conf.backup")
+    try:
+        yield
+    finally:
+        os.replace("/etc/pacman.conf.backup", "/etc/pacman.conf")
+
+
+@contextmanager
+def staging_dependencies(pkg, builddir):
+    gh = Github(*get_credentials())
+    repo = gh.get_repo('msys2/msys2-devtools')
+
+    def add_to_repo(repo_root, repo_type, asset):
+        repo_dir = Path(repo_root) / get_repo_subdir(repo_type, asset)
+        os.makedirs(repo_dir, exist_ok=True)
+        print(f"Downloading {asset.name}...")
+        package_path = dowload_asset(asset, repo_dir)
+
+        repo_name = "autobuild-" + str(get_repo_subdir(repo_type, asset)).replace("/", "-").replace("\\", "-")
+        repo_db_path = os.path.join(repo_dir, f"{repo_name}.db.tar.gz")
+
+        with open("/etc/pacman.conf", "r", encoding="utf-8") as h:
+            text = h.read()
+            if str(repo_dir) not in text:
+                print(repo_dir)
+                text.replace("#RemoteFileSigLevel = Required", "RemoteFileSigLevel = Never")
+                with open("/etc/pacman.conf", "w", encoding="utf-8") as h2:
+                    h2.write(f"""[{repo_name}]\nServer={Path(repo_dir).as_uri()}\nSigLevel=Never\n""")
+                    h2.write(text)
+
+        run_cmd(["repo-add", repo_db_path, package_path], cwd=repo_dir)
+
+    repo_root = os.path.join(builddir, "_REPO")
+    try:
+        shutil.rmtree(repo_root, ignore_errors=True)
+        os.makedirs(repo_root, exist_ok=True)
+        with backup_pacman_conf():
+            to_add = []
+            for name, dep in pkg['ext-depends'].items():
+                pattern = f"{name}-{dep['version']}-*.pkg.*"
+                repo_type = "msys" if dep['repo'].startswith('MSYS2') else "mingw"
+                release = repo.get_release("staging-" + repo_type)
+                for asset in release.get_assets():
+                    if fnmatch.fnmatch(asset.name, pattern):
+                        to_add.append((repo_type, asset))
+                        break
+                else:
+                    raise MissingDependencyError(f"asset for {pattern} not found")
+
+            for repo_type, asset in to_add:
+                add_to_repo(repo_root, repo_type, asset)
+
+            # in case they are already installed we need to upgrade
+            run_cmd(["pacman", "--noconfirm", "-Suy"])
+            yield
+    finally:
+        shutil.rmtree(repo_root, ignore_errors=True)
+        # downgrade again
+        run_cmd(["pacman", "--noconfirm", "-Suuy"])
+
+
 def build_package(pkg, builddir):
     assert os.path.isabs(builddir)
     os.makedirs(builddir, exist_ok=True)
 
-    isMSYS = pkg['repo'].startswith('MSYS2')
-    repo_dir = get_repo_checkout_dir(pkg['repo'])
-    pkg_dir = os.path.join(repo_dir, pkg['repo_path'])
-    ensure_git_repo(pkg['repo_url'], repo_dir)
+    repo_dir = os.path.join(builddir, pkg['repo'].replace("-packages", ""))
+    is_msys = pkg['repo'].startswith('MSYS2')
 
-    def run_cmd(args, **kwargs):
-        check_call(['bash', '-c'] + [shlex.join(args)], cwd=pkg_dir, timeout=get_timeout(), **kwargs)
+    with staging_dependencies(pkg, builddir), fresh_git_repo(pkg['repo_url'], repo_dir):
+        pkg_dir = os.path.join(repo_dir, pkg['repo_path'])
+        makepkg = 'makepkg' if is_msys else 'makepkg-mingw'
 
-    makepkg = 'makepkg' if isMSYS else 'makepkg-mingw'
+        try:
+            run_cmd([
+                makepkg,
+                '--noconfirm',
+                '--noprogressbar',
+                '--skippgpcheck',
+                '--nocheck',
+                '--syncdeps',
+                '--rmdeps',
+                '--cleanbuild'
+            ], cwd=pkg_dir, timeout=get_timeout())
 
-    try:
-        run_cmd([
-            makepkg,
-            '--noconfirm',
-            '--noprogressbar',
-            '--skippgpcheck',
-            '--nocheck',
-            '--syncdeps',
-            '--rmdeps',
-            '--cleanbuild'
-        ])
+            env = environ.copy()
+            if not is_msys:
+                env['MINGW_INSTALLS'] = 'mingw64'
+            run_cmd([
+                makepkg,
+                '--noconfirm',
+                '--noprogressbar',
+                '--skippgpcheck',
+                '--allsource'
+            ], env=env, cwd=pkg_dir, timeout=get_timeout())
+        except subprocess.TimeoutExpired as e:
+            raise BuildTimeoutError(e)
+        except subprocess.CalledProcessError as e:
 
-        env = environ.copy()
-        if not isMSYS:
-            env['MINGW_INSTALLS'] = 'mingw64'
-        run_cmd([
-            makepkg,
-            '--noconfirm',
-            '--noprogressbar',
-            '--skippgpcheck',
-            '--allsource'
-        ], env=env)
-    except subprocess.TimeoutExpired as e:
-        raise BuildTimeoutError(e)
-    except subprocess.CalledProcessError as e:
+            for item in pkg['packages']:
+                with tempfile.TemporaryDirectory() as tempdir:
+                    failed_path = os.path.join(tempdir, f"{item}-{pkg['version']}.failed")
+                    with open(failed_path, 'wb') as h:
+                        # github doesn't allow empty assets
+                        h.write(b'oh no')
+                    upload_asset("failed", failed_path)
 
-        for item in pkg['packages']:
-            with tempfile.TemporaryDirectory() as tempdir:
-                failed_path = os.path.join(tempdir, f"{item}-{pkg['version']}.failed")
-                with open(failed_path, 'wb') as h:
-                    # github doesn't allow empty assets
-                    h.write(b'oh no')
-                upload_asset("failed", failed_path)
-
-        raise BuildError(e)
-    else:
-        for entry in os.listdir(pkg_dir):
-            if fnmatch.fnmatch(entry, '*.pkg.tar.*') or fnmatch.fnmatch(entry, '*.src.tar.*'):
-                path = os.path.join(pkg_dir, entry)
-                upload_asset("msys" if isMSYS else "mingw", path)
-    finally:
-        # remove built artifacts
-        reset_git_repo(repo_dir)
+            raise BuildError(e)
+        else:
+            for entry in os.listdir(pkg_dir):
+                if fnmatch.fnmatch(entry, '*.pkg.tar.*') or fnmatch.fnmatch(entry, '*.src.tar.*'):
+                    path = os.path.join(pkg_dir, entry)
+                    upload_asset("msys" if is_msys else "mingw", path)
 
 
 def run_build(args):
     builddir = os.path.abspath(args.builddir)
 
     for pkg in get_packages_to_build()[2]:
-        try:
-            with gha_group(f"[{ pkg['repo'] }] { pkg['repo_path'] }..."):
+        with gha_group(f"[{ pkg['repo'] }] { pkg['name'] }..."):
+            try:
                 build_package(pkg, builddir)
-        except BuildTimeoutError:
-            print("timeout")
-            break
-        except BuildError:
-            print("failed")
-            traceback.print_exc()
+            except MissingDependencyError:
+                print("missing deps")
+                traceback.print_exc()
+                continue
+            except BuildTimeoutError:
+                print("timeout")
+                break
+            except BuildError:
+                print("failed")
+                traceback.print_exc()
+                continue
 
 
 def get_buildqueue():
     pkgs = []
     r = requests.get("https://packages.msys2.org/api/buildqueue")
     r.raise_for_status()
+    dep_mapping = {}
     for pkg in r.json():
         pkg['repo'] = pkg['repo_url'].split('/')[-1]
         pkgs.append(pkg)
+        for name in pkg['packages']:
+            dep_mapping[name] = pkg
+
+    # extend depends with the version in the
+    for pkg in pkgs:
+        ver_depends = {}
+        for dep in pkg['depends']:
+            ver_depends[dep] = dep_mapping[dep]
+        pkg['ext-depends'] = ver_depends
+
     return pkgs
 
 
@@ -211,7 +283,7 @@ def get_packages_to_build():
     for pkg in get_buildqueue():
         if pkg_is_done(pkg):
             done.append(pkg)
-        elif pkg_has_failed(pkg) or pkg['repo_path'] in SKIP:
+        elif (pkg_has_failed(pkg) or pkg['name'] in SKIP):
             skipped.append(pkg)
         else:
             todo.append(pkg)
@@ -225,7 +297,7 @@ def show_build(args):
     def print_packages(title, pkgs):
         print()
         print(title)
-        print(tabulate([(p["repo_path"], p["version"]) for p in pkgs], headers=["Package", "Version"]))
+        print(tabulate([(p["name"], p["version"]) for p in pkgs], headers=["Package", "Version"]))
 
     print_packages("TODO:", todo)
     print_packages("SKIPPED:", skipped)
@@ -250,36 +322,38 @@ def show_assets(args):
         ))
 
 
+def get_repo_subdir(type_, asset):
+    entry = asset.name
+    t = Path(type_)
+    if type_ == "msys":
+        if fnmatch.fnmatch(entry, '*.pkg.tar.*'):
+            return t / "x86_64"
+        elif fnmatch.fnmatch(entry, '*.src.tar.*'):
+            return t / "sources"
+        else:
+            raise Exception("unknown file type")
+    elif type_ == "mingw":
+        if fnmatch.fnmatch(entry, '*.src.tar.*'):
+            return t / "sources"
+        elif entry.startswith("mingw-w64-x86_64-"):
+            return t / "x86_64"
+        elif entry.startswith("mingw-w64-i686-"):
+            return t / "i686"
+        else:
+            raise Exception("unknown file type")
+
+
 def fetch_assets(args):
     gh = Github(*get_credentials())
     repo = gh.get_repo('msys2/msys2-devtools')
 
     todo = []
-
-    def get_subdir(type_, entry):
-        if type_ == "msys":
-            if fnmatch.fnmatch(entry, '*.pkg.tar.*'):
-                return "x86_64"
-            elif fnmatch.fnmatch(entry, '*.src.tar.*'):
-                return "sources"
-            else:
-                raise Exception("unknown file type")
-        elif type_ == "mingw":
-            if fnmatch.fnmatch(entry, '*.src.tar.*'):
-                return "sources"
-            elif entry.startswith("mingw-w64-x86_64-"):
-                return "x86_64"
-            elif entry.startswith("mingw-w64-i686-"):
-                return "i686"
-            else:
-                raise Exception("unknown file type")
-
     skipped = []
     for name in ["msys", "mingw"]:
-        p = Path(args.targetdir) / name
+        p = Path(args.targetdir)
         assets = repo.get_release('staging-' + name).get_assets()
         for asset in assets:
-            asset_dir = p / get_subdir(name, asset.name)
+            asset_dir = p / get_repo_subdir(name, asset)
             asset_dir.mkdir(parents=True, exist_ok=True)
             asset_path = asset_dir / asset.name
             if asset_path.exists():
