@@ -241,7 +241,7 @@ def run_build(args):
                 break
             except BuildError:
                 print("failed")
-                traceback.print_exc()
+                traceback.print_exc(file=sys.stdout)
                 continue
 
 
