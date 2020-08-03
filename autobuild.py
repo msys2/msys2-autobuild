@@ -29,9 +29,11 @@ SKIP = [
 
 def timeoutgen(timeout):
     end = time.time() + timeout
+
     def new():
         return max(end - time.time(), 0)
     return new
+
 
 get_timeout = timeoutgen(BUILD_TIMEOUT)
 
@@ -69,8 +71,10 @@ def gha_group(title):
 class BuildError(Exception):
     pass
 
+
 class MissingDependencyError(BuildError):
     pass
+
 
 class BuildTimeoutError(BuildError):
     pass
@@ -118,16 +122,21 @@ def staging_dependencies(pkg, builddir):
         package_path = os.path.join(repo_dir, asset.name)
         download_asset(asset, package_path)
 
-        repo_name = "autobuild-" + str(get_repo_subdir(repo_type, asset)).replace("/", "-").replace("\\", "-")
+        repo_name = "autobuild-" + (
+            str(get_repo_subdir(repo_type, asset)).replace("/", "-").replace("\\", "-"))
         repo_db_path = os.path.join(repo_dir, f"{repo_name}.db.tar.gz")
 
         with open("/etc/pacman.conf", "r", encoding="utf-8") as h:
             text = h.read()
             if str(repo_dir) not in text:
                 print(repo_dir)
-                text.replace("#RemoteFileSigLevel = Required", "RemoteFileSigLevel = Never")
+                text.replace("#RemoteFileSigLevel = Required",
+                             "RemoteFileSigLevel = Never")
                 with open("/etc/pacman.conf", "w", encoding="utf-8") as h2:
-                    h2.write(f"""[{repo_name}]\nServer={Path(repo_dir).as_uri()}\nSigLevel=Never\n""")
+                    h2.write(f"""[{repo_name}]
+Server={Path(repo_dir).as_uri()}
+SigLevel=Never
+""")
                     h2.write(text)
 
         run_cmd(["repo-add", repo_db_path, package_path], cwd=repo_dir)
@@ -209,7 +218,8 @@ def build_package(pkg, builddir):
             raise BuildError(e)
         else:
             for entry in os.listdir(pkg_dir):
-                if fnmatch.fnmatch(entry, '*.pkg.tar.*') or fnmatch.fnmatch(entry, '*.src.tar.*'):
+                if fnmatch.fnmatch(entry, '*.pkg.tar.*') or \
+                        fnmatch.fnmatch(entry, '*.src.tar.*'):
                     path = os.path.join(pkg_dir, entry)
                     upload_asset("msys" if is_msys else "mingw", path)
 
@@ -296,7 +306,8 @@ def show_build(args):
     def print_packages(title, pkgs):
         print()
         print(title)
-        print(tabulate([(p["name"], p["version"]) for p in pkgs], headers=["Package", "Version"]))
+        print(tabulate([(p["name"], p["version"]) for p in pkgs],
+                       headers=["Package", "Version"]))
 
     print_packages("TODO:", todo)
     print_packages("SKIPPED:", skipped)
@@ -305,9 +316,10 @@ def show_build(args):
 
 def show_assets(args):
     gh = Github(*get_credentials())
+    repo = gh.get_repo('msys2/msys2-devtools')
 
     for name in ["msys", "mingw"]:
-        assets = gh.get_repo('msys2/msys2-devtools').get_release('staging-' + name).get_assets()
+        assets = repo.get_release('staging-' + name).get_assets()
 
         print(tabulate(
             [[
@@ -315,9 +327,8 @@ def show_assets(args):
                 asset.size,
                 asset.created_at,
                 asset.updated_at,
-                #asset.browser_download_url
             ] for asset in assets],
-            headers=["name", "size", "created", "updated"] #, "url"]
+            headers=["name", "size", "created", "updated"]
         ))
 
 
@@ -434,13 +445,16 @@ def main(argv):
     sub.add_argument("builddir")
     sub.set_defaults(func=run_build)
 
-    sub = subparser.add_parser("show", help="Show all packages to be built", allow_abbrev=False)
+    sub = subparser.add_parser(
+        "show", help="Show all packages to be built", allow_abbrev=False)
     sub.set_defaults(func=show_build)
 
-    sub = subparser.add_parser("show-assets", help="Show all staging packages", allow_abbrev=False)
+    sub = subparser.add_parser(
+        "show-assets", help="Show all staging packages", allow_abbrev=False)
     sub.set_defaults(func=show_assets)
 
-    sub = subparser.add_parser("fetch-assets", help="Download all staging packages", allow_abbrev=False)
+    sub = subparser.add_parser(
+        "fetch-assets", help="Download all staging packages", allow_abbrev=False)
     sub.add_argument("targetdir")
     sub.set_defaults(func=fetch_assets)
 
@@ -448,7 +462,8 @@ def main(argv):
     sub.set_defaults(func=trigger_gha_build)
 
     sub = subparser.add_parser("clean-assets", help="Clean up GHA assets", allow_abbrev=False)
-    sub.add_argument("--dry-run", action="store_true", help="Only show what is going to be deleted")
+    sub.add_argument(
+        "--dry-run", action="store_true", help="Only show what is going to be deleted")
     sub.set_defaults(func=clean_gha_assets)
 
     get_credentials()
