@@ -76,14 +76,12 @@ class BuildTimeoutError(BuildError):
     pass
 
 
-def dowload_asset(asset, target_dir: str) -> str:
-    with requests.get(asset.browser_download_url, stream=True) as r:
+def download_asset(asset, target_path: str, timeout=15) -> str:
+    with requests.get(asset.browser_download_url, stream=True, timeout=timeout) as r:
         r.raise_for_status()
-        target_path = os.path.join(target_dir, asset.name)
         with open(target_path, 'wb') as h:
             for chunk in r.iter_content(4096):
                 h.write(chunk)
-    return target_path
 
 
 def upload_asset(type_: str, path: os.PathLike, replace=True):
@@ -117,7 +115,8 @@ def staging_dependencies(pkg, builddir):
         repo_dir = Path(repo_root) / get_repo_subdir(repo_type, asset)
         os.makedirs(repo_dir, exist_ok=True)
         print(f"Downloading {asset.name}...")
-        package_path = dowload_asset(asset, repo_dir)
+        package_path = os.path.join(repo_dir, asset.name)
+        download_asset(asset, package_path)
 
         repo_name = "autobuild-" + str(get_repo_subdir(repo_type, asset)).replace("/", "-").replace("\\", "-")
         repo_db_path = os.path.join(repo_dir, f"{repo_name}.db.tar.gz")
@@ -366,15 +365,13 @@ def fetch_assets(args):
     print(f"downloading: {len(todo)}, skipped: {len(skipped)}")
 
     def fetch_item(item):
-        r = requests.get(item[0].browser_download_url, timeout=10)
-        r.raise_for_status()
-        return (item, r.content)
+        asset, asset_path = item
+        download_asset(asset, asset_path)
+        return item
 
     with ThreadPoolExecutor(4) as executor:
-        for i, (item, data) in enumerate(executor.map(fetch_item, todo)):
+        for i, item in enumerate(executor.map(fetch_item, todo)):
             print(f"[{i + 1}/{len(todo)}] {item[0].name}")
-            with open(item[1], "wb") as h:
-                h.write(data)
 
     print("done")
 
