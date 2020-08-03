@@ -27,11 +27,7 @@ jobs:
       with:
         msystem: MSYS
         update: true
-        install: base-devel msys2-devel mingw-w64-x86_64-toolchain mingw-w64-i686-toolchain git python python-pip
-
-    - name: Check install
-      run: |
-        pacman -Qkq
+        install: base-devel msys2-devel mingw-w64-x86_64-toolchain mingw-w64-i686-toolchain git python-pip python
 
     - name: Install deps
       run: |
