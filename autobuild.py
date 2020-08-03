@@ -231,9 +231,9 @@ def run_build(args):
         with gha_group(f"[{ pkg['repo'] }] { pkg['name'] }..."):
             try:
                 build_package(pkg, builddir)
-            except MissingDependencyError:
+            except MissingDependencyError as e:
                 print("missing deps")
-                traceback.print_exc()
+                print(e)
                 continue
             except BuildTimeoutError:
                 print("timeout")
