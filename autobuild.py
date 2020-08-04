@@ -256,7 +256,7 @@ def get_buildqueue():
         for name in pkg['packages']:
             dep_mapping[name] = pkg
 
-    # extend depends with the version in the
+    # link up dependencies with the real package in the queue
     for pkg in pkgs:
         ver_depends = {}
         for dep in pkg['depends']:
@@ -287,16 +287,26 @@ def get_packages_to_build():
                 return True
         return False
 
+    def pkg_is_skipped(pkg):
+        return pkg['name'] in SKIP
+
     todo = []
     done = []
     skipped = []
     for pkg in get_buildqueue():
         if pkg_is_done(pkg):
             done.append(pkg)
-        elif (pkg_has_failed(pkg) or pkg['name'] in SKIP):
-            skipped.append(pkg)
+        elif pkg_has_failed(pkg):
+            skipped.append((pkg, "failed"))
+        elif pkg_is_skipped(pkg):
+            skipped.append((pkg, "skipped"))
         else:
-            todo.append(pkg)
+            for dep in pkg['ext-depends'].values():
+                if pkg_has_failed(dep) or pkg_is_skipped(dep):
+                    skipped.append((pkg, "requires: " + dep['name']))
+                    break
+            else:
+                todo.append(pkg)
 
     return done, skipped, todo
 
@@ -304,15 +314,17 @@ def get_packages_to_build():
 def show_build(args):
     done, skipped, todo = get_packages_to_build()
 
-    def print_packages(title, pkgs):
-        print()
-        print(title)
-        print(tabulate([(p["name"], p["version"]) for p in pkgs],
+    with gha_group("TODO"):
+        print(tabulate([(p["name"], p["version"]) for p in todo],
                        headers=["Package", "Version"]))
 
-    print_packages("TODO:", todo)
-    print_packages("SKIPPED:", skipped)
-    print_packages("DONE:", done)
+    with gha_group("SKIPPED"):
+        print(tabulate([(p["name"], p["version"], r) for (p, r) in skipped],
+                       headers=["Package", "Version", "Reason"]))
+
+    with gha_group("DONE"):
+        print(tabulate([(p["name"], p["version"]) for p in done],
+                       headers=["Package", "Version"]))
 
 
 def show_assets(args):
