@@ -16,22 +16,23 @@ jobs:
   build:
     runs-on: windows-latest
     continue-on-error: true
-    defaults:
-      run:
-        shell: msys2 {0}
     steps:
 
     - uses: actions/checkout@v2
+
+    - uses: actions/setup-python@v2
+      with:
+        python-version: '3.8'
 
     - uses: msys2/setup-msys2@v2
       with:
         msystem: MSYS
         update: true
-        install: base-devel msys2-devel mingw-w64-x86_64-toolchain mingw-w64-i686-toolchain git python-pip python
+        install: base-devel msys2-devel mingw-w64-x86_64-toolchain mingw-w64-i686-toolchain
 
     - name: Check install
       run: |
-        pacman -Qkq
+        msys2 -c 'pacman -Qkq'
 
     - name: Install deps
       run: |
@@ -53,5 +54,7 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
-        export PACKAGER="CI (msys2-devtools/${GITHUB_SHA::8}/${GITHUB_RUN_ID})"
-        python autobuild.py build "$(cygpath -u "$(powershell -c '(get-location).Drive.Root')/_")"
+        $env:PACKAGER='CI (msys2-devtools/' + $env:GITHUB_SHA.Substring(0, 8) + '/' + $env:GITHUB_RUN_ID + ')'
+        $BUILD_ROOT=((Get-Location).Drive.Root) + '_'
+        $MSYS2_ROOT=(msys2 -c 'cygpath -w /')
+        python autobuild.py build "$MSYS2_ROOT" "$BUILD_ROOT"

@@ -3,7 +3,7 @@ import os
 import argparse
 from os import environ
 from github import Github
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from subprocess import check_call
 import subprocess
 from sys import stdout
@@ -38,8 +38,13 @@ def timeoutgen(timeout):
 get_timeout = timeoutgen(BUILD_TIMEOUT)
 
 
-def run_cmd(args, **kwargs):
-    check_call(['bash', '-c'] + [shlex.join(args)], **kwargs)
+def run_cmd(msys2_root, args, **kwargs):
+    executable = os.path.join(msys2_root, 'usr', 'bin', 'bash.exe')
+    env = kwargs.pop("env", os.environ.copy())
+    env["CHERE_INVOKING"] = "1"
+    env["MSYSTEM"] = "MSYS"
+    env["MSYS2_PATH_TYPE"] = "minimal"
+    check_call([executable, '-lc'] + [shlex.join([str(a) for a in args])], env=env, **kwargs)
 
 
 @contextmanager
@@ -89,6 +94,8 @@ def download_asset(asset, target_path: str, timeout=15) -> str:
 
 
 def upload_asset(type_: str, path: os.PathLike, replace=True):
+    if not environ.get("CI"):
+        print("WARNING: upload skipped, not running in CI")
     # type_: msys/mingw/failed
     path = Path(path)
     gh = Github(*get_credentials())
@@ -101,17 +108,27 @@ def upload_asset(type_: str, path: os.PathLike, replace=True):
     release.upload_asset(str(path))
 
 
+def get_python_path(msys2_root, msys2_path):
+    return Path(os.path.normpath(msys2_root + msys2_path))
+
+
+def to_pure_posix_path(path):
+    return PurePosixPath("/" + str(path).replace(":", "", 1).replace("\\", "/"))
+
+
 @contextmanager
-def backup_pacman_conf():
-    shutil.copyfile("/etc/pacman.conf", "/etc/pacman.conf.backup")
+def backup_pacman_conf(msys2_root):
+    conf = get_python_path(msys2_root, "/etc/pacman.conf")
+    backup = get_python_path(msys2_root, "/etc/pacman.conf.backup")
+    shutil.copyfile(conf, backup)
     try:
         yield
     finally:
-        os.replace("/etc/pacman.conf.backup", "/etc/pacman.conf")
+        os.replace(backup, conf)
 
 
 @contextmanager
-def staging_dependencies(pkg, builddir):
+def staging_dependencies(pkg, msys2_root, builddir):
     gh = Github(*get_credentials())
     repo = gh.get_repo('msys2/msys2-devtools')
 
@@ -126,26 +143,28 @@ def staging_dependencies(pkg, builddir):
             str(get_repo_subdir(repo_type, asset)).replace("/", "-").replace("\\", "-"))
         repo_db_path = os.path.join(repo_dir, f"{repo_name}.db.tar.gz")
 
-        with open("/etc/pacman.conf", "r", encoding="utf-8") as h:
+        conf = get_python_path(msys2_root, "/etc/pacman.conf")
+        with open(conf, "r", encoding="utf-8") as h:
             text = h.read()
-            if str(repo_dir) not in text:
-                print(repo_dir)
+            uri = to_pure_posix_path(repo_dir).as_uri()
+            if uri not in text:
                 text.replace("#RemoteFileSigLevel = Required",
                              "RemoteFileSigLevel = Never")
-                with open("/etc/pacman.conf", "w", encoding="utf-8") as h2:
+                with open(conf, "w", encoding="utf-8") as h2:
                     h2.write(f"""[{repo_name}]
-Server={Path(repo_dir).as_uri()}
+Server={uri}
 SigLevel=Never
 """)
                     h2.write(text)
 
-        run_cmd(["repo-add", repo_db_path, package_path], cwd=repo_dir)
+        run_cmd(msys2_root, ["repo-add", to_pure_posix_path(repo_db_path),
+                             to_pure_posix_path(package_path)], cwd=repo_dir)
 
     repo_root = os.path.join(builddir, "_REPO")
     try:
         shutil.rmtree(repo_root, ignore_errors=True)
         os.makedirs(repo_root, exist_ok=True)
-        with backup_pacman_conf():
+        with backup_pacman_conf(msys2_root):
             to_add = []
             for name, dep in pkg['ext-depends'].items():
                 pattern = f"{name}-{dep['version']}-*.pkg.*"
@@ -162,28 +181,30 @@ SigLevel=Never
                 add_to_repo(repo_root, repo_type, asset)
 
             # in case they are already installed we need to upgrade
-            run_cmd(["pacman", "--noconfirm", "-Suy"])
+            run_cmd(msys2_root, ["pacman", "--noconfirm", "-Suy"])
             yield
     finally:
         shutil.rmtree(repo_root, ignore_errors=True)
         # downgrade again
-        run_cmd(["pacman", "--noconfirm", "-Suuy"])
+        run_cmd(msys2_root, ["pacman", "--noconfirm", "-Suuy"])
 
 
-def build_package(pkg, builddir):
+def build_package(pkg, msys2_root, builddir):
     assert os.path.isabs(builddir)
+    assert os.path.isabs(msys2_root)
     os.makedirs(builddir, exist_ok=True)
 
     repo_name = {"MINGW-packages": "M", "MSYS2-packages": "S"}.get(pkg['repo'], pkg['repo'])
     repo_dir = os.path.join(builddir, repo_name)
     is_msys = pkg['repo'].startswith('MSYS2')
 
-    with staging_dependencies(pkg, builddir), fresh_git_repo(pkg['repo_url'], repo_dir):
+    with (staging_dependencies(pkg, msys2_root, builddir),
+          fresh_git_repo(pkg['repo_url'], repo_dir)):
         pkg_dir = os.path.join(repo_dir, pkg['repo_path'])
         makepkg = 'makepkg' if is_msys else 'makepkg-mingw'
 
         try:
-            run_cmd([
+            run_cmd(msys2_root, [
                 makepkg,
                 '--noconfirm',
                 '--noprogressbar',
@@ -197,7 +218,7 @@ def build_package(pkg, builddir):
             env = environ.copy()
             if not is_msys:
                 env['MINGW_INSTALLS'] = 'mingw64'
-            run_cmd([
+            run_cmd(msys2_root, [
                 makepkg,
                 '--noconfirm',
                 '--noprogressbar',
@@ -227,11 +248,26 @@ def build_package(pkg, builddir):
 
 def run_build(args):
     builddir = os.path.abspath(args.builddir)
+    msys2_root = os.path.abspath(args.msys2_root)
+
+    if not sys.platform == "win32":
+        raise SystemExit("ERROR: Needs to run under native Python")
+
+    if not shutil.which("git"):
+        raise SystemExit("ERROR: git not in PATH")
+
+    if not os.path.isdir(msys2_root):
+        raise SystemExit("ERROR: msys2_root doesn't exist")
+
+    try:
+        run_cmd(msys2_root, [])
+    except Exception as e:
+        raise SystemExit("ERROR: msys2_root not functional", e)
 
     for pkg in get_packages_to_build()[2]:
         with gha_group(f"[{ pkg['repo'] }] { pkg['name'] }..."):
             try:
-                build_package(pkg, builddir)
+                build_package(pkg, msys2_root, builddir)
             except MissingDependencyError as e:
                 print("missing deps")
                 print(e)
@@ -455,7 +491,10 @@ def main(argv):
     subparser = parser.add_subparsers(title="subcommands")
 
     sub = subparser.add_parser("build", help="Build all packages")
-    sub.add_argument("builddir")
+    sub.add_argument("msys2_root", help="The MSYS2 install used for building. e.g. C:\\msys64")
+    sub.add_argument(
+        "builddir",
+        help="A directory used for saving temporary build results and the git repos")
     sub.set_defaults(func=run_build)
 
     sub = subparser.add_parser(
