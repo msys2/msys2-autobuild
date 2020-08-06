@@ -350,15 +350,15 @@ def get_packages_to_build():
 def show_build(args):
     done, skipped, todo = get_packages_to_build()
 
-    with gha_group("TODO"):
+    with gha_group(f"TODO ({len(todo)})"):
         print(tabulate([(p["name"], p["version"]) for p in todo],
                        headers=["Package", "Version"]))
 
-    with gha_group("SKIPPED"):
+    with gha_group(f"SKIPPED ({len(skipped)})"):
         print(tabulate([(p["name"], p["version"], r) for (p, r) in skipped],
                        headers=["Package", "Version", "Reason"]))
 
-    with gha_group("DONE"):
+    with gha_group(f"DONE ({len(done)})"):
         print(tabulate([(p["name"], p["version"]) for p in done],
                        headers=["Package", "Version"]))
 
