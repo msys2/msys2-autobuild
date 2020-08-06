@@ -94,13 +94,17 @@ def download_asset(asset, target_path: str, timeout=15) -> str:
 
 
 def upload_asset(type_: str, path: os.PathLike, replace=True):
-    if not environ.get("CI"):
-        print("WARNING: upload skipped, not running in CI")
     # type_: msys/mingw/failed
     path = Path(path)
     gh = Github(*get_credentials())
+
+    current_user = gh.get_user()
+    if current_user.login != "github-actions[bot]" or current_user.type != "Bot":
+        print("WARNING: upload skipped, not running in CI")
+        return
+
     repo = gh.get_repo('msys2/msys2-devtools')
-    release = repo.get_release("staging-" + type_)
+    release = get_release_assets(repo, "staging-" + type_)
     if replace:
         for asset in release.get_assets():
             if path.name == asset.name:
@@ -169,8 +173,7 @@ SigLevel=Never
             for name, dep in pkg['ext-depends'].items():
                 pattern = f"{name}-{dep['version']}-*.pkg.*"
                 repo_type = "msys" if dep['repo'].startswith('MSYS2') else "mingw"
-                release = repo.get_release("staging-" + repo_type)
-                for asset in release.get_assets():
+                for asset in get_release_assets(repo, "staging-" + repo_type):
                     if fnmatch.fnmatch(asset.name, pattern):
                         to_add.append((repo_type, asset))
                         break
@@ -302,14 +305,25 @@ def get_buildqueue():
     return pkgs
 
 
+def get_release_assets(repo, release_name):
+    assets = []
+    for asset in repo.get_release(release_name).get_assets():
+        uploader = asset.uploader
+        if uploader.type != "Bot" or uploader.login != "github-actions[bot]":
+            raise SystemExit(f"ERROR: Asset '{asset.name}' not uploaded "
+                             f"by GHA but '{uploader.login}'. Aborting.")
+        assets.append(asset)
+    return assets
+
+
 def get_packages_to_build():
     gh = Github(*get_credentials())
 
     repo = gh.get_repo('msys2/msys2-devtools')
     assets = []
     for name in ["msys", "mingw"]:
-        assets.extend([a.name for a in repo.get_release('staging-' + name).get_assets()])
-    assets_failed = [a.name for a in repo.get_release('staging-failed').get_assets()]
+        assets.extend([a.name for a in get_release_assets(repo, 'staging-' + name)])
+    assets_failed = [a.name for a in get_release_assets(repo, 'staging-failed')]
 
     def pkg_is_done(pkg):
         for item in pkg['packages']:
@@ -368,7 +382,7 @@ def show_assets(args):
     repo = gh.get_repo('msys2/msys2-devtools')
 
     for name in ["msys", "mingw"]:
-        assets = repo.get_release('staging-' + name).get_assets()
+        assets = get_release_assets(repo, 'staging-' + name)
 
         print(tabulate(
             [[
@@ -410,7 +424,7 @@ def fetch_assets(args):
     skipped = []
     for name in ["msys", "mingw"]:
         p = Path(args.targetdir)
-        assets = repo.get_release('staging-' + name).get_assets()
+        assets = get_release_assets(repo, 'staging-' + name)
         for asset in assets:
             asset_dir = p / get_repo_subdir(name, asset)
             asset_dir.mkdir(parents=True, exist_ok=True)
@@ -459,7 +473,7 @@ def clean_gha_assets(args):
     assets = {}
     repo = gh.get_repo('msys2/msys2-devtools')
     for release in ['staging-msys', 'staging-mingw', 'staging-failed']:
-        for asset in repo.get_release(release).get_assets():
+        for asset in get_release_assets(repo, release):
             assets.setdefault(asset.name, []).append(asset)
 
     for pattern in patterns:
