@@ -198,8 +198,8 @@ def build_package(pkg, msys2_root, builddir):
     repo_dir = os.path.join(builddir, repo_name)
     is_msys = pkg['repo'].startswith('MSYS2')
 
-    with (staging_dependencies(pkg, msys2_root, builddir),
-          fresh_git_repo(pkg['repo_url'], repo_dir)):
+    with staging_dependencies(pkg, msys2_root, builddir), \
+            fresh_git_repo(pkg['repo_url'], repo_dir):
         pkg_dir = os.path.join(repo_dir, pkg['repo_path'])
         makepkg = 'makepkg' if is_msys else 'makepkg-mingw'
 
