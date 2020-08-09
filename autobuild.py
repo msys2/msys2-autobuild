@@ -95,14 +95,11 @@ def download_asset(asset, target_path: str, timeout=15) -> str:
 
 def upload_asset(type_: str, path: os.PathLike, replace=True):
     # type_: msys/mingw/failed
-    path = Path(path)
-    gh = Github(*get_credentials())
-
-    current_user = gh.get_user()
-    if current_user.login != "github-actions[bot]" or current_user.type != "Bot":
+    if not environ.get("CI"):
         print("WARNING: upload skipped, not running in CI")
         return
-
+    path = Path(path)
+    gh = Github(*get_credentials())
     repo = gh.get_repo('msys2/msys2-devtools')
     release = get_release_assets(repo, "staging-" + type_)
     if replace:
