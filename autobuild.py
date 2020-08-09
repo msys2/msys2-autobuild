@@ -101,9 +101,10 @@ def upload_asset(type_: str, path: os.PathLike, replace=True):
     path = Path(path)
     gh = Github(*get_credentials())
     repo = gh.get_repo('msys2/msys2-devtools')
-    release = get_release_assets(repo, "staging-" + type_)
+    release_name = "staging-" + type_
+    release = repo.get_release(release_name)
     if replace:
-        for asset in release.get_assets():
+        for asset in get_release_assets(repo, release_name):
             if path.name == asset.name:
                 asset.delete_asset()
     release.upload_asset(str(path))
