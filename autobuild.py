@@ -17,6 +17,7 @@ import shlex
 import time
 import tempfile
 import shutil
+import base64
 
 # After which overall time it should stop building (in seconds)
 BUILD_TIMEOUT = 18000
@@ -103,11 +104,20 @@ def upload_asset(type_: str, path: os.PathLike, replace=True):
     repo = gh.get_repo('msys2/msys2-devtools')
     release_name = "staging-" + type_
     release = repo.get_release(release_name)
+
+    path = str(path)
+    basename = os.path.basename(path)
+    # GitHub will throw out charaters like '~', so we have to encode
+    # and store the real name in the label
+    asset_name = base64.b64encode(basename.encode()).decode()
+    asset_label = basename
+
     if replace:
         for asset in get_release_assets(repo, release_name):
-            if path.name == asset.name:
+            if asset_name == asset.name:
                 asset.delete_asset()
-    release.upload_asset(str(path))
+
+    release.upload_asset(path, label=asset_label, name=asset_name)
 
 
 def get_python_path(msys2_root, msys2_path):
@@ -137,8 +147,8 @@ def staging_dependencies(pkg, msys2_root, builddir):
     def add_to_repo(repo_root, repo_type, asset):
         repo_dir = Path(repo_root) / get_repo_subdir(repo_type, asset)
         os.makedirs(repo_dir, exist_ok=True)
-        print(f"Downloading {asset.name}...")
-        package_path = os.path.join(repo_dir, asset.name)
+        print(f"Downloading {get_asset_filename(asset)}...")
+        package_path = os.path.join(repo_dir, get_asset_filename(asset))
         download_asset(asset, package_path)
 
         repo_name = "autobuild-" + (
@@ -172,7 +182,7 @@ SigLevel=Never
                 pattern = f"{name}-{dep['version']}-*.pkg.*"
                 repo_type = "msys" if dep['repo'].startswith('MSYS2') else "mingw"
                 for asset in get_release_assets(repo, "staging-" + repo_type):
-                    if fnmatch.fnmatch(asset.name, pattern):
+                    if fnmatch.fnmatch(get_asset_filename(asset), pattern):
                         to_add.append((repo_type, asset))
                         break
                 else:
@@ -303,12 +313,20 @@ def get_buildqueue():
     return pkgs
 
 
+def get_asset_filename(asset):
+    if not asset.label:
+        return asset.name
+    else:
+        assert base64.b64decode(asset.name.encode()).decode() == asset.label
+        return asset.label
+
+
 def get_release_assets(repo, release_name):
     assets = []
     for asset in repo.get_release(release_name).get_assets():
         uploader = asset.uploader
         if uploader.type != "Bot" or uploader.login != "github-actions[bot]":
-            raise SystemExit(f"ERROR: Asset '{asset.name}' not uploaded "
+            raise SystemExit(f"ERROR: Asset '{get_asset_filename(asset)}' not uploaded "
                              f"by GHA but '{uploader.login}'. Aborting.")
         assets.append(asset)
     return assets
@@ -320,8 +338,10 @@ def get_packages_to_build():
     repo = gh.get_repo('msys2/msys2-devtools')
     assets = []
     for name in ["msys", "mingw"]:
-        assets.extend([a.name for a in get_release_assets(repo, 'staging-' + name)])
-    assets_failed = [a.name for a in get_release_assets(repo, 'staging-failed')]
+        assets.extend([
+            get_asset_filename(a) for a in get_release_assets(repo, 'staging-' + name)])
+    assets_failed = [
+        get_asset_filename(a) for a in get_release_assets(repo, 'staging-failed')]
 
     def pkg_is_done(pkg):
         for item in pkg['packages']:
@@ -384,7 +404,7 @@ def show_assets(args):
 
         print(tabulate(
             [[
-                asset.name,
+                get_asset_filename(asset),
                 asset.size,
                 asset.created_at,
                 asset.updated_at,
@@ -394,7 +414,7 @@ def show_assets(args):
 
 
 def get_repo_subdir(type_, asset):
-    entry = asset.name
+    entry = get_asset_filename(asset)
     t = Path(type_)
     if type_ == "msys":
         if fnmatch.fnmatch(entry, '*.pkg.tar.*'):
@@ -426,7 +446,7 @@ def fetch_assets(args):
         for asset in assets:
             asset_dir = p / get_repo_subdir(name, asset)
             asset_dir.mkdir(parents=True, exist_ok=True)
-            asset_path = asset_dir / asset.name
+            asset_path = asset_dir / get_asset_filename(asset)
             if asset_path.exists():
                 if asset_path.stat().st_size != asset.size:
                     print(f"Warning: {asset_path} already exists but has a different size")
@@ -443,7 +463,7 @@ def fetch_assets(args):
 
     with ThreadPoolExecutor(4) as executor:
         for i, item in enumerate(executor.map(fetch_item, todo)):
-            print(f"[{i + 1}/{len(todo)}] {item[0].name}")
+            print(f"[{i + 1}/{len(todo)}] {get_asset_filename(item[0])}")
 
     print("done")
 
@@ -472,7 +492,7 @@ def clean_gha_assets(args):
     repo = gh.get_repo('msys2/msys2-devtools')
     for release in ['staging-msys', 'staging-mingw', 'staging-failed']:
         for asset in get_release_assets(repo, release):
-            assets.setdefault(asset.name, []).append(asset)
+            assets.setdefault(get_asset_filename(asset), []).append(asset)
 
     for pattern in patterns:
         for key in fnmatch.filter(assets.keys(), pattern):
@@ -480,7 +500,7 @@ def clean_gha_assets(args):
 
     for items in assets.values():
         for asset in items:
-            print(f"Deleting {asset.name}...")
+            print(f"Deleting {get_asset_filename(asset)}...")
             if not args.dry_run:
                 asset.delete_asset()
 
