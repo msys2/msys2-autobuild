@@ -17,7 +17,7 @@ import shlex
 import time
 import tempfile
 import shutil
-import base64
+from hashlib import sha256
 
 # After which overall time it should stop building (in seconds)
 BUILD_TIMEOUT = 18000
@@ -107,9 +107,7 @@ def upload_asset(type_: str, path: os.PathLike, replace=True):
 
     path = str(path)
     basename = os.path.basename(path)
-    # GitHub will throw out charaters like '~', so we have to encode
-    # and store the real name in the label
-    asset_name = base64.b64encode(basename.encode()).decode()
+    asset_name = get_gh_asset_name(basename)
     asset_label = basename
 
     if replace:
@@ -313,11 +311,17 @@ def get_buildqueue():
     return pkgs
 
 
+def get_gh_asset_name(basename):
+    # GitHub will throw out charaters like '~' or '='. It also doesn't like
+    # when there is no file extension and will try to add one
+    return sha256(str(basename).encode("utf-8")).hexdigest() + ".bin"
+
+
 def get_asset_filename(asset):
     if not asset.label:
         return asset.name
     else:
-        assert base64.b64decode(asset.name.encode()).decode() == asset.label
+        assert get_gh_asset_name(asset.label) == asset.name
         return asset.label
 
 
