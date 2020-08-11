@@ -28,7 +28,7 @@ jobs:
       with:
         msystem: MSYS
         update: true
-        install: base-devel msys2-devel mingw-w64-x86_64-toolchain mingw-w64-i686-toolchain
+        install: msys2-devel base-devel mingw-w64-x86_64-toolchain mingw-w64-i686-toolchain
 
     - name: Check install
       run: |
