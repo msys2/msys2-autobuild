@@ -28,11 +28,17 @@ jobs:
       with:
         msystem: MSYS
         update: true
-        install: msys2-devel base-devel mingw-w64-x86_64-toolchain mingw-w64-i686-toolchain
+        install: msys2-devel base-devel mingw-w64-x86_64-toolchain mingw-w64-i686-toolchain git
 
     - name: Check install
       run: |
         msys2 -c 'pacman -Qkq'
+
+    - name: Init git
+      shell: msys2 {0}
+      run: |
+        git config --global user.email 'ci@msys2.org'
+        git config --global user.name 'MSYS2 Continuous Integration'
 
     - name: Install deps
       run: |
