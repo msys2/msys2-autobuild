@@ -24,6 +24,17 @@ jobs:
       with:
         python-version: '3.8'
 
+    - uses: actions/cache@v2
+      with:
+        path: ~\AppData\Local\pip\Cache
+        key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+
+    - name: Install deps
+      run: |
+        python -m pip install --user -r requirements.txt
+
     - uses: msys2/setup-msys2@v2
       with:
         msystem: MSYS
@@ -39,10 +50,6 @@ jobs:
       run: |
         git config --global user.email 'ci@msys2.org'
         git config --global user.name 'MSYS2 Continuous Integration'
-
-    - name: Install deps
-      run: |
-        python -m pip install --user -r requirements.txt
 
     - name: Show build queue
       env:
