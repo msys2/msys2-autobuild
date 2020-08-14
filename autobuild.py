@@ -313,20 +313,21 @@ def run_build(args):
             print("timeout reached")
             break
 
-        with gha_group(f"[{ pkg['repo'] }] { pkg['name'] }..."):
-            try:
+        try:
+            with gha_group(f"[{ pkg['repo'] }] { pkg['name'] }..."):
                 build_package(pkg, msys2_root, builddir)
-            except MissingDependencyError as e:
-                print("missing deps")
-                print(e)
-                continue
-            except BuildTimeoutError:
-                print("timeout")
-                break
-            except BuildError:
-                print("failed")
+        except MissingDependencyError:
+            with gha_group(f"[{ pkg['repo'] }] { pkg['name'] }: failed -> missing deps"):
+                pass
+            continue
+        except BuildTimeoutError:
+            with gha_group(f"[{ pkg['repo'] }] { pkg['name'] }: build time limit reached"):
+                pass
+            break
+        except BuildError:
+            with gha_group(f"[{ pkg['repo'] }] { pkg['name'] }: failed"):
                 traceback.print_exc(file=sys.stdout)
-                continue
+            continue
 
 
 def get_buildqueue():
