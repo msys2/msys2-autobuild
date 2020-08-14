@@ -55,7 +55,7 @@ jobs:
       with:
         msystem: MSYS
         update: true
-        install: msys2-devel base-devel mingw-w64-x86_64-toolchain mingw-w64-i686-toolchain git
+        install: msys2-devel base-devel mingw-w64-x86_64-toolchain git mingw-w64-i686-toolchain
 
     - name: Check install
       if: steps.id.queue.skip-build != 'true'
