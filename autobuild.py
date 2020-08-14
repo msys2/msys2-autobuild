@@ -273,7 +273,12 @@ def run_build(args):
     except Exception as e:
         raise SystemExit("ERROR: msys2_root not functional", e)
 
-    for pkg in get_packages_to_build()[2]:
+    while True:
+        todo = get_packages_to_build()[2]
+        if not todo:
+            break
+        pkg = todo[0]
+
         with gha_group(f"[{ pkg['repo'] }] { pkg['name'] }..."):
             try:
                 build_package(pkg, msys2_root, builddir)
