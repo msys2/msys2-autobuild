@@ -47,30 +47,31 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
         python autobuild.py show --fail-on-idle
-        If ($LASTEXITCODE) {echo '::set-output name=skip-build::true'}
+        $skipBuild = ($LASTEXITCODE -ne 0)
+        If ($skipBuild) {echo '::set-output name=skip-build::true'}
         exit 0
 
     - uses: msys2/setup-msys2@v2
-      if: steps.id.queue.skip-build != 'true'
+      if: steps.queue.outputs.skip-build != 'true'
       with:
         msystem: MSYS
         update: true
         install: msys2-devel base-devel mingw-w64-x86_64-toolchain git mingw-w64-i686-toolchain
 
     - name: Check install
-      if: steps.id.queue.skip-build != 'true'
+      if: steps.queue.outputs.skip-build != 'true'
       run: |
         msys2 -c 'pacman -Qkq'
 
     - name: Init git
-      if: steps.id.queue.skip-build != 'true'
+      if: steps.queue.outputs.skip-build != 'true'
       shell: msys2 {0}
       run: |
         git config --global user.email 'ci@msys2.org'
         git config --global user.name 'MSYS2 Continuous Integration'
 
     - name: Process build queue
-      if: steps.id.queue.skip-build != 'true'
+      if: steps.queue.outputs.skip-build != 'true'
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
