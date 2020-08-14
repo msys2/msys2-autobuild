@@ -62,7 +62,12 @@ def fresh_git_repo(url, path):
         yield
     finally:
         assert os.path.exists(path)
-        check_call(["git", "clean", "-xfdf"], cwd=path)
+        try:
+            check_call(["git", "clean", "-xfdf"], cwd=path)
+        except subprocess.CalledProcessError:
+            # sometimes it fails right after the build has failed
+            # not sure why
+            pass
         check_call(["git", "reset", "--hard", "HEAD"], cwd=path)
 
 
