@@ -20,7 +20,9 @@ import shutil
 from hashlib import sha256
 
 # After which overall time it should stop building (in seconds)
-BUILD_TIMEOUT = 18000
+HARD_TIMEOUT = 5.7 * 60 * 60
+# After which we shouldn't start a new build
+SOFT_TIMEOUT = HARD_TIMEOUT / 2
 
 # Packages that take too long to build, and should be handled manually
 SKIP = [
@@ -36,7 +38,8 @@ def timeoutgen(timeout):
     return new
 
 
-get_timeout = timeoutgen(BUILD_TIMEOUT)
+get_hard_timeout = timeoutgen(HARD_TIMEOUT)
+get_soft_timeout = timeoutgen(SOFT_TIMEOUT)
 
 
 def run_cmd(msys2_root, args, **kwargs):
@@ -222,7 +225,7 @@ def build_package(pkg, msys2_root, builddir):
                 '--syncdeps',
                 '--rmdeps',
                 '--cleanbuild'
-            ], cwd=pkg_dir, timeout=get_timeout())
+            ], cwd=pkg_dir, timeout=get_hard_timeout())
 
             env = environ.copy()
             if not is_msys:
@@ -233,7 +236,7 @@ def build_package(pkg, msys2_root, builddir):
                 '--noprogressbar',
                 '--skippgpcheck',
                 '--allsource'
-            ], env=env, cwd=pkg_dir, timeout=get_timeout())
+            ], env=env, cwd=pkg_dir, timeout=get_hard_timeout())
         except subprocess.TimeoutExpired as e:
             raise BuildTimeoutError(e)
         except subprocess.CalledProcessError as e:
@@ -278,6 +281,10 @@ def run_build(args):
         if not todo:
             break
         pkg = todo[0]
+
+        if get_soft_timeout() == 0:
+            print("timeout reached")
+            break
 
         with gha_group(f"[{ pkg['repo'] }] { pkg['name'] }..."):
             try:
