@@ -398,6 +398,9 @@ def show_build(args):
         print(tabulate([(p["name"], p["version"]) for p in done],
                        headers=["Package", "Version"]))
 
+    if args.fail_on_idle and not todo:
+        raise SystemExit("Nothing to build")
+
 
 def show_assets(args):
     gh = Github(*get_credentials())
@@ -535,6 +538,8 @@ def main(argv):
 
     sub = subparser.add_parser(
         "show", help="Show all packages to be built", allow_abbrev=False)
+    sub.add_argument(
+        "--fail-on-idle", action="store_true", help="Fails if there is nothing to do")
     sub.set_defaults(func=show_build)
 
     sub = subparser.add_parser(
