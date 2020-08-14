@@ -141,6 +141,29 @@ def backup_pacman_conf(msys2_root):
 
 
 @contextmanager
+def auto_key_retrieve(msys2_root):
+    home_dir = os.path.join(msys2_root, "home", environ["USERNAME"])
+    assert os.path.exists(home_dir)
+    gnupg_dir = os.path.join(home_dir, ".gnupg")
+    os.makedirs(gnupg_dir, exist_ok=True)
+    conf = os.path.join(gnupg_dir, "gpg.conf")
+    backup = None
+    if os.path.exists(conf):
+        backup = conf + ".backup"
+        shutil.copyfile(conf, backup)
+    try:
+        with open(conf, "w", encoding="utf-8") as h:
+            h.write("""
+keyserver keyserver.ubuntu.com
+keyserver-options auto-key-retrieve
+""")
+        yield
+    finally:
+        if backup is not None:
+            os.replace(backup, conf)
+
+
+@contextmanager
 def staging_dependencies(pkg, msys2_root, builddir):
     gh = Github(*get_credentials())
     repo = gh.get_repo('msys2/msys2-devtools')
@@ -211,6 +234,7 @@ def build_package(pkg, msys2_root, builddir):
     is_msys = pkg['repo'].startswith('MSYS2')
 
     with staging_dependencies(pkg, msys2_root, builddir), \
+            auto_key_retrieve(msys2_root), \
             fresh_git_repo(pkg['repo_url'], repo_dir):
         pkg_dir = os.path.join(repo_dir, pkg['repo_path'])
         makepkg = 'makepkg' if is_msys else 'makepkg-mingw'
@@ -220,7 +244,6 @@ def build_package(pkg, msys2_root, builddir):
                 makepkg,
                 '--noconfirm',
                 '--noprogressbar',
-                '--skippgpcheck',
                 '--nocheck',
                 '--syncdeps',
                 '--rmdeps',
@@ -234,7 +257,6 @@ def build_package(pkg, msys2_root, builddir):
                 makepkg,
                 '--noconfirm',
                 '--noprogressbar',
-                '--skippgpcheck',
                 '--allsource'
             ], env=env, cwd=pkg_dir, timeout=get_hard_timeout())
         except subprocess.TimeoutExpired as e:
