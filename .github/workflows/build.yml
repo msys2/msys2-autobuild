@@ -75,7 +75,7 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
-        $env:PACKAGER='CI (msys2-devtools/' + $env:GITHUB_SHA.Substring(0, 8) + '/' + $env:GITHUB_RUN_ID + ')'
+        $env:PACKAGER='CI (msys2-autobuild/' + $env:GITHUB_SHA.Substring(0, 8) + '/' + $env:GITHUB_RUN_ID + ')'
         $BUILD_ROOT='C:\_'
         $MSYS2_ROOT=(msys2 -c 'cygpath -w /')
         Get-PSDrive -PSProvider FileSystem

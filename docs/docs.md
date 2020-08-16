@@ -6,7 +6,7 @@ sequenceDiagram
     participant APPVEYOR as Appveyor
     participant API as packages.msys2.org
     participant GHA as GitHub Actions
-    participant DT as devtools
+    participant DT as msys2-autobuild
     participant DEV as Developer
     participant REPO as Pacman Repo
 

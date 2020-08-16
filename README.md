@@ -1,4 +1,4 @@
-# msys2-devtools
+# msys2-autobuild
 
 ## autobuild.py
 

@@ -30,6 +30,9 @@ SKIP = [
 ]
 
 
+REPO = "msys2/msys2-autobuild"
+
+
 def timeoutgen(timeout):
     end = time.time() + timeout
 
@@ -109,7 +112,7 @@ def upload_asset(type_: str, path: os.PathLike, replace=True):
         return
     path = Path(path)
     gh = Github(*get_credentials())
-    repo = gh.get_repo('msys2/msys2-devtools')
+    repo = gh.get_repo(REPO)
     release_name = "staging-" + type_
     release = repo.get_release(release_name)
 
@@ -171,7 +174,7 @@ keyserver-options auto-key-retrieve
 @contextmanager
 def staging_dependencies(pkg, msys2_root, builddir):
     gh = Github(*get_credentials())
-    repo = gh.get_repo('msys2/msys2-devtools')
+    repo = gh.get_repo(REPO)
 
     def add_to_repo(repo_root, repo_type, asset):
         repo_dir = Path(repo_root) / get_repo_subdir(repo_type, asset)
@@ -379,7 +382,7 @@ def get_release_assets(repo, release_name):
 def get_packages_to_build():
     gh = Github(*get_credentials())
 
-    repo = gh.get_repo('msys2/msys2-devtools')
+    repo = gh.get_repo(REPO)
     assets = []
     for name in ["msys", "mingw"]:
         assets.extend([
@@ -444,7 +447,7 @@ def show_build(args):
 
 def show_assets(args):
     gh = Github(*get_credentials())
-    repo = gh.get_repo('msys2/msys2-devtools')
+    repo = gh.get_repo(REPO)
 
     for name in ["msys", "mingw"]:
         assets = get_release_assets(repo, 'staging-' + name)
@@ -483,7 +486,7 @@ def get_repo_subdir(type_, asset):
 
 def fetch_assets(args):
     gh = Github(*get_credentials())
-    repo = gh.get_repo('msys2/msys2-devtools')
+    repo = gh.get_repo(REPO)
 
     todo = []
     skipped = []
@@ -517,7 +520,7 @@ def fetch_assets(args):
 
 def trigger_gha_build(args):
     gh = Github(*get_credentials())
-    repo = gh.get_repo('msys2/msys2-devtools')
+    repo = gh.get_repo(REPO)
     if repo.create_repository_dispatch('manual-build'):
         print("Build triggered")
     else:
@@ -536,7 +539,7 @@ def clean_gha_assets(args):
 
     print("Fetching assets...")
     assets = {}
-    repo = gh.get_repo('msys2/msys2-devtools')
+    repo = gh.get_repo(REPO)
     for release in ['staging-msys', 'staging-mingw', 'staging-failed']:
         for asset in get_release_assets(repo, release):
             assets.setdefault(get_asset_filename(asset), []).append(asset)
