@@ -3,20 +3,22 @@ https://mermaid-js.github.io
 ```
 sequenceDiagram
     participant GIT as MSYS2/MINGW-packages
-    participant APPVEYOR as Appveyor
     participant API as packages.msys2.org
     participant GHA as GitHub Actions
     participant DT as msys2-autobuild
     participant DEV as Developer
     participant REPO as Pacman Repo
 
-    GIT->>API: webhook trigger on push
-    API->>APPVEYOR: trigger PKGBUILD parse
-    APPVEYOR->>GIT: fetch PKGBUILDS
-    GIT-->>APPVEYOR: 
-    APPVEYOR->>APPVEYOR: parse PKGBUILDS
-    APPVEYOR-->>API: upload parsed PKGBUILDS
+    GIT->>GHA: GIT push trigger
+    GHA->>GHA: parse PKBUILDs
+    GHA-->>GIT: upload parsed PKGBUILDs
 
+loop Every 5 minutes
+    API->>GIT: fetch parsed PKGBUILDs
+    GIT-->>API: 
+end
+
+loop Every 4 hours
     DT->>GHA: cron trigger
     GHA->>API: fetch TODO list
     API-->>GHA: 
@@ -26,6 +28,7 @@ sequenceDiagram
     DT-->>GHA: 
     GHA->>GHA: build packages
     GHA-->>DT: upload packages
+end
 
     DEV->>DT: fetch packages
     DT-->>DEV: 
