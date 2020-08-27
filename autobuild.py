@@ -127,6 +127,7 @@ def upload_asset(type_: str, path: os.PathLike, replace=True):
                 asset.delete_asset()
 
     release.upload_asset(path, label=asset_label, name=asset_name)
+    print(f"Uploaded {asset_name} as {asset_label}")
 
 
 def get_python_path(msys2_root, msys2_path):
