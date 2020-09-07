@@ -27,6 +27,7 @@ SOFT_TIMEOUT = HARD_TIMEOUT / 2
 # Packages that take too long to build, and should be handled manually
 SKIP = [
     'mingw-w64-clang',
+    'mingw-w64-arm-none-eabi-gcc',
 ]
 
 
