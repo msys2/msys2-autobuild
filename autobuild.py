@@ -309,11 +309,16 @@ def run_build(args):
     except Exception as e:
         raise SystemExit("ERROR: msys2_root not functional", e)
 
+    done = set()
     while True:
         todo = get_packages_to_build()[2]
         if not todo:
             break
         pkg = todo[0]
+        key = pkg['repo'] + pkg['name']
+        if key in done:
+            raise SystemExit("ERROR: building package again in the same run", pkg)
+        done.add(key)
 
         if get_soft_timeout() == 0:
             print("timeout reached")
