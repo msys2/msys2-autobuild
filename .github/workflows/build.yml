@@ -80,3 +80,9 @@ jobs:
         $MSYS2_ROOT=(msys2 -c 'cygpath -w /')
         Get-PSDrive -PSProvider FileSystem
         python autobuild.py build "$MSYS2_ROOT" "$BUILD_ROOT"
+
+    - name: Clean up assets
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        python autobuild.py clean-assets
