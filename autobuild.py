@@ -3,7 +3,9 @@ import os
 import argparse
 from os import environ
 from github import Github
-from pathlib import Path, PurePosixPath
+from github.GitReleaseAsset import GitReleaseAsset
+from github.Repository import Repository
+from pathlib import Path, PurePosixPath, PurePath
 from subprocess import check_call
 import subprocess
 from sys import stdout
@@ -18,6 +20,10 @@ import time
 import tempfile
 import shutil
 from hashlib import sha256
+from typing import Generator, Union, AnyStr, List, Callable, Any, Dict, Tuple
+
+_PathLike = Union[os.PathLike, AnyStr]
+_Package = Dict
 
 # After which overall time it should stop building (in seconds)
 HARD_TIMEOUT = 5.7 * 60 * 60
@@ -35,10 +41,10 @@ SKIP = [
 REPO = "msys2/msys2-autobuild"
 
 
-def timeoutgen(timeout):
+def timeoutgen(timeout: float) -> Callable[[], float]:
     end = time.time() + timeout
 
-    def new():
+    def new() -> float:
         return max(end - time.time(), 0)
     return new
 
@@ -47,7 +53,7 @@ get_hard_timeout = timeoutgen(HARD_TIMEOUT)
 get_soft_timeout = timeoutgen(SOFT_TIMEOUT)
 
 
-def run_cmd(msys2_root, args, **kwargs):
+def run_cmd(msys2_root: _PathLike, args, **kwargs):
     executable = os.path.join(msys2_root, 'usr', 'bin', 'bash.exe')
     env = kwargs.pop("env", os.environ.copy())
     env["CHERE_INVOKING"] = "1"
@@ -57,7 +63,7 @@ def run_cmd(msys2_root, args, **kwargs):
 
 
 @contextmanager
-def fresh_git_repo(url, path):
+def fresh_git_repo(url: str, path: _PathLike) -> Generator:
     if not os.path.exists(path):
         check_call(["git", "clone", url, path])
     else:
@@ -77,7 +83,7 @@ def fresh_git_repo(url, path):
 
 
 @contextmanager
-def gha_group(title):
+def gha_group(title: str) -> Generator:
     print(f'\n::group::{title}')
     stdout.flush()
     try:
@@ -99,7 +105,7 @@ class BuildTimeoutError(BuildError):
     pass
 
 
-def download_asset(asset, target_path: str, timeout=15) -> str:
+def download_asset(asset: GitReleaseAsset, target_path: str, timeout: int = 15) -> None:
     with requests.get(asset.browser_download_url, stream=True, timeout=timeout) as r:
         r.raise_for_status()
         with open(target_path, 'wb') as h:
@@ -107,7 +113,7 @@ def download_asset(asset, target_path: str, timeout=15) -> str:
                 h.write(chunk)
 
 
-def upload_asset(type_: str, path: os.PathLike, replace=True):
+def upload_asset(type_: str, path: _PathLike, replace: bool = True) -> None:
     # type_: msys/mingw/failed
     if not environ.get("CI"):
         print("WARNING: upload skipped, not running in CI")
@@ -118,8 +124,7 @@ def upload_asset(type_: str, path: os.PathLike, replace=True):
     release_name = "staging-" + type_
     release = repo.get_release(release_name)
 
-    path = str(path)
-    basename = os.path.basename(path)
+    basename = os.path.basename(str(path))
     asset_name = get_gh_asset_name(basename)
     asset_label = basename
 
@@ -128,20 +133,20 @@ def upload_asset(type_: str, path: os.PathLike, replace=True):
             if asset_name == asset.name:
                 asset.delete_asset()
 
-    release.upload_asset(path, label=asset_label, name=asset_name)
+    release.upload_asset(str(path), label=asset_label, name=asset_name)
     print(f"Uploaded {asset_name} as {asset_label}")
 
 
-def get_python_path(msys2_root, msys2_path):
-    return Path(os.path.normpath(msys2_root + msys2_path))
+def get_python_path(msys2_root: _PathLike, msys2_path: _PathLike) -> Path:
+    return Path(os.path.normpath(str(msys2_root) + str(msys2_path)))
 
 
-def to_pure_posix_path(path):
+def to_pure_posix_path(path: _PathLike) -> PurePath:
     return PurePosixPath("/" + str(path).replace(":", "", 1).replace("\\", "/"))
 
 
 @contextmanager
-def backup_pacman_conf(msys2_root):
+def backup_pacman_conf(msys2_root: _PathLike) -> Generator:
     conf = get_python_path(msys2_root, "/etc/pacman.conf")
     backup = get_python_path(msys2_root, "/etc/pacman.conf.backup")
     shutil.copyfile(conf, backup)
@@ -152,7 +157,7 @@ def backup_pacman_conf(msys2_root):
 
 
 @contextmanager
-def auto_key_retrieve(msys2_root):
+def auto_key_retrieve(msys2_root: _PathLike) -> Generator:
     home_dir = os.path.join(msys2_root, "home", environ["USERNAME"])
     assert os.path.exists(home_dir)
     gnupg_dir = os.path.join(home_dir, ".gnupg")
@@ -175,7 +180,8 @@ keyserver-options auto-key-retrieve
 
 
 @contextmanager
-def staging_dependencies(pkg, msys2_root, builddir):
+def staging_dependencies(
+        pkg: _Package, msys2_root: _PathLike, builddir: _PathLike) -> Generator:
     gh = Github(*get_credentials())
     repo = gh.get_repo(REPO)
 
@@ -236,7 +242,7 @@ SigLevel=Never
         run_cmd(msys2_root, ["pacman", "--noconfirm", "-Suuy"])
 
 
-def build_package(pkg, msys2_root, builddir):
+def build_package(pkg, msys2_root: _PathLike, builddir: _PathLike) -> None:
     assert os.path.isabs(builddir)
     assert os.path.isabs(msys2_root)
     os.makedirs(builddir, exist_ok=True)
@@ -293,7 +299,7 @@ def build_package(pkg, msys2_root, builddir):
                     upload_asset("msys" if is_msys else "mingw", path)
 
 
-def run_build(args):
+def run_build(args: Any) -> None:
     builddir = os.path.abspath(args.builddir)
     msys2_root = os.path.abspath(args.msys2_root)
 
@@ -343,7 +349,7 @@ def run_build(args):
             continue
 
 
-def get_buildqueue():
+def get_buildqueue() -> List[_Package]:
     pkgs = []
     r = requests.get("https://packages.msys2.org/api/buildqueue")
     r.raise_for_status()
@@ -357,7 +363,7 @@ def get_buildqueue():
 
     # link up dependencies with the real package in the queue
     for pkg in pkgs:
-        ver_depends = {}
+        ver_depends: Dict[str, Dict[str, _Package]] = {}
         for repo, deps in pkg['depends'].items():
             for dep in deps:
                 ver_depends.setdefault(repo, {})[dep] = dep_mapping[dep]
@@ -366,13 +372,13 @@ def get_buildqueue():
     return pkgs
 
 
-def get_gh_asset_name(basename):
+def get_gh_asset_name(basename: _PathLike) -> str:
     # GitHub will throw out charaters like '~' or '='. It also doesn't like
     # when there is no file extension and will try to add one
     return sha256(str(basename).encode("utf-8")).hexdigest() + ".bin"
 
 
-def get_asset_filename(asset):
+def get_asset_filename(asset: GitReleaseAsset) -> str:
     if not asset.label:
         return asset.name
     else:
@@ -380,7 +386,7 @@ def get_asset_filename(asset):
         return asset.label
 
 
-def get_release_assets(repo, release_name):
+def get_release_assets(repo: Repository, release_name: str) -> List[GitReleaseAsset]:
     assets = []
     for asset in repo.get_release(release_name).get_assets():
         uploader = asset.uploader
@@ -391,7 +397,8 @@ def get_release_assets(repo, release_name):
     return assets
 
 
-def get_packages_to_build():
+def get_packages_to_build() -> Tuple[
+        List[_Package], List[Tuple[_Package, str]], List[_Package]]:
     gh = Github(*get_credentials())
 
     repo = gh.get_repo(REPO)
@@ -441,7 +448,7 @@ def get_packages_to_build():
     return done, skipped, todo
 
 
-def show_build(args):
+def show_build(args: Any) -> None:
     done, skipped, todo = get_packages_to_build()
 
     with gha_group(f"TODO ({len(todo)})"):
@@ -460,7 +467,7 @@ def show_build(args):
         raise SystemExit("Nothing to build")
 
 
-def show_assets(args):
+def show_assets(args: Any) -> None:
     gh = Github(*get_credentials())
     repo = gh.get_repo(REPO)
 
@@ -478,7 +485,7 @@ def show_assets(args):
         ))
 
 
-def get_repo_subdir(type_, asset):
+def get_repo_subdir(type_: str, asset: GitReleaseAsset) -> Path:
     entry = get_asset_filename(asset)
     t = Path(type_)
     if type_ == "msys":
@@ -497,9 +504,11 @@ def get_repo_subdir(type_, asset):
             return t / "i686"
         else:
             raise Exception("unknown file type")
+    else:
+        raise Exception("unknown type")
 
 
-def fetch_assets(args):
+def fetch_assets(args: Any) -> None:
     gh = Github(*get_credentials())
     repo = gh.get_repo(REPO)
 
@@ -533,16 +542,16 @@ def fetch_assets(args):
     print("done")
 
 
-def trigger_gha_build(args):
+def trigger_gha_build(args: Any) -> None:
     gh = Github(*get_credentials())
     repo = gh.get_repo(REPO)
-    if repo.create_repository_dispatch('manual-build'):
+    if repo.create_repository_dispatch('manual-build', {}):
         print("Build triggered")
     else:
         raise Exception("trigger failed")
 
 
-def clean_gha_assets(args):
+def clean_gha_assets(args: Any) -> None:
     gh = Github(*get_credentials())
 
     print("Fetching packages to build...")
@@ -555,7 +564,7 @@ def clean_gha_assets(args):
                 patterns.append(f"{item}-{pkg['version']}.failed")
 
     print("Fetching assets...")
-    assets = {}
+    assets: Dict[str, List[GitReleaseAsset]] = {}
     repo = gh.get_repo(REPO)
     for release in ['staging-msys', 'staging-mingw', 'staging-failed']:
         for asset in get_release_assets(repo, release):
@@ -575,7 +584,7 @@ def clean_gha_assets(args):
         print("Nothing to delete")
 
 
-def get_credentials():
+def get_credentials() -> List:
     if "GITHUB_TOKEN" in environ:
         return [environ["GITHUB_TOKEN"]]
     elif "GITHUB_USER" in environ and "GITHUB_PASS" in environ:
@@ -584,7 +593,7 @@ def get_credentials():
         raise Exception("'GITHUB_TOKEN' or 'GITHUB_USER'/'GITHUB_PASS' env vars not set")
 
 
-def main(argv):
+def main(argv: List[str]):
     parser = argparse.ArgumentParser(description="Build packages", allow_abbrev=False)
     parser.set_defaults(func=lambda *x: parser.print_help())
     subparser = parser.add_subparsers(title="subcommands")
