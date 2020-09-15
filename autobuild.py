@@ -33,7 +33,6 @@ SKIP = [
 
 
 REPO = "msys2/msys2-autobuild"
-MSYS2_REPOS = ["mingw32", "mingw64", "msys"]
 
 
 def timeoutgen(timeout):
@@ -100,7 +99,7 @@ class BuildTimeoutError(BuildError):
     pass
 
 
-def download_asset(asset, target_path: str, timeout=15) -> None:
+def download_asset(asset, target_path: str, timeout=15) -> str:
     with requests.get(asset.browser_download_url, stream=True, timeout=timeout) as r:
         r.raise_for_status()
         with open(target_path, 'wb') as h:
@@ -108,7 +107,7 @@ def download_asset(asset, target_path: str, timeout=15) -> None:
                 h.write(chunk)
 
 
-def upload_asset(repo_type: str, path: os.PathLike, replace: bool = True) -> None:
+def upload_asset(type_: str, path: os.PathLike, replace=True):
     # type_: msys/mingw/failed
     if not environ.get("CI"):
         print("WARNING: upload skipped, not running in CI")
@@ -116,10 +115,11 @@ def upload_asset(repo_type: str, path: os.PathLike, replace: bool = True) -> Non
     path = Path(path)
     gh = Github(*get_credentials())
     repo = gh.get_repo(REPO)
-    release_name = "staging-" + repo_type
+    release_name = "staging-" + type_
     release = repo.get_release(release_name)
 
-    basename = os.path.basename(str(path))
+    path = str(path)
+    basename = os.path.basename(path)
     asset_name = get_gh_asset_name(basename)
     asset_label = basename
 
@@ -128,7 +128,7 @@ def upload_asset(repo_type: str, path: os.PathLike, replace: bool = True) -> Non
             if asset_name == asset.name:
                 asset.delete_asset()
 
-    release.upload_asset(str(path), label=asset_label, name=asset_name)
+    release.upload_asset(path, label=asset_label, name=asset_name)
     print(f"Uploaded {asset_name} as {asset_label}")
 
 
@@ -213,9 +213,10 @@ SigLevel=Never
         os.makedirs(repo_root, exist_ok=True)
         with backup_pacman_conf(msys2_root):
             to_add = []
-            for repo_type, deps in pkg['ext-depends'].items():
+            for repo, deps in pkg['ext-depends'].items():
                 for name, dep in deps.items():
                     pattern = f"{name}-{dep['version']}-*.pkg.*"
+                    repo_type = "msys" if dep['repo'].startswith('MSYS2') else "mingw"
                     for asset in get_release_assets(repo, "staging-" + repo_type):
                         if fnmatch.fnmatch(get_asset_filename(asset), pattern):
                             to_add.append((repo_type, asset))
@@ -289,14 +290,7 @@ def build_package(pkg, msys2_root, builddir):
                 if fnmatch.fnmatch(entry, '*.pkg.tar.*') or \
                         fnmatch.fnmatch(entry, '*.src.tar.*'):
                     path = os.path.join(pkg_dir, entry)
-                    if is_msys:
-                        repo = "msys"
-                    elif entry.startswith("mingw-w64-i686-"):
-                        repo = "mingw32"
-                    else:
-                        repo = "mingw64"
-
-                    upload_asset(repo, path)
+                    upload_asset("msys" if is_msys else "mingw", path)
 
 
 def run_build(args):
@@ -402,9 +396,9 @@ def get_packages_to_build():
 
     repo = gh.get_repo(REPO)
     assets = []
-    for repo_type in MSYS2_REPOS:
+    for name in ["msys", "mingw"]:
         assets.extend([
-            get_asset_filename(a) for a in get_release_assets(repo, 'staging-' + repo_type)])
+            get_asset_filename(a) for a in get_release_assets(repo, 'staging-' + name)])
     assets_failed = [
         get_asset_filename(a) for a in get_release_assets(repo, 'staging-failed')]
 
@@ -470,8 +464,8 @@ def show_assets(args):
     gh = Github(*get_credentials())
     repo = gh.get_repo(REPO)
 
-    for repo_type in MSYS2_REPOS:
-        assets = get_release_assets(repo, 'staging-' + repo_type)
+    for name in ["msys", "mingw"]:
+        assets = get_release_assets(repo, 'staging-' + name)
 
         print(tabulate(
             [[
@@ -484,24 +478,23 @@ def show_assets(args):
         ))
 
 
-def get_repo_subdir(repo_type: str, asset):
+def get_repo_subdir(type_, asset):
     entry = get_asset_filename(asset)
-    t = Path(repo_type)
-    if repo_type == "msys":
+    t = Path(type_)
+    if type_ == "msys":
         if fnmatch.fnmatch(entry, '*.pkg.tar.*'):
             return t / "x86_64"
         elif fnmatch.fnmatch(entry, '*.src.tar.*'):
             return t / "sources"
         else:
             raise Exception("unknown file type")
-    else:
-        if fnmatch.fnmatch(entry, '*.pkg.tar.*'):
-            if repo_type == "mingw32":
-                return t / "i686"
-            elif repo_type == "mingw64":
-                return t / "x86_64"
-        elif fnmatch.fnmatch(entry, '*.src.tar.*'):
+    elif type_ == "mingw":
+        if fnmatch.fnmatch(entry, '*.src.tar.*'):
             return t / "sources"
+        elif entry.startswith("mingw-w64-x86_64-"):
+            return t / "x86_64"
+        elif entry.startswith("mingw-w64-i686-"):
+            return t / "i686"
         else:
             raise Exception("unknown file type")
 
@@ -512,11 +505,11 @@ def fetch_assets(args):
 
     todo = []
     skipped = []
-    for repo_type in MSYS2_REPOS:
+    for name in ["msys", "mingw"]:
         p = Path(args.targetdir)
-        assets = get_release_assets(repo, 'staging-' + repo_type)
+        assets = get_release_assets(repo, 'staging-' + name)
         for asset in assets:
-            asset_dir = p / get_repo_subdir(repo_type, asset)
+            asset_dir = p / get_repo_subdir(name, asset)
             asset_dir.mkdir(parents=True, exist_ok=True)
             asset_path = asset_dir / get_asset_filename(asset)
             if asset_path.exists():
@@ -564,8 +557,8 @@ def clean_gha_assets(args):
     print("Fetching assets...")
     assets = {}
     repo = gh.get_repo(REPO)
-    for repo_type in MSYS2_REPOS + ['failed']:
-        for asset in get_release_assets(repo, 'staging-' + repo_type):
+    for release in ['staging-msys', 'staging-mingw', 'staging-failed']:
+        for asset in get_release_assets(repo, release):
             assets.setdefault(get_asset_filename(asset), []).append(asset)
 
     for pattern in patterns:
