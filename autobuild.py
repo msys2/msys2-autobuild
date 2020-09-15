@@ -213,15 +213,16 @@ SigLevel=Never
         os.makedirs(repo_root, exist_ok=True)
         with backup_pacman_conf(msys2_root):
             to_add = []
-            for name, dep in pkg['ext-depends'].items():
-                pattern = f"{name}-{dep['version']}-*.pkg.*"
-                repo_type = "msys" if dep['repo'].startswith('MSYS2') else "mingw"
-                for asset in get_release_assets(repo, "staging-" + repo_type):
-                    if fnmatch.fnmatch(get_asset_filename(asset), pattern):
-                        to_add.append((repo_type, asset))
-                        break
-                else:
-                    raise MissingDependencyError(f"asset for {pattern} not found")
+            for repo, deps in pkg['ext-depends'].items():
+                for name, dep in deps.items():
+                    pattern = f"{name}-{dep['version']}-*.pkg.*"
+                    repo_type = "msys" if dep['repo'].startswith('MSYS2') else "mingw"
+                    for asset in get_release_assets(repo, "staging-" + repo_type):
+                        if fnmatch.fnmatch(get_asset_filename(asset), pattern):
+                            to_add.append((repo_type, asset))
+                            break
+                    else:
+                        raise MissingDependencyError(f"asset for {pattern} not found")
 
             for repo_type, asset in to_add:
                 add_to_repo(repo_root, repo_type, asset)
@@ -274,13 +275,14 @@ def build_package(pkg, msys2_root, builddir):
             raise BuildTimeoutError(e)
         except subprocess.CalledProcessError as e:
 
-            for item in pkg['packages']:
-                with tempfile.TemporaryDirectory() as tempdir:
-                    failed_path = os.path.join(tempdir, f"{item}-{pkg['version']}.failed")
-                    with open(failed_path, 'wb') as h:
-                        # github doesn't allow empty assets
-                        h.write(b'oh no')
-                    upload_asset("failed", failed_path)
+            for repo, items in pkg['packages'].items():
+                for item in items:
+                    with tempfile.TemporaryDirectory() as tempdir:
+                        failed_path = os.path.join(tempdir, f"{item}-{pkg['version']}.failed")
+                        with open(failed_path, 'wb') as h:
+                            # github doesn't allow empty assets
+                            h.write(b'oh no')
+                        upload_asset("failed", failed_path)
 
             raise BuildError(e)
         else:
@@ -349,19 +351,16 @@ def get_buildqueue():
     for pkg in r.json():
         pkg['repo'] = pkg['repo_url'].split('/')[-1]
         pkgs.append(pkg)
-
-        # restore old format for now
-        pkg['packages'] = [n for sub in pkg['packages'].values() for n in sub]
-        pkg['depends'] = [n for sub in pkg['depends'].values() for n in sub]
-
-        for name in pkg['packages']:
-            dep_mapping[name] = pkg
+        for repo, names in pkg['packages'].items():
+            for name in names:
+                dep_mapping[name] = pkg
 
     # link up dependencies with the real package in the queue
     for pkg in pkgs:
         ver_depends = {}
-        for dep in pkg['depends']:
-            ver_depends[dep] = dep_mapping[dep]
+        for repo, deps in pkg['depends'].items():
+            for dep in deps:
+                ver_depends.setdefault(repo, {})[dep] = dep_mapping[dep]
         pkg['ext-depends'] = ver_depends
 
     return pkgs
@@ -404,15 +403,17 @@ def get_packages_to_build():
         get_asset_filename(a) for a in get_release_assets(repo, 'staging-failed')]
 
     def pkg_is_done(pkg):
-        for item in pkg['packages']:
-            if not fnmatch.filter(assets, f"{item}-{pkg['version']}-*.pkg.tar.*"):
-                return False
+        for repo, items in pkg['packages'].items():
+            for item in items:
+                if not fnmatch.filter(assets, f"{item}-{pkg['version']}-*.pkg.tar.*"):
+                    return False
         return True
 
     def pkg_has_failed(pkg):
-        for item in pkg['packages']:
-            if f"{item}-{pkg['version']}.failed" in assets_failed:
-                return True
+        for repo, items in pkg['packages'].items():
+            for item in items:
+                if f"{item}-{pkg['version']}.failed" in assets_failed:
+                    return True
         return False
 
     def pkg_is_skipped(pkg):
@@ -429,12 +430,13 @@ def get_packages_to_build():
         elif pkg_is_skipped(pkg):
             skipped.append((pkg, "skipped"))
         else:
-            for dep in pkg['ext-depends'].values():
-                if pkg_has_failed(dep) or pkg_is_skipped(dep):
-                    skipped.append((pkg, "requires: " + dep['name']))
-                    break
-            else:
-                todo.append(pkg)
+            for repo, deps in pkg['ext-depends'].items():
+                for dep in deps.values():
+                    if pkg_has_failed(dep) or pkg_is_skipped(dep):
+                        skipped.append((pkg, "requires: " + dep['name']))
+                        break
+                else:
+                    todo.append(pkg)
 
     return done, skipped, todo
 
@@ -547,8 +549,9 @@ def clean_gha_assets(args):
     patterns = []
     for pkg in get_buildqueue():
         patterns.append(f"{pkg['name']}-{pkg['version']}*")
-        for item in pkg['packages']:
-            patterns.append(f"{item}-{pkg['version']}*")
+        for repo, items in pkg['packages'].items():
+            for item in items:
+                patterns.append(f"{item}-{pkg['version']}*")
 
     print("Fetching assets...")
     assets = {}
