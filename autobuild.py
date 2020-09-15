@@ -349,6 +349,11 @@ def get_buildqueue():
     for pkg in r.json():
         pkg['repo'] = pkg['repo_url'].split('/')[-1]
         pkgs.append(pkg)
+
+        # restore old format for now
+        pkg['packages'] = [n for sub in pkg['packages'].values() for n in sub]
+        pkg['depends'] = [n for sub in pkg['depends'].values() for n in sub]
+
         for name in pkg['packages']:
             dep_mapping[name] = pkg
 
