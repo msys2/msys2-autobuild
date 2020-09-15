@@ -555,10 +555,11 @@ def clean_gha_assets(args):
     print("Fetching packages to build...")
     patterns = []
     for pkg in get_buildqueue():
-        patterns.append(f"{pkg['name']}-{pkg['version']}*")
+        patterns.append(f"{pkg['name']}-{pkg['version']}.src.tar.*")
         for repo, items in pkg['packages'].items():
             for item in items:
-                patterns.append(f"{item}-{pkg['version']}*")
+                patterns.append(f"{item}-{pkg['version']}-*.pkg.tar.*")
+                patterns.append(f"{item}-{pkg['version']}.failed")
 
     print("Fetching assets...")
     assets = {}
