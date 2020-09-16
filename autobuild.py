@@ -437,13 +437,17 @@ def get_packages_to_build() -> Tuple[
         elif pkg_is_skipped(pkg):
             skipped.append((pkg, "skipped"))
         else:
+            missing_deps = False
             for repo, deps in pkg['ext-depends'].items():
+                if missing_deps:
+                    break
                 for dep in deps.values():
                     if pkg_has_failed(dep) or pkg_is_skipped(dep):
                         skipped.append((pkg, "requires: " + dep['name']))
+                        missing_deps = True
                         break
-                else:
-                    todo.append(pkg)
+            if not missing_deps:
+                todo.append(pkg)
 
     return done, skipped, todo
 
