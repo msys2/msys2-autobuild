@@ -281,14 +281,19 @@ def build_package(pkg, msys2_root: _PathLike, builddir: _PathLike) -> None:
             raise BuildTimeoutError(e)
         except subprocess.CalledProcessError as e:
 
+            failed_entries = []
+            failed_entries.append(f"{pkg['name']}-{pkg['version']}.failed")
             for repo, items in pkg['packages'].items():
                 for item in items:
-                    with tempfile.TemporaryDirectory() as tempdir:
-                        failed_path = os.path.join(tempdir, f"{item}-{pkg['version']}.failed")
-                        with open(failed_path, 'wb') as h:
-                            # github doesn't allow empty assets
-                            h.write(b'oh no')
-                        upload_asset("failed", failed_path)
+                    failed_entries.append(f"{item}-{pkg['version']}.failed")
+
+            for entry in failed_entries:
+                with tempfile.TemporaryDirectory() as tempdir:
+                    failed_path = os.path.join(tempdir, entry)
+                    with open(failed_path, 'wb') as h:
+                        # github doesn't allow empty assets
+                        h.write(b'oh no')
+                    upload_asset("failed", failed_path)
 
             raise BuildError(e)
         else:
@@ -422,6 +427,8 @@ def get_packages_to_build() -> Tuple[
         get_asset_filename(a) for a in get_release_assets(repo, 'staging-failed')]
 
     def pkg_is_done(pkg):
+        if not fnmatch.filter(assets, f"{pkg['name']}-{pkg['version']}.src.tar.*"):
+            return False
         for repo, items in pkg['packages'].items():
             for item in items:
                 if not fnmatch.filter(assets, f"{item}-{pkg['version']}-*.pkg.tar.*"):
@@ -429,6 +436,8 @@ def get_packages_to_build() -> Tuple[
         return True
 
     def pkg_has_failed(pkg):
+        if f"{pkg['name']}-{pkg['version']}.failed" in assets_failed:
+            return True
         for repo, items in pkg['packages'].items():
             for item in items:
                 if f"{item}-{pkg['version']}.failed" in assets_failed:
