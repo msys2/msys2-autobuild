@@ -233,16 +233,16 @@ SigLevel=Never
         os.makedirs(repo_root, exist_ok=True)
         with backup_pacman_conf(msys2_root):
             to_add = []
-            for deps in pkg['ext-depends'].get(build_type_to_dep_type(build_type), {}):
-                for name, dep in deps.items():
-                    pattern = f"{name}-{dep['version']}-*.pkg.*"
-                    repo_type = "msys" if dep['repo'].startswith('MSYS2') else "mingw"
-                    for asset in get_release_assets(repo, "staging-" + repo_type):
-                        if fnmatch.fnmatch(get_asset_filename(asset), pattern):
-                            to_add.append((repo_type, asset))
-                            break
-                    else:
-                        raise MissingDependencyError(f"asset for {pattern} not found")
+            dep_type = build_type_to_dep_type(build_type)
+            for name, dep in pkg['ext-depends'].get(dep_type, {}).items():
+                pattern = f"{name}-{dep['version']}-*.pkg.*"
+                repo_type = "msys" if dep['repo'].startswith('MSYS2') else "mingw"
+                for asset in get_release_assets(repo, "staging-" + repo_type):
+                    if fnmatch.fnmatch(get_asset_filename(asset), pattern):
+                        to_add.append((repo_type, asset))
+                        break
+                else:
+                    raise MissingDependencyError(f"asset for {pattern} not found")
 
             for repo_type, asset in to_add:
                 add_to_repo(repo_root, repo_type, asset)
