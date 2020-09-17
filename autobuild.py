@@ -292,11 +292,23 @@ def build_package(pkg, msys2_root: _PathLike, builddir: _PathLike) -> None:
 
             raise BuildError(e)
         else:
-            for entry in os.listdir(pkg_dir):
-                if fnmatch.fnmatch(entry, '*.pkg.tar.*') or \
-                        fnmatch.fnmatch(entry, '*.src.tar.*'):
-                    path = os.path.join(pkg_dir, entry)
-                    upload_asset("msys" if is_msys else "mingw", path)
+            patterns = []
+            patterns.append(f"{pkg['name']}-{pkg['version']}.src.tar.*")
+            for repo, items in pkg['packages'].items():
+                for item in items:
+                    patterns.append(f"{item}-{pkg['version']}-*.pkg.tar.*")
+
+            to_upload: List[str] = []
+            entries = os.listdir(pkg_dir)
+            for pattern in patterns:
+                found = fnmatch.filter(entries, pattern)
+                if not found:
+                    raise BuildError(f"{pattern} not found, likely wrong version built")
+                to_upload.extend(found)
+
+            for entry in to_upload:
+                path = os.path.join(pkg_dir, entry)
+                upload_asset("msys" if is_msys else "mingw", path)
 
 
 def run_build(args: Any) -> None:
