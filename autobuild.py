@@ -233,7 +233,7 @@ SigLevel=Never
         os.makedirs(repo_root, exist_ok=True)
         with backup_pacman_conf(msys2_root):
             to_add = []
-            for deps in pkg['ext-depends'].get(build_type_to_dep_type(build_type), []):
+            for deps in pkg['ext-depends'].get(build_type_to_dep_type(build_type), {}):
                 for name, dep in deps.items():
                     pattern = f"{name}-{dep['version']}-*.pkg.*"
                     repo_type = "msys" if dep['repo'].startswith('MSYS2') else "mingw"
