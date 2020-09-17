@@ -113,7 +113,7 @@ def download_asset(asset: GitReleaseAsset, target_path: str, timeout: int = 15) 
                 h.write(chunk)
 
 
-def upload_asset(type_: str, path: _PathLike, replace: bool = True) -> None:
+def upload_asset(type_: str, path: _PathLike, replace: bool = False) -> None:
     # type_: msys/mingw/failed
     if not environ.get("CI"):
         print("WARNING: upload skipped, not running in CI")
@@ -128,10 +128,13 @@ def upload_asset(type_: str, path: _PathLike, replace: bool = True) -> None:
     asset_name = get_gh_asset_name(basename)
     asset_label = basename
 
-    if replace:
-        for asset in get_release_assets(repo, release_name):
-            if asset_name == asset.name:
+    for asset in get_release_assets(repo, release_name):
+        if asset_name == asset.name:
+            if replace:
                 asset.delete_asset()
+            else:
+                print(f"Skipping upload for {asset_name} as {asset_label}, already exists")
+                return
 
     release.upload_asset(str(path), label=asset_label, name=asset_name)
     print(f"Uploaded {asset_name} as {asset_label}")
