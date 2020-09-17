@@ -468,7 +468,7 @@ def get_packages_to_build() -> Tuple[
     assets_failed = [
         get_asset_filename(a) for a in get_release_assets(repo, 'staging-failed')]
 
-    def pkg_is_done(build_type, pkg):
+    def pkg_is_done(build_type: str, pkg: _Package) -> bool:
         if build_type in ["mingw-src", "msys-src"]:
             if not fnmatch.filter(assets, f"{pkg['name']}-{pkg['version']}.src.tar.*"):
                 return False
@@ -478,7 +478,7 @@ def get_packages_to_build() -> Tuple[
                     return False
         return True
 
-    def pkg_has_failed(build_type, pkg):
+    def pkg_has_failed(build_type: str, pkg: _Package) -> bool:
         if build_type in ["mingw-src", "msys-src"]:
             if f"{pkg['name']}-{pkg['version']}.failed" in assets_failed:
                 return True
@@ -488,7 +488,7 @@ def get_packages_to_build() -> Tuple[
                     return True
         return False
 
-    def pkg_is_skipped(build_type, pkg):
+    def pkg_is_skipped(build_type: str, pkg: _Package) -> bool:
         # XXX: If all builds fail, skip the src build
         if build_type == "msys-src" and pkg_has_failed("msys", pkg):
             return True
