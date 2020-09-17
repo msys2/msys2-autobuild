@@ -490,10 +490,8 @@ def get_packages_to_build() -> Tuple[
 
     def pkg_is_skipped(build_type: str, pkg: _Package) -> bool:
         # XXX: If all builds fail, skip the src build
-        if build_type == "msys-src" and pkg_has_failed("msys", pkg):
-            return True
-        if build_type == "mingw-src":
-            if all([pkg_has_failed(bt, pkg) for bt in ["mingw32", "mingw64"]]):
+        if build_type in ["mingw-src", "msys-src"]:
+            if all([pkg_has_failed(bt, pkg) for bt in pkg["packages"].keys()]):
                 return True
 
         return pkg['name'] in SKIP
