@@ -245,50 +245,90 @@ SigLevel=Never
         run_cmd(msys2_root, ["pacman", "--noconfirm", "-Suuy"])
 
 
-def build_package(pkg, msys2_root: _PathLike, builddir: _PathLike) -> None:
+def build_package(build_type: str, pkg, msys2_root: _PathLike, builddir: _PathLike) -> None:
     assert os.path.isabs(builddir)
     assert os.path.isabs(msys2_root)
     os.makedirs(builddir, exist_ok=True)
 
     repo_name = {"MINGW-packages": "M", "MSYS2-packages": "S"}.get(pkg['repo'], pkg['repo'])
     repo_dir = os.path.join(builddir, repo_name)
-    is_msys = pkg['repo'].startswith('MSYS2')
+    to_upload: List[str] = []
 
     with staging_dependencies(pkg, msys2_root, builddir), \
             auto_key_retrieve(msys2_root), \
             fresh_git_repo(pkg['repo_url'], repo_dir):
         pkg_dir = os.path.join(repo_dir, pkg['repo_path'])
-        makepkg = 'makepkg' if is_msys else 'makepkg-mingw'
 
         try:
-            run_cmd(msys2_root, [
-                makepkg,
-                '--noconfirm',
-                '--noprogressbar',
-                '--nocheck',
-                '--syncdeps',
-                '--rmdeps',
-                '--cleanbuild'
-            ], cwd=pkg_dir, timeout=get_hard_timeout())
-
-            env = environ.copy()
-            if not is_msys:
+            if build_type == "mingw-src":
+                env = environ.copy()
                 env['MINGW_INSTALLS'] = 'mingw64'
-            run_cmd(msys2_root, [
-                makepkg,
-                '--noconfirm',
-                '--noprogressbar',
-                '--allsource'
-            ], env=env, cwd=pkg_dir, timeout=get_hard_timeout())
+                run_cmd(msys2_root, [
+                    'makepkg-mingw',
+                    '--noconfirm',
+                    '--noprogressbar',
+                    '--allsource'
+                ], env=env, cwd=pkg_dir, timeout=get_hard_timeout())
+            elif build_type == "msys-src":
+                run_cmd(msys2_root, [
+                    'makepkg',
+                    '--noconfirm',
+                    '--noprogressbar',
+                    '--allsource'
+                ], cwd=pkg_dir, timeout=get_hard_timeout())
+            elif build_type in ["mingw32", "mingw64"]:
+                env = environ.copy()
+                env['MINGW_INSTALLS'] = build_type
+                run_cmd(msys2_root, [
+                    'makepkg-mingw',
+                    '--noconfirm',
+                    '--noprogressbar',
+                    '--nocheck',
+                    '--syncdeps',
+                    '--rmdeps',
+                    '--cleanbuild'
+                ], env=env, cwd=pkg_dir, timeout=get_hard_timeout())
+            elif build_type == "msys":
+                run_cmd(msys2_root, [
+                    'makepkg',
+                    '--noconfirm',
+                    '--noprogressbar',
+                    '--nocheck',
+                    '--syncdeps',
+                    '--rmdeps',
+                    '--cleanbuild'
+                ], cwd=pkg_dir, timeout=get_hard_timeout())
+            else:
+                assert 0
+
+            patterns = []
+            if build_type in ["mingw-src", "msys-src"]:
+                patterns.append(f"{pkg['name']}-{pkg['version']}.src.tar.*")
+            elif build_type in ["mingw32", "mingw64", "msys"]:
+                for item in pkg['packages'].get(build_type, []):
+                    patterns.append(f"{item}-{pkg['version']}-*.pkg.tar.*")
+            else:
+                assert 0
+
+            entries = os.listdir(pkg_dir)
+            for pattern in patterns:
+                found = fnmatch.filter(entries, pattern)
+                if not found:
+                    raise BuildError(f"{pattern} not found, likely wrong version built")
+                to_upload.extend([os.path.join(pkg_dir, e) for e in found])
+
         except subprocess.TimeoutExpired as e:
             raise BuildTimeoutError(e)
-        except subprocess.CalledProcessError as e:
 
+        except (subprocess.CalledProcessError, BuildError) as e:
             failed_entries = []
-            failed_entries.append(f"{pkg['name']}-{pkg['version']}.failed")
-            for repo, items in pkg['packages'].items():
-                for item in items:
+            if build_type in ["mingw-src", "msys-src"]:
+                failed_entries.append(f"{pkg['name']}-{pkg['version']}.failed")
+            elif build_type in ["mingw32", "mingw64", "msys"]:
+                for item in pkg['packages'].get(build_type, []):
                     failed_entries.append(f"{item}-{pkg['version']}.failed")
+            else:
+                assert 0
 
             for entry in failed_entries:
                 with tempfile.TemporaryDirectory() as tempdir:
@@ -300,23 +340,8 @@ def build_package(pkg, msys2_root: _PathLike, builddir: _PathLike) -> None:
 
             raise BuildError(e)
         else:
-            patterns = []
-            patterns.append(f"{pkg['name']}-{pkg['version']}.src.tar.*")
-            for repo, items in pkg['packages'].items():
-                for item in items:
-                    patterns.append(f"{item}-{pkg['version']}-*.pkg.tar.*")
-
-            to_upload: List[str] = []
-            entries = os.listdir(pkg_dir)
-            for pattern in patterns:
-                found = fnmatch.filter(entries, pattern)
-                if not found:
-                    raise BuildError(f"{pattern} not found, likely wrong version built")
-                to_upload.extend(found)
-
-            for entry in to_upload:
-                path = os.path.join(pkg_dir, entry)
-                upload_asset("msys" if is_msys else "mingw", path)
+            for path in to_upload:
+                upload_asset("msys" if build_type.startswith("msys") else "mingw", path)
 
 
 def run_build(args: Any) -> None:
@@ -352,9 +377,17 @@ def run_build(args: Any) -> None:
             print("timeout reached")
             break
 
+        is_msys = pkg['repo'].startswith('MSYS2')
+
+        if is_msys:
+            build_types = ["msys", "msys-src"]
+        else:
+            build_types = ["mingw32", "mingw64", "mingw-src"]
+
         try:
             with gha_group(f"[{ pkg['repo'] }] { pkg['name'] }..."):
-                build_package(pkg, msys2_root, builddir)
+                for build_type in build_types:
+                    build_package(build_type, pkg, msys2_root, builddir)
         except MissingDependencyError:
             with gha_group(f"[{ pkg['repo'] }] { pkg['name'] }: failed -> missing deps"):
                 pass
