@@ -182,19 +182,22 @@ keyserver-options auto-key-retrieve
             os.replace(backup, conf)
 
 
-@contextmanager
-def staging_dependencies(
-        build_type: str, pkg: _Package, msys2_root: _PathLike,
-        builddir: _PathLike) -> Generator:
-    gh = Github(*get_credentials())
-    repo = gh.get_repo(REPO)
-
+def build_type_to_dep_type(build_type):
     if build_type == "mingw-src":
         dep_type = "mingw64"
     elif build_type == "msys-src":
         dep_type = "msys"
     else:
         dep_type = build_type
+    return dep_type
+
+
+@contextmanager
+def staging_dependencies(
+        build_type: str, pkg: _Package, msys2_root: _PathLike,
+        builddir: _PathLike) -> Generator:
+    gh = Github(*get_credentials())
+    repo = gh.get_repo(REPO)
 
     def add_to_repo(repo_root, repo_type, asset):
         repo_dir = Path(repo_root) / get_repo_subdir(repo_type, asset)
@@ -230,7 +233,7 @@ SigLevel=Never
         os.makedirs(repo_root, exist_ok=True)
         with backup_pacman_conf(msys2_root):
             to_add = []
-            for deps in pkg['ext-depends'].get(dep_type, []):
+            for deps in pkg['ext-depends'].get(build_type_to_dep_type(build_type), []):
                 for name, dep in deps.items():
                     pattern = f"{name}-{dep['version']}-*.pkg.*"
                     repo_type = "msys" if dep['repo'].startswith('MSYS2') else "mingw"
@@ -375,8 +378,8 @@ def run_build(args: Any) -> None:
         todo = get_packages_to_build()[2]
         if not todo:
             break
-        pkg = todo[0]
-        key = pkg['repo'] + pkg['name']
+        pkg, build_type = todo[0]
+        key = pkg['repo'] + build_type + pkg['name']
         if key in done:
             raise SystemExit("ERROR: building package again in the same run", pkg)
         done.add(key)
@@ -385,27 +388,21 @@ def run_build(args: Any) -> None:
             print("timeout reached")
             break
 
-        is_msys = pkg['repo'].startswith('MSYS2')
-
-        if is_msys:
-            build_types = ["msys", "msys-src"]
-        else:
-            build_types = ["mingw32", "mingw64", "mingw-src"]
-
         try:
-            with gha_group(f"[{ pkg['repo'] }] { pkg['name'] }..."):
-                for build_type in build_types:
-                    build_package(build_type, pkg, msys2_root, builddir)
+            with gha_group(f"[{ pkg['repo'] }] [{ build_type }] { pkg['name'] }..."):
+                build_package(build_type, pkg, msys2_root, builddir)
         except MissingDependencyError:
-            with gha_group(f"[{ pkg['repo'] }] { pkg['name'] }: failed -> missing deps"):
+            with gha_group(f"[{ pkg['repo'] }] [{ build_type }] { pkg['name'] }: "
+                           f"failed -> missing deps"):
                 pass
             continue
         except BuildTimeoutError:
-            with gha_group(f"[{ pkg['repo'] }] { pkg['name'] }: build time limit reached"):
+            with gha_group(f"[{ pkg['repo'] }] [{ build_type }] { pkg['name'] }: "
+                           f"build time limit reached"):
                 pass
             break
         except BuildError:
-            with gha_group(f"[{ pkg['repo'] }] { pkg['name'] }: failed"):
+            with gha_group(f"[{ pkg['repo'] }] [{ build_type }] { pkg['name'] }: failed"):
                 traceback.print_exc(file=sys.stdout)
             continue
 
@@ -459,7 +456,8 @@ def get_release_assets(repo: Repository, release_name: str) -> List[GitReleaseAs
 
 
 def get_packages_to_build() -> Tuple[
-        List[_Package], List[Tuple[_Package, str]], List[_Package]]:
+        List[Tuple[_Package, str]], List[Tuple[_Package, str, str]],
+        List[Tuple[_Package, str]]]:
     gh = Github(*get_credentials())
 
     repo = gh.get_repo(REPO)
@@ -470,49 +468,55 @@ def get_packages_to_build() -> Tuple[
     assets_failed = [
         get_asset_filename(a) for a in get_release_assets(repo, 'staging-failed')]
 
-    def pkg_is_done(pkg):
-        if not fnmatch.filter(assets, f"{pkg['name']}-{pkg['version']}.src.tar.*"):
-            return False
-        for repo, items in pkg['packages'].items():
-            for item in items:
+    def pkg_is_done(build_type, pkg):
+        if build_type in ["mingw-src", "msys-src"]:
+            if not fnmatch.filter(assets, f"{pkg['name']}-{pkg['version']}.src.tar.*"):
+                return False
+        else:
+            for item in pkg['packages'].get(build_type, []):
                 if not fnmatch.filter(assets, f"{item}-{pkg['version']}-*.pkg.tar.*"):
                     return False
         return True
 
-    def pkg_has_failed(pkg):
-        if f"{pkg['name']}-{pkg['version']}.failed" in assets_failed:
-            return True
-        for repo, items in pkg['packages'].items():
-            for item in items:
+    def pkg_has_failed(build_type, pkg):
+        if build_type in ["mingw-src", "msys-src"]:
+            if f"{pkg['name']}-{pkg['version']}.failed" in assets_failed:
+                return True
+        else:
+            for item in pkg['packages'].get(build_type, []):
                 if f"{item}-{pkg['version']}.failed" in assets_failed:
                     return True
         return False
 
-    def pkg_is_skipped(pkg):
+    def pkg_is_skipped(build_type, pkg):
         return pkg['name'] in SKIP
 
     todo = []
     done = []
     skipped = []
     for pkg in get_buildqueue():
-        if pkg_is_done(pkg):
-            done.append(pkg)
-        elif pkg_has_failed(pkg):
-            skipped.append((pkg, "failed"))
-        elif pkg_is_skipped(pkg):
-            skipped.append((pkg, "skipped"))
+
+        is_msys = pkg['repo'].startswith('MSYS2')
+        if is_msys:
+            build_types = ["msys", "msys-src"]
         else:
-            missing_deps = False
-            for repo, deps in pkg['ext-depends'].items():
-                if missing_deps:
-                    break
-                for dep in deps.values():
-                    if pkg_has_failed(dep) or pkg_is_skipped(dep):
-                        skipped.append((pkg, "requires: " + dep['name']))
-                        missing_deps = True
+            build_types = ["mingw32", "mingw64", "mingw-src"]
+
+        for build_type in build_types:
+            if pkg_is_done(build_type, pkg):
+                done.append((pkg, build_type))
+            elif pkg_has_failed(build_type, pkg):
+                skipped.append((pkg, build_type, "failed"))
+            elif pkg_is_skipped(build_type, pkg):
+                skipped.append((pkg, build_type, "skipped"))
+            else:
+                dep_type = build_type_to_dep_type(build_type)
+                for dep in pkg['ext-depends'].get(dep_type, {}).values():
+                    if pkg_has_failed(build_type, dep) or pkg_is_skipped(build_type, dep):
+                        skipped.append((pkg, build_type, "requires: " + dep['name']))
                         break
-            if not missing_deps:
-                todo.append(pkg)
+                else:
+                    todo.append((pkg, build_type))
 
     return done, skipped, todo
 
@@ -521,16 +525,16 @@ def show_build(args: Any) -> None:
     done, skipped, todo = get_packages_to_build()
 
     with gha_group(f"TODO ({len(todo)})"):
-        print(tabulate([(p["name"], p["version"]) for p in todo],
-                       headers=["Package", "Version"]))
+        print(tabulate([(p["name"], bt, p["version"]) for (p, bt) in todo],
+                       headers=["Package", "Build", "Version"]))
 
     with gha_group(f"SKIPPED ({len(skipped)})"):
-        print(tabulate([(p["name"], p["version"], r) for (p, r) in skipped],
-                       headers=["Package", "Version", "Reason"]))
+        print(tabulate([(p["name"], bt, p["version"], r) for (p, bt, r) in skipped],
+                       headers=["Package", "Build", "Version", "Reason"]))
 
     with gha_group(f"DONE ({len(done)})"):
-        print(tabulate([(p["name"], p["version"]) for p in done],
-                       headers=["Package", "Version"]))
+        print(tabulate([(p["name"], bt, p["version"]) for (p, bt) in done],
+                       headers=["Package", "Build", "Version"]))
 
     if args.fail_on_idle and not todo:
         raise SystemExit("Nothing to build")
@@ -627,6 +631,7 @@ def clean_gha_assets(args: Any) -> None:
     patterns = []
     for pkg in get_buildqueue():
         patterns.append(f"{pkg['name']}-{pkg['version']}.src.tar.*")
+        patterns.append(f"{pkg['name']}-{pkg['version']}.failed")
         for repo, items in pkg['packages'].items():
             for item in items:
                 patterns.append(f"{item}-{pkg['version']}-*.pkg.tar.*")
