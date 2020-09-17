@@ -184,9 +184,17 @@ keyserver-options auto-key-retrieve
 
 @contextmanager
 def staging_dependencies(
-        pkg: _Package, msys2_root: _PathLike, builddir: _PathLike) -> Generator:
+        build_type: str, pkg: _Package, msys2_root: _PathLike,
+        builddir: _PathLike) -> Generator:
     gh = Github(*get_credentials())
     repo = gh.get_repo(REPO)
+
+    if build_type == "mingw-src":
+        dep_type = "mingw64"
+    elif build_type == "msys-src":
+        dep_type = "msys"
+    else:
+        dep_type = build_type
 
     def add_to_repo(repo_root, repo_type, asset):
         repo_dir = Path(repo_root) / get_repo_subdir(repo_type, asset)
@@ -222,7 +230,7 @@ SigLevel=Never
         os.makedirs(repo_root, exist_ok=True)
         with backup_pacman_conf(msys2_root):
             to_add = []
-            for deps in pkg['ext-depends'].values():
+            for deps in pkg['ext-depends'].get(dep_type, []):
                 for name, dep in deps.items():
                     pattern = f"{name}-{dep['version']}-*.pkg.*"
                     repo_type = "msys" if dep['repo'].startswith('MSYS2') else "mingw"
@@ -254,7 +262,7 @@ def build_package(build_type: str, pkg, msys2_root: _PathLike, builddir: _PathLi
     repo_dir = os.path.join(builddir, repo_name)
     to_upload: List[str] = []
 
-    with staging_dependencies(pkg, msys2_root, builddir), \
+    with staging_dependencies(build_type, pkg, msys2_root, builddir), \
             auto_key_retrieve(msys2_root), \
             fresh_git_repo(pkg['repo_url'], repo_dir):
         pkg_dir = os.path.join(repo_dir, pkg['repo_path'])
