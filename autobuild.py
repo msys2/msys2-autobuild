@@ -502,14 +502,10 @@ def get_packages_to_build() -> Tuple[
     done = []
     skipped = []
     for pkg in get_buildqueue():
-
-        is_msys = pkg['repo'].startswith('MSYS2')
-        if is_msys:
-            build_types = ["msys", "msys-src"]
-        else:
-            build_types = ["mingw32", "mingw64", "mingw-src"]
-
-        for build_type in build_types:
+        for build_type in ["msys", "mingw32", "mingw64", "mingw-src", "msys-src"]:
+            dep_type = build_type_to_dep_type(build_type)
+            if dep_type not in pkg["packages"]:
+                continue
             if pkg_is_done(build_type, pkg):
                 done.append((pkg, build_type))
             elif pkg_has_failed(build_type, pkg):
