@@ -586,12 +586,16 @@ def fetch_assets(args: Any) -> None:
     gh = Github(*get_credentials())
     repo = gh.get_repo(REPO)
 
+    to_delete = get_assets_to_delete()
+
     todo = []
     skipped = []
     for name in ["msys", "mingw"]:
         p = Path(args.targetdir)
         assets = get_release_assets(repo, 'staging-' + name)
         for asset in assets:
+            if asset in to_delete:
+                continue
             asset_dir = p / get_repo_subdir(name, asset)
             asset_dir.mkdir(parents=True, exist_ok=True)
             asset_path = asset_dir / get_asset_filename(asset)
@@ -625,7 +629,7 @@ def trigger_gha_build(args: Any) -> None:
         raise Exception("trigger failed")
 
 
-def clean_gha_assets(args: Any) -> None:
+def get_assets_to_delete() -> List[GitReleaseAsset]:
     gh = Github(*get_credentials())
 
     print("Fetching packages to build...")
@@ -649,11 +653,19 @@ def clean_gha_assets(args: Any) -> None:
         for key in fnmatch.filter(assets.keys(), pattern):
             del assets[key]
 
+    result = []
     for items in assets.values():
         for asset in items:
-            print(f"Deleting {get_asset_filename(asset)}...")
-            if not args.dry_run:
-                asset.delete_asset()
+            result.append(asset)
+    return result
+
+
+def clean_gha_assets(args: Any) -> None:
+    assets = get_assets_to_delete()
+    for asset in assets:
+        print(f"Deleting {get_asset_filename(asset)}...")
+        if not args.dry_run:
+            asset.delete_asset()
 
     if not assets:
         print("Nothing to delete")
