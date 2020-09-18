@@ -35,12 +35,6 @@ jobs:
         python -m pip install --upgrade pip setuptools wheel
         python -m pip install --user -r requirements.txt
 
-    - name: Clean up assets
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      run: |
-        python autobuild.py clean-assets
-
     - name: Show build queue
       id: queue
       env:
