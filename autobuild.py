@@ -545,8 +545,10 @@ def show_assets(args: Any) -> None:
     gh = Github(*get_credentials())
     repo = gh.get_repo(REPO)
 
+    to_delete = get_assets_to_delete()
+
     for name in ["msys", "mingw"]:
-        assets = get_release_assets(repo, 'staging-' + name)
+        assets = [a for a in get_release_assets(repo, 'staging-' + name) if a not in to_delete]
 
         print(tabulate(
             [[
