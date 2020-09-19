@@ -546,10 +546,8 @@ def show_assets(args: Any) -> None:
     gh = Github(*get_credentials())
     repo = gh.get_repo(REPO)
 
-    to_delete = get_assets_to_delete()
-
     for name in ["msys", "mingw"]:
-        assets = [a for a in get_release_assets(repo, 'staging-' + name) if a not in to_delete]
+        assets = get_finished_assets(repo, 'staging-' + name)
 
         print(tabulate(
             [[
@@ -589,16 +587,12 @@ def fetch_assets(args: Any) -> None:
     gh = Github(*get_credentials())
     repo = gh.get_repo(REPO)
 
-    to_delete = get_assets_to_delete()
-
     todo = []
     skipped = []
     for name in ["msys", "mingw"]:
         p = Path(args.targetdir)
-        assets = get_release_assets(repo, 'staging-' + name)
+        assets = get_finished_assets(repo, 'staging-' + name)
         for asset in assets:
-            if asset in to_delete:
-                continue
             asset_dir = p / get_repo_subdir(name, asset)
             asset_dir.mkdir(parents=True, exist_ok=True)
             asset_path = asset_dir / get_asset_filename(asset)
@@ -632,9 +626,7 @@ def trigger_gha_build(args: Any) -> None:
         raise Exception("trigger failed")
 
 
-def get_assets_to_delete() -> List[GitReleaseAsset]:
-    gh = Github(*get_credentials())
-
+def get_assets_to_delete(repo: Repository) -> List[GitReleaseAsset]:
     print("Fetching packages to build...")
     patterns = []
     for pkg in get_buildqueue():
@@ -647,7 +639,6 @@ def get_assets_to_delete() -> List[GitReleaseAsset]:
 
     print("Fetching assets...")
     assets: Dict[str, List[GitReleaseAsset]] = {}
-    repo = gh.get_repo(REPO)
     for release in ['staging-msys', 'staging-mingw', 'staging-failed']:
         for asset in get_release_assets(repo, release):
             assets.setdefault(get_asset_filename(asset), []).append(asset)
@@ -663,8 +654,40 @@ def get_assets_to_delete() -> List[GitReleaseAsset]:
     return result
 
 
+def get_finished_assets(repo: Repository, release_name: str) -> List[GitReleaseAsset]:
+    """Returns assets for packages where all package results are available"""
+
+    assets: Dict[str, List[GitReleaseAsset]] = {}
+    for asset in get_release_assets(repo, release_name):
+        assets.setdefault(get_asset_filename(asset), []).append(asset)
+
+    finished = []
+
+    for pkg in get_buildqueue():
+        patterns = []
+        patterns.append(f"{pkg['name']}-{pkg['version']}.src.tar.*")
+        for repo, items in pkg['packages'].items():
+            for item in items:
+                patterns.append(f"{item}-{pkg['version']}-*.pkg.tar.*")
+
+        finished_maybe = []
+        for pattern in patterns:
+            matches = fnmatch.filter(assets.keys(), pattern)
+            if matches:
+                found = assets[matches[0]]
+                finished_maybe.extend(found)
+
+        if len(finished_maybe) == len(patterns):
+            finished.extend(finished_maybe)
+
+    return finished
+
+
 def clean_gha_assets(args: Any) -> None:
-    assets = get_assets_to_delete()
+    gh = Github(*get_credentials())
+    repo = gh.get_repo(REPO)
+    assets = get_assets_to_delete(repo)
+
     for asset in assets:
         print(f"Deleting {get_asset_filename(asset)}...")
         if not args.dry_run:
