@@ -26,7 +26,8 @@ _PathLike = Union[os.PathLike, AnyStr]
 _Package = Dict
 
 # After which overall time it should stop building (in seconds)
-HARD_TIMEOUT = 5.7 * 60 * 60
+# Disabled for now, we don't do anything with it and every minute counts
+HARD_TIMEOUT = 999 * 60 * 60
 # After which we shouldn't start a new build
 SOFT_TIMEOUT = HARD_TIMEOUT / 2
 
