@@ -36,6 +36,7 @@ SKIP: List[str] = [
     # 'mingw-w64-clang',
     # 'mingw-w64-arm-none-eabi-gcc',
     # 'mingw-w64-gcc',
+    'mingw-w64-gcc-git',
 ]
 
 
