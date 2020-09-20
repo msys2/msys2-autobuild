@@ -632,7 +632,7 @@ def get_assets_to_delete(repo: Repository) -> List[GitReleaseAsset]:
     for pkg in get_buildqueue():
         patterns.append(f"{pkg['name']}-{pkg['version']}.src.tar.*")
         patterns.append(f"{pkg['name']}-{pkg['version']}.failed")
-        for repo, items in pkg['packages'].items():
+        for items in pkg['packages'].values():
             for item in items:
                 patterns.append(f"{item}-{pkg['version']}-*.pkg.tar.*")
                 patterns.append(f"{item}-{pkg['version']}.failed")
