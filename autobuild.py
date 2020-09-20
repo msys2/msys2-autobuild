@@ -410,7 +410,7 @@ def run_build(args: Any) -> None:
 
 def get_buildqueue() -> List[_Package]:
     pkgs = []
-    r = requests.get("https://packages.msys2.org/api/buildqueue")
+    r = requests.get("https://packages.msys2.org/api/buildqueue?include_vcs=true")
     r.raise_for_status()
     dep_mapping = {}
     for pkg in r.json():
