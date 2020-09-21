@@ -422,6 +422,16 @@ def get_buildqueue() -> List[_Package]:
             for name in names:
                 dep_mapping[name] = pkg
 
+    # We need to pull in all packages of that particular build because they can
+    # depend on each other with a fixed version
+    for pkg in pkgs:
+        for repo, deps in pkg['depends'].items():
+            all_deps = set(deps)
+            for dep in deps:
+                dep_pkg = dep_mapping[dep]
+                all_deps.update(dep_pkg['packages'][repo])
+            pkg['depends'][repo] = sorted(all_deps)
+
     # link up dependencies with the real package in the queue
     for pkg in pkgs:
         ver_depends: Dict[str, Dict[str, _Package]] = {}
