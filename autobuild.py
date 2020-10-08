@@ -508,6 +508,10 @@ def get_packages_to_build() -> Tuple[
             if not any(pkg_is_done(bt, pkg) for bt in pkg["packages"].keys()):
                 return True
 
+        for other, other_type, msg in skipped:
+            if build_type == other_type and pkg is other:
+                return True
+
         return pkg['name'] in SKIP
 
     todo = []
