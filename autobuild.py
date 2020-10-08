@@ -38,6 +38,7 @@ SKIP: List[str] = [
     # 'mingw-w64-gcc',
     'mingw-w64-gcc-git',
     'mingw-w64-firebird-git',
+    'mingw-w64-qt5-static',
 ]
 
 
