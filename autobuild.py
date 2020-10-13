@@ -3,6 +3,7 @@ import os
 import argparse
 from os import environ
 from github import Github
+from github.GitRelease import GitRelease
 from github.GitReleaseAsset import GitReleaseAsset
 from github.Repository import Repository
 from pathlib import Path, PurePosixPath, PurePath
@@ -117,22 +118,18 @@ def download_asset(asset: GitReleaseAsset, target_path: str, timeout: int = 15) 
                 h.write(chunk)
 
 
-def upload_asset(type_: str, path: _PathLike, replace: bool = False) -> None:
+def upload_asset(release: GitRelease, path: _PathLike, replace: bool = False) -> None:
     # type_: msys/mingw/failed
     if not environ.get("CI"):
         print("WARNING: upload skipped, not running in CI")
         return
     path = Path(path)
-    gh = Github(*get_credentials())
-    repo = gh.get_repo(REPO)
-    release_name = "staging-" + type_
-    release = repo.get_release(release_name)
 
     basename = os.path.basename(str(path))
     asset_name = get_gh_asset_name(basename)
     asset_label = basename
 
-    for asset in get_release_assets(repo, release_name):
+    for asset in get_release_assets(release):
         if asset_name == asset.name:
             if replace:
                 asset.delete_asset()
@@ -231,6 +228,14 @@ SigLevel=Never
         run_cmd(msys2_root, ["repo-add", to_pure_posix_path(repo_db_path),
                              to_pure_posix_path(package_path)], cwd=repo_dir)
 
+    def get_cached_assets(
+            repo: Repository, release_name: str, *, _cache={}) -> List[GitReleaseAsset]:
+        key = (repo.full_name, release_name)
+        if key not in _cache:
+            release = repo.get_release(release_name)
+            _cache[key] = get_release_assets(release)
+        return _cache[key]
+
     repo_root = os.path.join(builddir, "_REPO")
     try:
         shutil.rmtree(repo_root, ignore_errors=True)
@@ -241,7 +246,7 @@ SigLevel=Never
             for name, dep in pkg['ext-depends'].get(dep_type, {}).items():
                 pattern = f"{name}-{dep['version']}-*.pkg.*"
                 repo_type = "msys" if dep['repo'].startswith('MSYS2') else "mingw"
-                for asset in get_release_assets(repo, "staging-" + repo_type):
+                for asset in get_cached_assets(repo, "staging-" + repo_type):
                     if fnmatch.fnmatch(get_asset_filename(asset), pattern):
                         to_add.append((repo_type, asset))
                         break
@@ -268,6 +273,9 @@ def build_package(build_type: str, pkg, msys2_root: _PathLike, builddir: _PathLi
     repo_name = {"MINGW-packages": "M", "MSYS2-packages": "S"}.get(pkg['repo'], pkg['repo'])
     repo_dir = os.path.join(builddir, repo_name)
     to_upload: List[str] = []
+
+    gh = Github(*get_credentials())
+    repo = gh.get_repo(REPO)
 
     with staging_dependencies(build_type, pkg, msys2_root, builddir), \
             auto_key_retrieve(msys2_root), \
@@ -345,18 +353,21 @@ def build_package(build_type: str, pkg, msys2_root: _PathLike, builddir: _PathLi
             else:
                 assert 0
 
+            release = repo.get_release("staging-failed")
             for entry in failed_entries:
                 with tempfile.TemporaryDirectory() as tempdir:
                     failed_path = os.path.join(tempdir, entry)
                     with open(failed_path, 'wb') as h:
                         # github doesn't allow empty assets
                         h.write(b'oh no')
-                    upload_asset("failed", failed_path)
+                    upload_asset(release, failed_path)
 
             raise BuildError(e)
         else:
+            release = repo.get_release(
+                "staging-msys"if build_type.startswith("msys") else "staging-mingw")
             for path in to_upload:
-                upload_asset("msys" if build_type.startswith("msys") else "mingw", path)
+                upload_asset(release, path)
 
 
 def run_build(args: Any) -> None:
@@ -458,9 +469,9 @@ def get_asset_filename(asset: GitReleaseAsset) -> str:
         return asset.label
 
 
-def get_release_assets(repo: Repository, release_name: str) -> List[GitReleaseAsset]:
+def get_release_assets(release: GitRelease) -> List[GitReleaseAsset]:
     assets = []
-    for asset in repo.get_release(release_name).get_assets():
+    for asset in release.get_assets():
         uploader = asset.uploader
         if uploader.type != "Bot" or uploader.login != "github-actions[bot]":
             raise SystemExit(f"ERROR: Asset '{get_asset_filename(asset)}' not uploaded "
@@ -477,10 +488,12 @@ def get_packages_to_build() -> Tuple[
     repo = gh.get_repo(REPO)
     assets = []
     for name in ["msys", "mingw"]:
+        release = repo.get_release('staging-' + name)
         assets.extend([
-            get_asset_filename(a) for a in get_release_assets(repo, 'staging-' + name)])
+            get_asset_filename(a) for a in get_release_assets(release)])
+    release = repo.get_release('staging-failed')
     assets_failed = [
-        get_asset_filename(a) for a in get_release_assets(repo, 'staging-failed')]
+        get_asset_filename(a) for a in get_release_assets(release)]
 
     def pkg_is_done(build_type: str, pkg: _Package) -> bool:
         if build_type in ["mingw-src", "msys-src"]:
@@ -564,7 +577,8 @@ def show_assets(args: Any) -> None:
     repo = gh.get_repo(REPO)
 
     for name in ["msys", "mingw"]:
-        assets = get_finished_assets(repo, 'staging-' + name)
+        release = repo.get_release('staging-' + name)
+        assets = get_finished_assets(release)
 
         print(tabulate(
             [[
@@ -608,7 +622,8 @@ def fetch_assets(args: Any) -> None:
     skipped = []
     for name in ["msys", "mingw"]:
         p = Path(args.targetdir)
-        assets = get_finished_assets(repo, 'staging-' + name)
+        release = repo.get_release('staging-' + name)
+        assets = get_finished_assets(release)
         for asset in assets:
             asset_dir = p / get_repo_subdir(name, asset)
             asset_dir.mkdir(parents=True, exist_ok=True)
@@ -656,8 +671,9 @@ def get_assets_to_delete(repo: Repository) -> List[GitReleaseAsset]:
 
     print("Fetching assets...")
     assets: Dict[str, List[GitReleaseAsset]] = {}
-    for release in ['staging-msys', 'staging-mingw', 'staging-failed']:
-        for asset in get_release_assets(repo, release):
+    for release_name in ['staging-msys', 'staging-mingw', 'staging-failed']:
+        release = repo.get_release(release_name)
+        for asset in get_release_assets(release):
             assets.setdefault(get_asset_filename(asset), []).append(asset)
 
     for pattern in patterns:
@@ -671,11 +687,11 @@ def get_assets_to_delete(repo: Repository) -> List[GitReleaseAsset]:
     return result
 
 
-def get_finished_assets(repo: Repository, release_name: str) -> List[GitReleaseAsset]:
+def get_finished_assets(release: GitRelease) -> List[GitReleaseAsset]:
     """Returns assets for packages where all package results are available"""
 
     assets: Dict[str, List[GitReleaseAsset]] = {}
-    for asset in get_release_assets(repo, release_name):
+    for asset in get_release_assets(release):
         assets.setdefault(get_asset_filename(asset), []).append(asset)
 
     finished = []
