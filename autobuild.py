@@ -197,8 +197,7 @@ def build_type_to_dep_type(build_type):
 def staging_dependencies(
         build_type: str, pkg: _Package, msys2_root: _PathLike,
         builddir: _PathLike) -> Generator:
-    gh = get_github()
-    repo = gh.get_repo(REPO)
+    repo = get_repo()
 
     def add_to_repo(repo_root, repo_type, asset):
         repo_dir = Path(repo_root) / get_repo_subdir(repo_type, asset)
@@ -274,8 +273,7 @@ def build_package(build_type: str, pkg, msys2_root: _PathLike, builddir: _PathLi
     repo_dir = os.path.join(builddir, repo_name)
     to_upload: List[str] = []
 
-    gh = get_github()
-    repo = gh.get_repo(REPO)
+    repo = get_repo()
 
     with staging_dependencies(build_type, pkg, msys2_root, builddir), \
             auto_key_retrieve(msys2_root), \
@@ -483,9 +481,7 @@ def get_release_assets(release: GitRelease) -> List[GitReleaseAsset]:
 def get_packages_to_build() -> Tuple[
         List[Tuple[_Package, str]], List[Tuple[_Package, str, str]],
         List[Tuple[_Package, str]]]:
-    gh = get_github()
-
-    repo = gh.get_repo(REPO)
+    repo = get_repo()
     assets = []
     for name in ["msys", "mingw"]:
         release = repo.get_release('staging-' + name)
@@ -573,8 +569,7 @@ def show_build(args: Any) -> None:
 
 
 def show_assets(args: Any) -> None:
-    gh = get_github()
-    repo = gh.get_repo(REPO)
+    repo = get_repo()
 
     for name in ["msys", "mingw"]:
         release = repo.get_release('staging-' + name)
@@ -615,8 +610,7 @@ def get_repo_subdir(type_: str, asset: GitReleaseAsset) -> Path:
 
 
 def fetch_assets(args: Any) -> None:
-    gh = get_github()
-    repo = gh.get_repo(REPO)
+    repo = get_repo()
 
     todo = []
     skipped = []
@@ -650,8 +644,7 @@ def fetch_assets(args: Any) -> None:
 
 
 def trigger_gha_build(args: Any) -> None:
-    gh = get_github()
-    repo = gh.get_repo(REPO)
+    repo = get_repo()
     if repo.create_repository_dispatch('manual-build', {}):
         print("Build triggered")
     else:
@@ -717,8 +710,7 @@ def get_finished_assets(release: GitRelease) -> List[GitReleaseAsset]:
 
 
 def clean_gha_assets(args: Any) -> None:
-    gh = get_github()
-    repo = gh.get_repo(REPO)
+    repo = get_repo()
     assets = get_assets_to_delete(repo)
 
     for asset in assets:
@@ -739,11 +731,12 @@ def get_credentials() -> Dict[str, Any]:
         raise Exception("'GITHUB_TOKEN' or 'GITHUB_USER'/'GITHUB_PASS' env vars not set")
 
 
-def get_github() -> Github:
+def get_repo() -> Repository:
     kwargs = get_credentials()
     # 100 is the maximum allowed
     kwargs['per_page'] = 100
-    return Github(**kwargs)
+    gh = Github(**kwargs)
+    return gh.get_repo(REPO, lazy=True)
 
 
 def main(argv: List[str]):
