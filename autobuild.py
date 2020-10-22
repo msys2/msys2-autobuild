@@ -197,7 +197,7 @@ def build_type_to_dep_type(build_type):
 def staging_dependencies(
         build_type: str, pkg: _Package, msys2_root: _PathLike,
         builddir: _PathLike) -> Generator:
-    gh = Github(*get_credentials())
+    gh = get_github()
     repo = gh.get_repo(REPO)
 
     def add_to_repo(repo_root, repo_type, asset):
@@ -274,7 +274,7 @@ def build_package(build_type: str, pkg, msys2_root: _PathLike, builddir: _PathLi
     repo_dir = os.path.join(builddir, repo_name)
     to_upload: List[str] = []
 
-    gh = Github(*get_credentials())
+    gh = get_github()
     repo = gh.get_repo(REPO)
 
     with staging_dependencies(build_type, pkg, msys2_root, builddir), \
@@ -483,7 +483,7 @@ def get_release_assets(release: GitRelease) -> List[GitReleaseAsset]:
 def get_packages_to_build() -> Tuple[
         List[Tuple[_Package, str]], List[Tuple[_Package, str, str]],
         List[Tuple[_Package, str]]]:
-    gh = Github(*get_credentials())
+    gh = get_github()
 
     repo = gh.get_repo(REPO)
     assets = []
@@ -573,7 +573,7 @@ def show_build(args: Any) -> None:
 
 
 def show_assets(args: Any) -> None:
-    gh = Github(*get_credentials())
+    gh = get_github()
     repo = gh.get_repo(REPO)
 
     for name in ["msys", "mingw"]:
@@ -615,7 +615,7 @@ def get_repo_subdir(type_: str, asset: GitReleaseAsset) -> Path:
 
 
 def fetch_assets(args: Any) -> None:
-    gh = Github(*get_credentials())
+    gh = get_github()
     repo = gh.get_repo(REPO)
 
     todo = []
@@ -650,7 +650,7 @@ def fetch_assets(args: Any) -> None:
 
 
 def trigger_gha_build(args: Any) -> None:
-    gh = Github(*get_credentials())
+    gh = get_github()
     repo = gh.get_repo(REPO)
     if repo.create_repository_dispatch('manual-build', {}):
         print("Build triggered")
@@ -717,7 +717,7 @@ def get_finished_assets(release: GitRelease) -> List[GitReleaseAsset]:
 
 
 def clean_gha_assets(args: Any) -> None:
-    gh = Github(*get_credentials())
+    gh = get_github()
     repo = gh.get_repo(REPO)
     assets = get_assets_to_delete(repo)
 
@@ -730,13 +730,20 @@ def clean_gha_assets(args: Any) -> None:
         print("Nothing to delete")
 
 
-def get_credentials() -> List:
+def get_credentials() -> Dict[str, Any]:
     if "GITHUB_TOKEN" in environ:
-        return [environ["GITHUB_TOKEN"]]
+        return {'login_or_token': environ["GITHUB_TOKEN"]}
     elif "GITHUB_USER" in environ and "GITHUB_PASS" in environ:
-        return [environ["GITHUB_USER"], environ["GITHUB_PASS"]]
+        return {'login_or_token': environ["GITHUB_USER"], 'password': environ["GITHUB_PASS"]}
     else:
         raise Exception("'GITHUB_TOKEN' or 'GITHUB_USER'/'GITHUB_PASS' env vars not set")
+
+
+def get_github() -> Github:
+    kwargs = get_credentials()
+    # 100 is the maximum allowed
+    kwargs['per_page'] = 100
+    return Github(**kwargs)
 
 
 def main(argv: List[str]):
