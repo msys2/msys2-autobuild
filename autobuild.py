@@ -44,6 +44,7 @@ SKIP: List[str] = [
 
 
 REPO = "msys2/msys2-autobuild"
+WORKFLOW = "build"
 
 
 def timeoutgen(timeout: float) -> Callable[[], float]:
@@ -549,6 +550,35 @@ def get_packages_to_build() -> Tuple[
     return done, skipped, todo
 
 
+def get_workflow():
+    repo = get_repo()
+    for workflow in repo.get_workflows():
+        if workflow.name == WORKFLOW:
+            return workflow
+    else:
+        raise Exception("workflow not found:", WORKFLOW)
+
+
+def should_run(args: Any) -> None:
+    current_id = None
+    if "GITHUB_RUN_ID" in os.environ:
+        current_id = int(os.environ["GITHUB_RUN_ID"])
+
+    workflow = get_workflow()
+    runs = list(workflow.get_runs(status="in_progress"))
+    runs += list(workflow.get_runs(status="queued"))
+    for run in runs:
+        if current_id is not None and current_id == run.id:
+            # Ignore this run itself
+            continue
+        raise SystemExit(
+            f"Another workflow is currently running or has something queued: {run.html_url}")
+
+    done, skipped, todo = get_packages_to_build()
+    if not todo:
+        raise SystemExit("Nothing to build")
+
+
 def show_build(args: Any) -> None:
     done, skipped, todo = get_packages_to_build()
 
@@ -563,9 +593,6 @@ def show_build(args: Any) -> None:
     with gha_group(f"DONE ({len(done)})"):
         print(tabulate([(p["name"], bt, p["version"]) for (p, bt) in done],
                        headers=["Package", "Build", "Version"]))
-
-    if args.fail_on_idle and not todo:
-        raise SystemExit("Nothing to build")
 
 
 def show_assets(args: Any) -> None:
@@ -756,6 +783,10 @@ def main(argv: List[str]):
     sub.add_argument(
         "--fail-on-idle", action="store_true", help="Fails if there is nothing to do")
     sub.set_defaults(func=show_build)
+
+    sub = subparser.add_parser(
+        "should-run", help="Fails if the workflow shouldn't run", allow_abbrev=False)
+    sub.set_defaults(func=should_run)
 
     sub = subparser.add_parser(
         "show-assets", help="Show all staging packages", allow_abbrev=False)

@@ -35,37 +35,43 @@ jobs:
         python -m pip install --upgrade pip setuptools wheel
         python -m pip install --user -r requirements.txt
 
-    - name: Show build queue
-      id: queue
+    - name: Check if we should run
+      id: check
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
-        python autobuild.py show --fail-on-idle
+        python autobuild.py should-run
         $skipBuild = ($LASTEXITCODE -ne 0)
         If ($skipBuild) {echo '::set-output name=skip-build::true'}
         exit 0
 
+    - name: Show build queue
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        python autobuild.py show
+
     - uses: msys2/setup-msys2@v2
-      if: steps.queue.outputs.skip-build != 'true'
+      if: steps.check.outputs.skip-build != 'true'
       with:
         msystem: MSYS
         update: true
         install: msys2-devel base-devel mingw-w64-x86_64-toolchain mingw-w64-i686-toolchain git
 
     - name: Check install
-      if: steps.queue.outputs.skip-build != 'true'
+      if: steps.check.outputs.skip-build != 'true'
       run: |
         msys2 -c 'pacman -Qkq'
 
     - name: Init git
-      if: steps.queue.outputs.skip-build != 'true'
+      if: steps.check.outputs.skip-build != 'true'
       shell: msys2 {0}
       run: |
         git config --global user.email 'ci@msys2.org'
         git config --global user.name 'MSYS2 Continuous Integration'
 
     - name: Process build queue
-      if: steps.queue.outputs.skip-build != 'true'
+      if: steps.check.outputs.skip-build != 'true'
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
@@ -76,6 +82,7 @@ jobs:
         python autobuild.py build "$MSYS2_ROOT" "$BUILD_ROOT"
 
     - name: Clean up assets
+      if: steps.check.outputs.skip-build != 'true'
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
