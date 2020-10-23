@@ -46,6 +46,7 @@ jobs:
         exit 0
 
     - name: Show build queue
+      if: steps.check.outputs.skip-build != 'true'
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
