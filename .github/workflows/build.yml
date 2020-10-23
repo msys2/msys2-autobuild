@@ -44,6 +44,13 @@ jobs:
         If ($skipBuild) {echo '::set-output name=skip-build::true'}
         exit 0
 
+    - name: Clean up assets
+      if: steps.check.outputs.skip-build != 'true'
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        python autobuild.py clean-assets
+
     - name: Show build queue
       if: steps.check.outputs.skip-build != 'true'
       env:
@@ -80,10 +87,3 @@ jobs:
         $MSYS2_ROOT=(msys2 -c 'cygpath -w /')
         Get-PSDrive -PSProvider FileSystem
         python autobuild.py build "$MSYS2_ROOT" "$BUILD_ROOT"
-
-    - name: Clean up assets
-      if: steps.check.outputs.skip-build != 'true'
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      run: |
-        python autobuild.py clean-assets
