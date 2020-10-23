@@ -646,7 +646,8 @@ def fetch_assets(args: Any) -> None:
 
 def trigger_gha_build(args: Any) -> None:
     repo = get_repo()
-    if repo.create_repository_dispatch('manual-build', {}):
+    workflow = get_workflow()
+    if workflow.create_dispatch(repo.default_branch):
         print("Build triggered")
     else:
         raise Exception("trigger failed")

@@ -2,8 +2,6 @@ name: 'build'
 
 on:
   workflow_dispatch:
-  repository_dispatch:
-    types: [manual-build]
   schedule:
     - cron: '0 0/2 * * *'
 
