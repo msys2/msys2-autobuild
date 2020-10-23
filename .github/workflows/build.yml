@@ -5,7 +5,7 @@ on:
   repository_dispatch:
     types: [manual-build]
   schedule:
-    - cron: '0 0/4 * * *'
+    - cron: '0 0/2 * * *'
 
 env:
   CI: true
