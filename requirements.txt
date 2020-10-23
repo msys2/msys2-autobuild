@@ -2,9 +2,9 @@ certifi==2020.6.20
 chardet==3.0.4
 Deprecated==1.2.10
 idna==2.10
-PyGithub==1.52
+PyGithub==1.53
 PyJWT==1.7.1
 requests==2.24.0
 tabulate==0.8.7
-urllib3==1.25.10
+urllib3==1.25.11
 wrapt==1.12.1
