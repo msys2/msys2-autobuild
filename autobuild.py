@@ -21,16 +21,13 @@ import time
 import tempfile
 import shutil
 from hashlib import sha256
-from typing import Generator, Union, AnyStr, List, Callable, Any, Dict, Tuple
+from typing import Generator, Union, AnyStr, List, Any, Dict, Tuple
 
 _PathLike = Union[os.PathLike, AnyStr]
 _Package = Dict
 
-# After which overall time it should stop building (in seconds)
-# Disabled for now, we don't do anything with it and every minute counts
-HARD_TIMEOUT = 999 * 60 * 60
 # After which we shouldn't start a new build
-SOFT_TIMEOUT = HARD_TIMEOUT / 2
+SOFT_TIMEOUT = 60 * 60 * 3
 
 # Packages that take too long to build, and should be handled manually
 SKIP: List[str] = [
@@ -45,18 +42,6 @@ SKIP: List[str] = [
 
 REPO = "msys2/msys2-autobuild"
 WORKFLOW = "build"
-
-
-def timeoutgen(timeout: float) -> Callable[[], float]:
-    end = time.time() + timeout
-
-    def new() -> float:
-        return max(end - time.time(), 0)
-    return new
-
-
-get_hard_timeout = timeoutgen(HARD_TIMEOUT)
-get_soft_timeout = timeoutgen(SOFT_TIMEOUT)
 
 
 def run_cmd(msys2_root: _PathLike, args, **kwargs):
@@ -104,10 +89,6 @@ class BuildError(Exception):
 
 
 class MissingDependencyError(BuildError):
-    pass
-
-
-class BuildTimeoutError(BuildError):
     pass
 
 
@@ -290,14 +271,14 @@ def build_package(build_type: str, pkg, msys2_root: _PathLike, builddir: _PathLi
                     '--noconfirm',
                     '--noprogressbar',
                     '--allsource'
-                ], env=env, cwd=pkg_dir, timeout=get_hard_timeout())
+                ], env=env, cwd=pkg_dir)
             elif build_type == "msys-src":
                 run_cmd(msys2_root, [
                     'makepkg',
                     '--noconfirm',
                     '--noprogressbar',
                     '--allsource'
-                ], cwd=pkg_dir, timeout=get_hard_timeout())
+                ], cwd=pkg_dir)
             elif build_type in ["mingw32", "mingw64"]:
                 env = environ.copy()
                 env['MINGW_INSTALLS'] = build_type
@@ -309,7 +290,7 @@ def build_package(build_type: str, pkg, msys2_root: _PathLike, builddir: _PathLi
                     '--syncdeps',
                     '--rmdeps',
                     '--cleanbuild'
-                ], env=env, cwd=pkg_dir, timeout=get_hard_timeout())
+                ], env=env, cwd=pkg_dir)
             elif build_type == "msys":
                 run_cmd(msys2_root, [
                     'makepkg',
@@ -319,7 +300,7 @@ def build_package(build_type: str, pkg, msys2_root: _PathLike, builddir: _PathLi
                     '--syncdeps',
                     '--rmdeps',
                     '--cleanbuild'
-                ], cwd=pkg_dir, timeout=get_hard_timeout())
+                ], cwd=pkg_dir)
             else:
                 assert 0
 
@@ -338,9 +319,6 @@ def build_package(build_type: str, pkg, msys2_root: _PathLike, builddir: _PathLi
                 if not found:
                     raise BuildError(f"{pattern} not found, likely wrong version built")
                 to_upload.extend([os.path.join(pkg_dir, e) for e in found])
-
-        except subprocess.TimeoutExpired as e:
-            raise BuildTimeoutError(e)
 
         except (subprocess.CalledProcessError, BuildError) as e:
             failed_entries = []
@@ -372,6 +350,7 @@ def build_package(build_type: str, pkg, msys2_root: _PathLike, builddir: _PathLi
 def run_build(args: Any) -> None:
     builddir = os.path.abspath(args.builddir)
     msys2_root = os.path.abspath(args.msys2_root)
+    start_time = time.monotonic()
 
     if not sys.platform == "win32":
         raise SystemExit("ERROR: Needs to run under native Python")
@@ -398,7 +377,7 @@ def run_build(args: Any) -> None:
             raise SystemExit("ERROR: building package again in the same run", pkg)
         done.add(key)
 
-        if get_soft_timeout() == 0:
+        if (time.monotonic() - start_time) >= SOFT_TIMEOUT:
             print("timeout reached")
             break
 
@@ -410,11 +389,6 @@ def run_build(args: Any) -> None:
                            f"failed -> missing deps"):
                 pass
             continue
-        except BuildTimeoutError:
-            with gha_group(f"[{ pkg['repo'] }] [{ build_type }] { pkg['name'] }: "
-                           f"build time limit reached"):
-                pass
-            break
         except BuildError:
             with gha_group(f"[{ pkg['repo'] }] [{ build_type }] { pkg['name'] }: failed"):
                 traceback.print_exc(file=sys.stdout)
