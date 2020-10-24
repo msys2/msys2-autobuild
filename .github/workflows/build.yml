@@ -76,8 +76,8 @@ jobs:
     - name: Update using the main mirror
       if: steps.check.outputs.skip-build != 'true'
       run: |
-        msys2 -c 'pacman --noconfirm -Suy'
-        msys2 -c 'pacman --noconfirm -Su'
+        msys2 -c 'pacman --noconfirm -Suuy'
+        msys2 -c 'pacman --noconfirm -Suu'
 
     - name: Check install
       if: steps.check.outputs.skip-build != 'true'
