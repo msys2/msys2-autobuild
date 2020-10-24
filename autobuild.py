@@ -197,8 +197,6 @@ def staging_dependencies(
             text = h.read()
             uri = to_pure_posix_path(repo_dir).as_uri()
             if uri not in text:
-                text.replace("#RemoteFileSigLevel = Required",
-                             "RemoteFileSigLevel = Never")
                 with open(conf, "w", encoding="utf-8") as h2:
                     h2.write(f"""[{repo_name}]
 Server={uri}
