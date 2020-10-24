@@ -72,6 +72,7 @@ jobs:
         sed -e "s|Include = /etc/pacman.d/mirrorlist.mingw32|Server = http://repo.msys2.org/mingw/i686/|g" -i /etc/pacman.conf
         sed -e "s|Include = /etc/pacman.d/mirrorlist.mingw64|Server = http://repo.msys2.org/mingw/x86_64/|g" -i /etc/pacman.conf
         sed -e "s|Include = /etc/pacman.d/mirrorlist.msys|Server = http://repo.msys2.org/msys/\$arch/|g" -i /etc/pacman.conf
+        pacman-conf.exe
 
     - name: Update using the main mirror
       if: steps.check.outputs.skip-build != 'true'
