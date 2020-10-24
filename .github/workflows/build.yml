@@ -65,6 +65,15 @@ jobs:
         update: true
         install: msys2-devel base-devel mingw-w64-x86_64-toolchain mingw-w64-i686-toolchain git
 
+    - name: Switch to the main mirror
+      if: steps.check.outputs.skip-build != 'true'
+      run: |
+        msys2 -c 'sed -e "s|Include = /etc/pacman.d/mirrorlist.mingw32|Server = http://repo.msys2.org/mingw/i686/|g" -i /etc/pacman.conf'
+        msys2 -c 'sed -e "s|Include = /etc/pacman.d/mirrorlist.mingw64|Server = http://repo.msys2.org/mingw/x86_64/|g" -i /etc/pacman.conf'
+        msys2 -c 'sed -e "s|Include = /etc/pacman.d/mirrorlist.msys|Server = http://repo.msys2.org/msys/\$arch/|g" -i /etc/pacman.conf'
+        msys2 -c 'pacman --noconfirm -Suy'
+        msys2 -c 'pacman --noconfirm -Su'
+
     - name: Check install
       if: steps.check.outputs.skip-build != 'true'
       run: |
