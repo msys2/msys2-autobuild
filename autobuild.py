@@ -504,7 +504,7 @@ def get_packages_to_build() -> Tuple[
             else:
                 dep_type = build_type_to_dep_type(build_type)
                 for dep in pkg['ext-depends'].get(dep_type, {}).values():
-                    if pkg_has_failed(build_type, dep) or pkg_is_skipped(build_type, dep):
+                    if pkg_has_failed(dep_type, dep) or pkg_is_skipped(dep_type, dep):
                         skipped.append((pkg, build_type, "requires: " + dep['name']))
                         break
                 else:
