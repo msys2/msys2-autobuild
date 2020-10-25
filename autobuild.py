@@ -88,10 +88,6 @@ class BuildError(Exception):
     pass
 
 
-class MissingDependencyError(BuildError):
-    pass
-
-
 def download_asset(asset: GitReleaseAsset, target_path: str, timeout: int = 15) -> None:
     with requests.get(asset.browser_download_url, stream=True, timeout=timeout) as r:
         r.raise_for_status()
@@ -230,7 +226,7 @@ SigLevel=Never
                         to_add.append((repo_type, asset))
                         break
                 else:
-                    raise MissingDependencyError(f"asset for {pattern} not found")
+                    raise SystemExit(f"asset for {pattern} in {repo_type} not found")
 
             for repo_type, asset in to_add:
                 add_to_repo(repo_root, repo_type, asset)
@@ -382,11 +378,6 @@ def run_build(args: Any) -> None:
         try:
             with gha_group(f"[{ pkg['repo'] }] [{ build_type }] { pkg['name'] }..."):
                 build_package(build_type, pkg, msys2_root, builddir)
-        except MissingDependencyError:
-            with gha_group(f"[{ pkg['repo'] }] [{ build_type }] { pkg['name'] }: "
-                           f"failed -> missing deps"):
-                pass
-            continue
         except BuildError:
             with gha_group(f"[{ pkg['repo'] }] [{ build_type }] { pkg['name'] }: failed"):
                 traceback.print_exc(file=sys.stdout)
