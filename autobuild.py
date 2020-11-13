@@ -88,7 +88,15 @@ class BuildError(Exception):
     pass
 
 
+def asset_is_complete(asset: GitReleaseAsset) -> bool:
+    # assets can stay around in a weird incomplete state
+    # in which case asset.state == "starter". GitHub shows
+    # them with a red warning sign in the edit UI.
+    return asset.state == "uploaded"
+
+
 def download_asset(asset: GitReleaseAsset, target_path: str, timeout: int = 15) -> None:
+    assert asset_is_complete(asset)
     with requests.get(asset.browser_download_url, stream=True, timeout=timeout) as r:
         r.raise_for_status()
         with open(target_path, 'wb') as h:
@@ -107,9 +115,11 @@ def upload_asset(release: GitRelease, path: _PathLike, replace: bool = False) ->
     asset_name = get_gh_asset_name(basename)
     asset_label = basename
 
-    for asset in get_release_assets(release):
+    for asset in get_release_assets(release, include_incomplete=True):
         if asset_name == asset.name:
-            if replace:
+            # We want to tread incomplete assets as if they weren't there
+            # so replace them always
+            if replace or not asset_is_complete(asset):
                 asset.delete_asset()
             else:
                 print(f"Skipping upload for {asset_name} as {asset_label}, already exists")
@@ -431,9 +441,12 @@ def get_asset_filename(asset: GitReleaseAsset) -> str:
         return asset.label
 
 
-def get_release_assets(release: GitRelease) -> List[GitReleaseAsset]:
+def get_release_assets(release: GitRelease, include_incomplete=False) -> List[GitReleaseAsset]:
     assets = []
     for asset in release.get_assets():
+        # skip in case not fully uploaded yet (or uploading failed)
+        if not asset_is_complete(asset) and not include_incomplete:
+            continue
         uploader = asset.uploader
         if uploader.type != "Bot" or uploader.login != "github-actions[bot]":
             raise SystemExit(f"ERROR: Asset '{get_asset_filename(asset)}' not uploaded "
@@ -657,7 +670,7 @@ def get_assets_to_delete(repo: Repository) -> List[GitReleaseAsset]:
     assets: Dict[str, List[GitReleaseAsset]] = {}
     for release_name in ['staging-msys', 'staging-mingw', 'staging-failed']:
         release = repo.get_release(release_name)
-        for asset in get_release_assets(release):
+        for asset in get_release_assets(release, include_incomplete=True):
             assets.setdefault(get_asset_filename(asset), []).append(asset)
 
     for pattern in patterns:
