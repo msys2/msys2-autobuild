@@ -500,13 +500,22 @@ def get_packages_to_build() -> Tuple[
 
         return pkg['name'] in SKIP
 
+    def pkg_needs_build(build_type: str, pkg: _Package) -> bool:
+        if build_type in pkg["packages"]:
+            return True
+        if build_type == "mingw-src" and \
+                any(k.startswith("mingw") for k in pkg["packages"].keys()):
+            return True
+        if build_type == "msys-src" and "msys" in pkg["packages"]:
+            return True
+        return False
+
     todo = []
     done = []
     skipped = []
     for pkg in get_buildqueue():
         for build_type in ["msys", "mingw32", "mingw64", "mingw-src", "msys-src"]:
-            dep_type = build_type_to_dep_type(build_type)
-            if dep_type not in pkg["packages"]:
+            if not pkg_needs_build(build_type, pkg):
                 continue
             if pkg_is_done(build_type, pkg):
                 done.append((pkg, build_type))
