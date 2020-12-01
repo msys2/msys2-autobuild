@@ -99,9 +99,17 @@ def download_asset(asset: GitReleaseAsset, target_path: str, timeout: int = 15) 
     assert asset_is_complete(asset)
     with requests.get(asset.browser_download_url, stream=True, timeout=timeout) as r:
         r.raise_for_status()
-        with open(target_path, 'wb') as h:
-            for chunk in r.iter_content(4096):
-                h.write(chunk)
+        fd, temppath = tempfile.mkstemp()
+        try:
+            with os.fdopen(fd, "wb") as h:
+                for chunk in r.iter_content(4096):
+                    h.write(chunk)
+            shutil.move(temppath, target_path)
+        finally:
+            try:
+                os.remove(temppath)
+            except OSError:
+                pass
 
 
 def upload_asset(release: GitRelease, path: _PathLike, replace: bool = False) -> None:
