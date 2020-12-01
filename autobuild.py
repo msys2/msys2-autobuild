@@ -95,9 +95,9 @@ def asset_is_complete(asset: GitReleaseAsset) -> bool:
     return asset.state == "uploaded"
 
 
-def download_asset(asset: GitReleaseAsset, target_path: str, timeout: int = 15) -> None:
+def download_asset(asset: GitReleaseAsset, target_path: str) -> None:
     assert asset_is_complete(asset)
-    with requests.get(asset.browser_download_url, stream=True, timeout=timeout) as r:
+    with requests.get(asset.browser_download_url, stream=True, timeout=(15, 30)) as r:
         r.raise_for_status()
         fd, temppath = tempfile.mkstemp()
         try:
@@ -656,7 +656,7 @@ def fetch_assets(args: Any) -> None:
         download_asset(asset, asset_path)
         return item
 
-    with ThreadPoolExecutor(4) as executor:
+    with ThreadPoolExecutor(8) as executor:
         for i, item in enumerate(executor.map(fetch_item, todo)):
             print(f"[{i + 1}/{len(todo)}] {get_asset_filename(item[0])}")
 
