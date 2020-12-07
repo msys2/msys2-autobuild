@@ -101,6 +101,7 @@ def download_asset(asset: GitReleaseAsset, target_path: str) -> None:
         r.raise_for_status()
         fd, temppath = tempfile.mkstemp()
         try:
+            os.chmod(temppath, 0o644)
             with os.fdopen(fd, "wb") as h:
                 for chunk in r.iter_content(4096):
                     h.write(chunk)
