@@ -385,7 +385,7 @@ def run_build(args: Any) -> None:
         if not todo:
             break
         pkg, build_type = todo[0]
-        key = pkg['repo'] + build_type + pkg['name']
+        key = pkg['repo'] + build_type + pkg['name'] + pkg['version']
         if key in done:
             raise SystemExit("ERROR: building package again in the same run", pkg)
         done.add(key)
