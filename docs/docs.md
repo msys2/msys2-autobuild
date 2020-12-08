@@ -18,7 +18,7 @@ loop Every 5 minutes
     GIT-->>API: 
 end
 
-loop Every 4 hours
+loop Every 2 hours
     DT->>GHA: cron trigger
     GHA->>API: fetch TODO list
     API-->>GHA: 
