@@ -171,7 +171,7 @@ def auto_key_retrieve(msys2_root: _PathLike) -> Generator:
     try:
         with open(conf, "w", encoding="utf-8") as h:
             h.write("""
-keyserver keyserver.ubuntu.com
+keyserver hkp://keys.gnupg.net
 keyserver-options auto-key-retrieve
 """)
         yield
