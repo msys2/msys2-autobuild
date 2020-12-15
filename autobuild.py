@@ -631,7 +631,7 @@ def get_repo_subdir(type_: str, asset: GitReleaseAsset) -> Path:
 
 
 def fetch_assets(args: Any) -> None:
-    repo = get_repo()
+    repo = get_repo(optional_credentials=True)
 
     todo = []
     skipped = []
@@ -744,20 +744,27 @@ def clean_gha_assets(args: Any) -> None:
         print("Nothing to delete")
 
 
-def get_credentials() -> Dict[str, Any]:
+def get_credentials(optional: bool = False) -> Dict[str, Any]:
     if "GITHUB_TOKEN" in environ:
         return {'login_or_token': environ["GITHUB_TOKEN"]}
     elif "GITHUB_USER" in environ and "GITHUB_PASS" in environ:
         return {'login_or_token': environ["GITHUB_USER"], 'password': environ["GITHUB_PASS"]}
     else:
-        raise Exception("'GITHUB_TOKEN' or 'GITHUB_USER'/'GITHUB_PASS' env vars not set")
+        if optional:
+            print("[Warning] 'GITHUB_TOKEN' or 'GITHUB_USER'/'GITHUB_PASS' env vars "
+                  "not set which might lead to API rate limiting", file=sys.stderr)
+            return {}
+        else:
+            raise Exception("'GITHUB_TOKEN' or 'GITHUB_USER'/'GITHUB_PASS' env vars not set")
 
 
-def get_repo() -> Repository:
-    kwargs = get_credentials()
+def get_repo(optional_credentials: bool = False) -> Repository:
+    kwargs = get_credentials(optional=optional_credentials)
     # 100 is the maximum allowed
     kwargs['per_page'] = 100
     gh = Github(**kwargs)
+    if optional_credentials:
+        print(f"[Warning] Rate limit status: {gh.get_rate_limit().core}", file=sys.stderr)
     return gh.get_repo(REPO, lazy=True)
 
 
@@ -799,8 +806,6 @@ def main(argv: List[str]):
     sub.add_argument(
         "--dry-run", action="store_true", help="Only show what is going to be deleted")
     sub.set_defaults(func=clean_gha_assets)
-
-    get_credentials()
 
     args = parser.parse_args(argv[1:])
     return args.func(args)
