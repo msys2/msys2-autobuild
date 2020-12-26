@@ -760,10 +760,11 @@ def get_credentials(optional: bool = False) -> Dict[str, Any]:
 
 def get_repo(optional_credentials: bool = False) -> Repository:
     kwargs = get_credentials(optional=optional_credentials)
+    has_creds = bool(kwargs)
     # 100 is the maximum allowed
     kwargs['per_page'] = 100
     gh = Github(**kwargs)
-    if optional_credentials:
+    if not has_creds and optional_credentials:
         print(f"[Warning] Rate limit status: {gh.get_rate_limit().core}", file=sys.stderr)
     return gh.get_repo(REPO, lazy=True)
 
