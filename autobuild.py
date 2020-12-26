@@ -21,10 +21,22 @@ import time
 import tempfile
 import shutil
 from hashlib import sha256
-from typing import Generator, Union, AnyStr, List, Any, Dict, Tuple
+from typing import Generator, Union, AnyStr, List, Any, Dict, Tuple, Set, Sequence, Collection
 
 _PathLike = Union[os.PathLike, AnyStr]
-_Package = Dict
+
+
+class _Package(dict):
+
+    def __repr__(self):
+        return "Package(%r)" % self["name"]
+
+    def __hash__(self):
+        return id(self)
+
+    def __eq__(self, other):
+        return self is other
+
 
 # After which we shouldn't start a new build
 SOFT_TIMEOUT = 60 * 60 * 3
@@ -408,7 +420,8 @@ def get_buildqueue() -> List[_Package]:
     r = requests.get("https://packages.msys2.org/api/buildqueue?include_vcs=true")
     r.raise_for_status()
     dep_mapping = {}
-    for pkg in r.json():
+    for received in r.json():
+        pkg = _Package(received)
         pkg['repo'] = pkg['repo_url'].split('/')[-1]
         pkgs.append(pkg)
         for repo, names in pkg['packages'].items():
@@ -592,19 +605,19 @@ def show_build(args: Any) -> None:
 def show_assets(args: Any) -> None:
     repo = get_repo()
 
+    rows = []
     for name in ["msys", "mingw"]:
         release = repo.get_release('staging-' + name)
-        assets = get_finished_assets(release)
+        assets = get_release_assets(release)
+        rows += [[
+            name,
+            get_asset_filename(asset),
+            asset.size,
+            asset.created_at,
+            asset.updated_at,
+        ] for asset in assets]
 
-        print(tabulate(
-            [[
-                get_asset_filename(asset),
-                asset.size,
-                asset.created_at,
-                asset.updated_at,
-            ] for asset in assets],
-            headers=["name", "size", "created", "updated"]
-        ))
+    print(tabulate(rows, headers=["repo", "name", "size", "created", "updated"]))
 
 
 def get_repo_subdir(type_: str, asset: GitReleaseAsset) -> Path:
@@ -633,24 +646,37 @@ def get_repo_subdir(type_: str, asset: GitReleaseAsset) -> Path:
 def fetch_assets(args: Any) -> None:
     repo = get_repo(optional_credentials=True)
 
+    pkgs = get_buildqueue()
+    groups = group_packages(pkgs)
+
     todo = []
-    skipped = []
+    done = []
+    done_pkgs = []
     for name in ["msys", "mingw"]:
         p = Path(args.targetdir)
         release = repo.get_release('staging-' + name)
-        assets = get_finished_assets(release)
-        for asset in assets:
-            asset_dir = p / get_repo_subdir(name, asset)
-            asset_dir.mkdir(parents=True, exist_ok=True)
-            asset_path = asset_dir / get_asset_filename(asset)
-            if asset_path.exists():
-                if asset_path.stat().st_size != asset.size:
-                    print(f"Warning: {asset_path} already exists but has a different size")
-                skipped.append(asset)
-                continue
-            todo.append((asset, asset_path))
+        release_assets = get_release_assets(release)
 
-    print(f"downloading: {len(todo)}, skipped: {len(skipped)}")
+        for group in groups:
+            finished_assets = get_finished_assets(group, release_assets)[0]
+
+            for pkg, assets in finished_assets.items():
+                done_pkgs.append(pkg)
+                for asset in assets:
+                    asset_dir = p / get_repo_subdir(name, asset)
+                    asset_dir.mkdir(parents=True, exist_ok=True)
+                    asset_path = asset_dir / get_asset_filename(asset)
+                    if asset_path.exists():
+                        if asset_path.stat().st_size != asset.size:
+                            print(f"Warning: {asset_path} already exists "
+                                  f"but has a different size")
+                        done.append(asset)
+                        continue
+                    todo.append((asset, asset_path))
+
+    skipped = len(pkgs) - len(done_pkgs)
+    print(f"downloading: {len(todo)}, done: {len(done)}, "
+          f"skipped: {skipped} (builds missing/failed)")
 
     def fetch_item(item):
         asset, asset_path = item
@@ -702,16 +728,50 @@ def get_assets_to_delete(repo: Repository) -> List[GitReleaseAsset]:
     return result
 
 
-def get_finished_assets(release: GitRelease) -> List[GitReleaseAsset]:
+def group_packages(pkgs: Sequence[_Package]) -> List[Set[_Package]]:
+    """Converts a sequence of packages into a list of non-overlapping sets
+    of packages that are related. Usually all those packages need to be
+    built before they can be added to the repo.
+    """
+
+    groups = []
+
+    pkgs_set = set(pkgs)
+    for pkg in pkgs:
+        transitive_deps = set([pkg])
+        for deps in pkg["ext-depends"].values():
+            transitive_deps.update(deps.values())
+        groups.append(transitive_deps & pkgs_set)
+
+    merged = []
+    while groups:
+        first, *rest = groups
+        rest_new = []
+        for r in rest:
+            if first & r:
+                first |= r
+            else:
+                rest_new.append(r)
+        groups = rest_new
+        merged.append(first)
+
+    return merged
+
+
+def get_finished_assets(pkgs: Collection[_Package],
+                        assets: Sequence[GitReleaseAsset]) -> Tuple[
+        Dict[_Package, List[GitReleaseAsset]], Dict[_Package, str]]:
     """Returns assets for packages where all package results are available"""
 
-    assets: Dict[str, List[GitReleaseAsset]] = {}
-    for asset in get_release_assets(release):
-        assets.setdefault(get_asset_filename(asset), []).append(asset)
+    assets_mapping: Dict[str, List[GitReleaseAsset]] = {}
+    for asset in assets:
+        assets_mapping.setdefault(get_asset_filename(asset), []).append(asset)
 
-    finished = []
-
-    for pkg in get_buildqueue():
+    unfinished = {}
+    finished = {}
+    for pkg in pkgs:
+        # Only returns assets for packages where everything has been
+        # built already
         patterns = []
         patterns.append(f"{pkg['name']}-{pkg['version']}.src.tar.*")
         for repo, items in pkg['packages'].items():
@@ -720,15 +780,24 @@ def get_finished_assets(release: GitRelease) -> List[GitReleaseAsset]:
 
         finished_maybe = []
         for pattern in patterns:
-            matches = fnmatch.filter(assets.keys(), pattern)
+            matches = fnmatch.filter(assets_mapping.keys(), pattern)
             if matches:
-                found = assets[matches[0]]
+                found = assets_mapping[matches[0]]
                 finished_maybe.extend(found)
 
         if len(finished_maybe) == len(patterns):
-            finished.extend(finished_maybe)
+            finished[pkg] = finished_maybe
+        else:
+            unfinished[pkg] = "missing builds"
 
-    return finished
+    # Skip any groups that aren't finished
+    if len(finished) != len(pkgs):
+        finished.clear()
+        for pkg in pkgs:
+            if pkg not in unfinished:
+                unfinished[pkg] = "group not finished"
+
+    return finished, unfinished
 
 
 def clean_gha_assets(args: Any) -> None:
