@@ -480,7 +480,7 @@ def get_release_assets(release: GitRelease, include_incomplete=False) -> List[Gi
 def get_packages_to_build() -> Tuple[
         List[Tuple[_Package, str]], List[Tuple[_Package, str, str]],
         List[Tuple[_Package, str]]]:
-    repo = get_repo()
+    repo = get_repo(optional_credentials=True)
     assets = []
     for name in ["msys", "mingw"]:
         release = repo.get_release('staging-' + name)
