@@ -446,6 +446,15 @@ def get_buildqueue() -> List[_Package]:
                 ver_depends.setdefault(repo, set()).add(dep_mapping[dep])
         pkg['ext-depends'] = ver_depends
 
+    # reverse dependencies
+    for pkg in pkgs:
+        r_depends: Dict[str, Set[_Package]] = {}
+        for pkg2 in pkgs:
+            for repo, deps in pkg2['ext-depends'].items():
+                if pkg in deps:
+                    r_depends.setdefault(repo, set()).add(pkg2)
+        pkg['ext-rdepends'] = r_depends
+
     return pkgs
 
 
@@ -647,36 +656,33 @@ def fetch_assets(args: Any) -> None:
     repo = get_repo(optional_credentials=True)
 
     pkgs = get_buildqueue()
-    groups = group_packages(pkgs)
 
     todo = []
     done = []
-    done_pkgs = []
+    all_blocked = {}
     for name in ["msys", "mingw"]:
         p = Path(args.targetdir)
         release = repo.get_release('staging-' + name)
         release_assets = get_release_assets(release)
+        finished_assets, blocked = get_finished_assets(pkgs, release_assets)
+        all_blocked.update(blocked)
 
-        for group in groups:
-            finished_assets = get_finished_assets(group, release_assets)[0]
+        for pkg, assets in finished_assets.items():
+            for asset in assets:
+                asset_dir = p / get_repo_subdir(name, asset)
+                asset_dir.mkdir(parents=True, exist_ok=True)
+                asset_path = asset_dir / get_asset_filename(asset)
+                if asset_path.exists():
+                    if asset_path.stat().st_size != asset.size:
+                        print(f"Warning: {asset_path} already exists "
+                              f"but has a different size")
+                    done.append(asset)
+                    continue
+                todo.append((asset, asset_path))
 
-            for pkg, assets in finished_assets.items():
-                done_pkgs.append(pkg)
-                for asset in assets:
-                    asset_dir = p / get_repo_subdir(name, asset)
-                    asset_dir.mkdir(parents=True, exist_ok=True)
-                    asset_path = asset_dir / get_asset_filename(asset)
-                    if asset_path.exists():
-                        if asset_path.stat().st_size != asset.size:
-                            print(f"Warning: {asset_path} already exists "
-                                  f"but has a different size")
-                        done.append(asset)
-                        continue
-                    todo.append((asset, asset_path))
-
-    skipped = len(pkgs) - len(done_pkgs)
+    blocked_count = len(pkgs) - len(all_blocked)
     print(f"downloading: {len(todo)}, done: {len(done)}, "
-          f"skipped: {skipped} (builds missing/failed)")
+          f"blocked: {blocked_count} (related builds missing)")
 
     def fetch_item(item):
         asset, asset_path = item
@@ -728,36 +734,6 @@ def get_assets_to_delete(repo: Repository) -> List[GitReleaseAsset]:
     return result
 
 
-def group_packages(pkgs: Sequence[_Package]) -> List[Set[_Package]]:
-    """Converts a sequence of packages into a list of non-overlapping sets
-    of packages that are related. Usually all those packages need to be
-    built before they can be added to the repo.
-    """
-
-    groups = []
-
-    pkgs_set = set(pkgs)
-    for pkg in pkgs:
-        transitive_deps = set([pkg])
-        for deps in pkg["ext-depends"].values():
-            transitive_deps.update(deps)
-        groups.append(transitive_deps & pkgs_set)
-
-    merged = []
-    while groups:
-        first, *rest = groups
-        rest_new = []
-        for r in rest:
-            if first & r:
-                first |= r
-            else:
-                rest_new.append(r)
-        groups = rest_new
-        merged.append(first)
-
-    return merged
-
-
 def get_finished_assets(pkgs: Collection[_Package],
                         assets: Sequence[GitReleaseAsset]) -> Tuple[
         Dict[_Package, List[GitReleaseAsset]], Dict[_Package, str]]:
@@ -767,7 +743,6 @@ def get_finished_assets(pkgs: Collection[_Package],
     for asset in assets:
         assets_mapping.setdefault(get_asset_filename(asset), []).append(asset)
 
-    unfinished = {}
     finished = {}
     for pkg in pkgs:
         # Only returns assets for packages where everything has been
@@ -787,17 +762,30 @@ def get_finished_assets(pkgs: Collection[_Package],
 
         if len(finished_maybe) == len(patterns):
             finished[pkg] = finished_maybe
-        else:
-            unfinished[pkg] = "missing builds"
 
-    # Skip any groups that aren't finished
-    if len(finished) != len(pkgs):
-        finished.clear()
-        for pkg in pkgs:
-            if pkg not in unfinished:
-                unfinished[pkg] = "group not finished"
+    blocked = {}
+    for pkg in finished:
+        blocked_reason = set()
 
-    return finished, unfinished
+        # skip packages where not all dependencies have been built
+        for repo, deps in pkg["ext-depends"].items():
+            for dep in deps:
+                if dep in pkgs and dep not in finished:
+                    blocked_reason.add(dep)
+
+        # skip packages where not all reverse dependencies have been built
+        for repo, deps in pkg["ext-rdepends"].items():
+            for dep in deps:
+                if dep in pkgs and dep not in finished:
+                    blocked_reason.add(dep)
+
+        if blocked_reason:
+            blocked[pkg] = "waiting on %r" % blocked_reason
+
+    for pkg in blocked:
+        finished.pop(pkg, None)
+
+    return finished, blocked
 
 
 def clean_gha_assets(args: Any) -> None:
