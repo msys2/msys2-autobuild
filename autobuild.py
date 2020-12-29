@@ -249,8 +249,8 @@ SigLevel=Never
         with backup_pacman_conf(msys2_root):
             to_add = []
             dep_type = build_type_to_dep_type(build_type)
-            for name, dep in pkg['ext-depends'].get(dep_type, {}).items():
-                pattern = f"{name}-{dep['version']}-*.pkg.*"
+            for dep in pkg['ext-depends'].get(dep_type, set()):
+                pattern = f"{dep['name']}-{dep['version']}-*.pkg.*"
                 repo_type = "msys" if dep['repo'].startswith('MSYS2') else "mingw"
                 for asset in get_cached_assets(repo, "staging-" + repo_type):
                     if fnmatch.fnmatch(get_asset_filename(asset), pattern):
@@ -440,10 +440,10 @@ def get_buildqueue() -> List[_Package]:
 
     # link up dependencies with the real package in the queue
     for pkg in pkgs:
-        ver_depends: Dict[str, Dict[str, _Package]] = {}
+        ver_depends: Dict[str, Set[_Package]] = {}
         for repo, deps in pkg['depends'].items():
             for dep in deps:
-                ver_depends.setdefault(repo, {})[dep] = dep_mapping[dep]
+                ver_depends.setdefault(repo, set()).add(dep_mapping[dep])
         pkg['ext-depends'] = ver_depends
 
     return pkgs
@@ -547,7 +547,7 @@ def get_packages_to_build() -> Tuple[
                 skipped.append((pkg, build_type, "skipped"))
             else:
                 dep_type = build_type_to_dep_type(build_type)
-                for dep in pkg['ext-depends'].get(dep_type, {}).values():
+                for dep in pkg['ext-depends'].get(dep_type, set()):
                     if pkg_has_failed(dep_type, dep) or pkg_is_skipped(dep_type, dep):
                         skipped.append((pkg, build_type, "requires: " + dep['name']))
                         break
@@ -740,7 +740,7 @@ def group_packages(pkgs: Sequence[_Package]) -> List[Set[_Package]]:
     for pkg in pkgs:
         transitive_deps = set([pkg])
         for deps in pkg["ext-depends"].values():
-            transitive_deps.update(deps.values())
+            transitive_deps.update(deps)
         groups.append(transitive_deps & pkgs_set)
 
     merged = []
