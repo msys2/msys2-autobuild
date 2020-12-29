@@ -451,7 +451,7 @@ def get_buildqueue() -> List[_Package]:
         r_depends: Dict[str, Set[_Package]] = {}
         for pkg2 in pkgs:
             for repo, deps in pkg2['ext-depends'].items():
-                if pkg in deps:
+                if pkg in deps.values():
                     r_depends.setdefault(repo, set()).add(pkg2)
         pkg['ext-rdepends'] = r_depends
 
