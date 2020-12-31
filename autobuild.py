@@ -664,7 +664,7 @@ def fetch_assets(args: Any) -> None:
         p = Path(args.targetdir)
         release = repo.get_release('staging-' + name)
         release_assets = get_release_assets(release)
-        finished_assets, blocked = get_finished_assets(pkgs, release_assets)
+        finished_assets, blocked = get_finished_assets(pkgs, release_assets, args.fetch_all)
         all_blocked.update(blocked)
 
         for pkg, assets in finished_assets.items():
@@ -680,9 +680,16 @@ def fetch_assets(args: Any) -> None:
                     continue
                 todo.append((asset, asset_path))
 
-    blocked_count = len(pkgs) - len(all_blocked)
+    if args.verbose and blocked:
+        import pprint
+        print("Packages that are blocked and why:")
+        pprint.pprint(blocked)
+
     print(f"downloading: {len(todo)}, done: {len(done)}, "
-          f"blocked: {blocked_count} (related builds missing)")
+          f"blocked: {len(all_blocked)} (related builds missing)")
+
+    print("Pass --verbose to see the list of blocked packages.")
+    print("Pass --fetch-all to also fetch blocked packages.")
 
     def fetch_item(item):
         asset, asset_path = item
@@ -735,7 +742,8 @@ def get_assets_to_delete(repo: Repository) -> List[GitReleaseAsset]:
 
 
 def get_finished_assets(pkgs: Collection[_Package],
-                        assets: Sequence[GitReleaseAsset]) -> Tuple[
+                        assets: Sequence[GitReleaseAsset],
+                        ignore_blocked: bool) -> Tuple[
         Dict[_Package, List[GitReleaseAsset]], Dict[_Package, str]]:
     """Returns assets for packages where all package results are available"""
 
@@ -764,26 +772,28 @@ def get_finished_assets(pkgs: Collection[_Package],
             finished[pkg] = finished_maybe
 
     blocked = {}
-    for pkg in finished:
-        blocked_reason = set()
 
-        # skip packages where not all dependencies have been built
-        for repo, deps in pkg["ext-depends"].items():
-            for dep in deps.values():
-                if dep in pkgs and dep not in finished:
-                    blocked_reason.add(dep)
+    if not ignore_blocked:
+        for pkg in finished:
+            blocked_reason = set()
 
-        # skip packages where not all reverse dependencies have been built
-        for repo, deps in pkg["ext-rdepends"].items():
-            for dep in deps:
-                if dep in pkgs and dep not in finished:
-                    blocked_reason.add(dep)
+            # skip packages where not all dependencies have been built
+            for repo, deps in pkg["ext-depends"].items():
+                for dep in deps.values():
+                    if dep in pkgs and dep not in finished:
+                        blocked_reason.add(dep)
 
-        if blocked_reason:
-            blocked[pkg] = "waiting on %r" % blocked_reason
+            # skip packages where not all reverse dependencies have been built
+            for repo, deps in pkg["ext-rdepends"].items():
+                for dep in deps:
+                    if dep in pkgs and dep not in finished:
+                        blocked_reason.add(dep)
 
-    for pkg in blocked:
-        finished.pop(pkg, None)
+            if blocked_reason:
+                blocked[pkg] = "waiting on %r" % blocked_reason
+
+        for pkg in blocked:
+            finished.pop(pkg, None)
 
     return finished, blocked
 
@@ -855,6 +865,10 @@ def main(argv: List[str]):
     sub = subparser.add_parser(
         "fetch-assets", help="Download all staging packages", allow_abbrev=False)
     sub.add_argument("targetdir")
+    sub.add_argument(
+        "--verbose", action="store_true", help="Show why things are blocked")
+    sub.add_argument(
+        "--fetch-all", action="store_true", help="Fetch all packages, even blocked ones")
     sub.set_defaults(func=fetch_assets)
 
     sub = subparser.add_parser("trigger", help="Trigger a GHA build", allow_abbrev=False)
