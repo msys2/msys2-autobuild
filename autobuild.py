@@ -68,6 +68,7 @@ IGNORE_RDEP_PACKAGES: List[str] = [
     "mingw-w64-yarn",
     "mingw-w64-bower",
     "mingw-w64-nodejs",
+    "mingw-w64-cross-conemu-git",
 ]
 
 
