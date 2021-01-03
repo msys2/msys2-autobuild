@@ -715,7 +715,8 @@ def fetch_assets(args: Any) -> None:
 
     def fetch_item(item):
         asset, asset_path = item
-        download_asset(asset, asset_path)
+        if not args.pretend:
+            download_asset(asset, asset_path)
         return item
 
     with ThreadPoolExecutor(8) as executor:
@@ -891,6 +892,8 @@ def main(argv: List[str]):
     sub.add_argument("targetdir")
     sub.add_argument(
         "--verbose", action="store_true", help="Show why things are blocked")
+    sub.add_argument(
+        "--pretend", action="store_true", help="Don't actually download, just show what would be done")
     sub.add_argument(
         "--fetch-all", action="store_true", help="Fetch all packages, even blocked ones")
     sub.set_defaults(func=fetch_assets)
