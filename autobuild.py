@@ -52,6 +52,25 @@ SKIP: List[str] = [
 ]
 
 
+# FIXME: Packages that should be ignored if they depend on other things
+# in the queue. Ideally this list should be empty..
+IGNORE_RDEP_PACKAGES: List[str] = [
+    "mingw-w64-vrpn",
+    "mingw-w64-cocos2d-x",
+    "mingw-w64-mlpack",
+    "mingw-w64-qemu",
+    "mingw-w64-ghc",
+    "mingw-w64-python-notebook",
+    "mingw-w64-python-pywin32",
+    "mingw-w64-usbmuxd",
+    "mingw-w64-ldns",
+    "mingw-w64-npm",
+    "mingw-w64-yarn",
+    "mingw-w64-bower",
+    "mingw-w64-nodejs",
+]
+
+
 REPO = "msys2/msys2-autobuild"
 WORKFLOW = "build"
 
@@ -788,6 +807,8 @@ def get_finished_assets(pkgs: Collection[_Package],
             # skip packages where not all reverse dependencies have been built
             for repo, deps in pkg["ext-rdepends"].items():
                 for dep in deps:
+                    if dep["name"] in IGNORE_RDEP_PACKAGES:
+                        continue
                     if dep in pkgs and dep not in finished:
                         blocked_reason.add(dep)
 
