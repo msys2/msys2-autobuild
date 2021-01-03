@@ -660,7 +660,7 @@ def fetch_assets(args: Any) -> None:
     todo = []
     done = []
     all_blocked = {}
-    for name, repo_name in [("msys", "MSYS-packages"), ("mingw", "MINGW-packages")]:
+    for name, repo_name in [("msys", "MSYS2-packages"), ("mingw", "MINGW-packages")]:
         p = Path(args.targetdir)
         release = repo.get_release('staging-' + name)
         release_assets = get_release_assets(release)
