@@ -702,7 +702,7 @@ def fetch_assets(args: Any) -> None:
                     continue
                 todo.append((asset, asset_path))
 
-    if args.verbose and blocked:
+    if args.verbose and all_blocked:
         import pprint
         print("Packages that are blocked and why:")
         pprint.pprint(all_blocked)
