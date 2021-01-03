@@ -705,7 +705,7 @@ def fetch_assets(args: Any) -> None:
     if args.verbose and blocked:
         import pprint
         print("Packages that are blocked and why:")
-        pprint.pprint(blocked)
+        pprint.pprint(all_blocked)
 
     print(f"downloading: {len(todo)}, done: {len(done)}, "
           f"blocked: {len(all_blocked)} (related builds missing)")
