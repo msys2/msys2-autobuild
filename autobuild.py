@@ -49,6 +49,7 @@ SKIP: List[str] = [
     'mingw-w64-gcc-git',
     'mingw-w64-firebird-git',
     'mingw-w64-qt5-static',
+    'mingw-w64-blender',
 ]
 
 
@@ -69,6 +70,8 @@ IGNORE_RDEP_PACKAGES: List[str] = [
     "mingw-w64-bower",
     "mingw-w64-nodejs",
     "mingw-w64-cross-conemu-git",
+    "mingw-w64-blender",
+    "mingw-w64-godot-cpp",
 ]
 
 
