@@ -77,7 +77,7 @@ IGNORE_RDEP_PACKAGES: List[str] = [
 
 REPO = "msys2/msys2-autobuild"
 WORKFLOW = "build"
-
+RUN_ID = os.getenv('GITHUB_RUN_ID','oh no')
 
 def run_cmd(msys2_root: _PathLike, args, **kwargs):
     executable = os.path.join(msys2_root, 'usr', 'bin', 'bash.exe')
@@ -382,9 +382,9 @@ def build_package(build_type: str, pkg, msys2_root: _PathLike, builddir: _PathLi
             for entry in failed_entries:
                 with tempfile.TemporaryDirectory() as tempdir:
                     failed_path = os.path.join(tempdir, entry)
-                    with open(failed_path, 'wb') as h:
+                    with open(failed_path, 'w') as h:
                         # github doesn't allow empty assets
-                        h.write(b'oh no')
+                        h.write(f"https://github.com/{REPO}/runs/{RUN_ID}")
                     upload_asset(release, failed_path)
 
             raise BuildError(e)
