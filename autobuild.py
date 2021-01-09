@@ -77,7 +77,8 @@ IGNORE_RDEP_PACKAGES: List[str] = [
 
 REPO = "msys2/msys2-autobuild"
 WORKFLOW = "build"
-RUN_ID = os.getenv('GITHUB_RUN_ID','oh no')
+RUN_ID = os.getenv('GITHUB_RUN_ID', 'oh no')
+
 
 def run_cmd(msys2_root: _PathLike, args, **kwargs):
     executable = os.path.join(msys2_root, 'usr', 'bin', 'bash.exe')
@@ -896,7 +897,8 @@ def main(argv: List[str]):
     sub.add_argument(
         "--verbose", action="store_true", help="Show why things are blocked")
     sub.add_argument(
-        "--pretend", action="store_true", help="Don't actually download, just show what would be done")
+        "--pretend", action="store_true",
+        help="Don't actually download, just show what would be done")
     sub.add_argument(
         "--fetch-all", action="store_true", help="Fetch all packages, even blocked ones")
     sub.set_defaults(func=fetch_assets)
