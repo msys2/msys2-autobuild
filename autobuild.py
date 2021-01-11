@@ -149,7 +149,8 @@ def download_asset(asset: GitReleaseAsset, target_path: str) -> None:
                 pass
 
 
-def upload_asset(release: GitRelease, path: _PathLike, replace: bool = False) -> None:
+def upload_asset(release: GitRelease, path: _PathLike, replace: bool = False,
+                 text: bool = False) -> None:
     # type_: msys/mingw/failed
     if not environ.get("CI"):
         print("WARNING: upload skipped, not running in CI")
@@ -157,7 +158,7 @@ def upload_asset(release: GitRelease, path: _PathLike, replace: bool = False) ->
     path = Path(path)
 
     basename = os.path.basename(str(path))
-    asset_name = get_gh_asset_name(basename)
+    asset_name = get_gh_asset_name(basename, text)
     asset_label = basename
 
     for asset in get_release_assets(release, include_incomplete=True):
@@ -385,8 +386,8 @@ def build_package(build_type: str, pkg, msys2_root: _PathLike, builddir: _PathLi
                     failed_path = os.path.join(tempdir, entry)
                     with open(failed_path, 'w') as h:
                         # github doesn't allow empty assets
-                        h.write(f"https://github.com/{REPO}/runs/{RUN_ID}")
-                    upload_asset(release, failed_path)
+                        h.write(f"https://github.com/{REPO}/actions/runs/{RUN_ID}")
+                    upload_asset(release, failed_path, text=True)
 
             raise BuildError(e)
         else:
@@ -482,17 +483,18 @@ def get_buildqueue() -> List[_Package]:
     return pkgs
 
 
-def get_gh_asset_name(basename: _PathLike) -> str:
+def get_gh_asset_name(basename: _PathLike, text: bool = False) -> str:
     # GitHub will throw out charaters like '~' or '='. It also doesn't like
     # when there is no file extension and will try to add one
-    return sha256(str(basename).encode("utf-8")).hexdigest() + ".bin"
+    return sha256(str(basename).encode("utf-8")).hexdigest() + (".bin" if not text else ".txt")
 
 
 def get_asset_filename(asset: GitReleaseAsset) -> str:
     if not asset.label:
         return asset.name
     else:
-        assert get_gh_asset_name(asset.label) == asset.name
+        assert os.path.splitext(get_gh_asset_name(asset.label))[0] == \
+            os.path.splitext(asset.name)[0]
         return asset.label
 
 
