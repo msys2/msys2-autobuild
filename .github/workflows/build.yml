@@ -32,6 +32,7 @@ jobs:
       env:
         PIP_DISABLE_PIP_VERSION_CHECK: 1
       run: |
+        python -m pip install --user wheel
         python -m pip install --user -r requirements.txt
 
     - name: Check if we should run
