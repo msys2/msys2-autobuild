@@ -4,6 +4,8 @@
 
 ```console
 $ python -m pip install --user -r requirements.txt
+# or
+$ poetry install
 ```
 
 ```console

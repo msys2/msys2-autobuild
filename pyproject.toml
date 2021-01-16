@@ -1,0 +1,19 @@
+[tool.poetry]
+name = "msys2-autobuild"
+version = "0.1.0"
+description = ""
+authors = ["Christoph Reiter <reiter.christoph@gmail.com>"]
+
+[tool.poetry.dependencies]
+python = "^3.7"
+PyGithub = "^1.54.1"
+tabulate = "^0.8.7"
+requests = "^2.25.1"
+
+[tool.poetry.dev-dependencies]
+mypy = "^0.790"
+flake8 = "^3.8.4"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
