@@ -50,7 +50,6 @@ SKIP: List[str] = [
     'mingw-w64-firebird-git',
     'mingw-w64-qt5-static',
     'mingw-w64-blender',
-    'mingw-w64-v8',  # src is too large to upload it seems
 ]
 
 
