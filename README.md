@@ -10,7 +10,7 @@ $ poetry install
 
 ```console
 $ python autobuild.py --help
-usage: autobuild.py [-h] {build,show,show-assets,fetch-assets,trigger,clean-assets} ...
+usage: autobuild.py [-h] {build,show,should-run,fetch-assets,clean-assets} ...
 
 Build packages
 
@@ -18,12 +18,11 @@ optional arguments:
   -h, --help            show this help message and exit
 
 subcommands:
-  {build,show,show-assets,fetch-assets,trigger,clean-assets}
+  {build,show,should-run,fetch-assets,clean-assets}
     build               Build all packages
     show                Show all packages to be built
-    show-assets         Show all staging packages
+    should-run          Fails if the workflow shouldn't run
     fetch-assets        Download all staging packages
-    trigger             Trigger a GHA build
     clean-assets        Clean up GHA assets
 ```
 

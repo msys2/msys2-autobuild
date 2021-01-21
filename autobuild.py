@@ -644,24 +644,6 @@ def show_build(args: Any) -> None:
                        headers=["Package", "Build", "Version"]))
 
 
-def show_assets(args: Any) -> None:
-    repo = get_repo()
-
-    rows = []
-    for name in ["msys", "mingw"]:
-        release = repo.get_release('staging-' + name)
-        assets = get_release_assets(release)
-        rows += [[
-            name,
-            get_asset_filename(asset),
-            asset.size,
-            asset.created_at,
-            asset.updated_at,
-        ] for asset in assets]
-
-    print(tabulate(rows, headers=["repo", "name", "size", "created", "updated"]))
-
-
 def get_repo_subdir(type_: str, asset: GitReleaseAsset) -> Path:
     entry = get_asset_filename(asset)
     t = Path(type_)
@@ -737,15 +719,6 @@ def fetch_assets(args: Any) -> None:
             print(f"[{i + 1}/{len(todo)}] {get_asset_filename(item[0])}")
 
     print("done")
-
-
-def trigger_gha_build(args: Any) -> None:
-    repo = get_repo()
-    workflow = get_workflow()
-    if workflow.create_dispatch(repo.default_branch):
-        print("Build triggered")
-    else:
-        raise Exception("trigger failed")
 
 
 def get_assets_to_delete(repo: Repository) -> List[GitReleaseAsset]:
@@ -892,10 +865,6 @@ def main(argv: List[str]):
     sub.set_defaults(func=should_run)
 
     sub = subparser.add_parser(
-        "show-assets", help="Show all staging packages", allow_abbrev=False)
-    sub.set_defaults(func=show_assets)
-
-    sub = subparser.add_parser(
         "fetch-assets", help="Download all staging packages", allow_abbrev=False)
     sub.add_argument("targetdir")
     sub.add_argument(
@@ -906,9 +875,6 @@ def main(argv: List[str]):
     sub.add_argument(
         "--fetch-all", action="store_true", help="Fetch all packages, even blocked ones")
     sub.set_defaults(func=fetch_assets)
-
-    sub = subparser.add_parser("trigger", help="Trigger a GHA build", allow_abbrev=False)
-    sub.set_defaults(func=trigger_gha_build)
 
     sub = subparser.add_parser("clean-assets", help="Clean up GHA assets", allow_abbrev=False)
     sub.add_argument(
