@@ -20,8 +20,10 @@ import shlex
 import time
 import tempfile
 import shutil
+import json
 from hashlib import sha256
-from typing import Generator, Union, AnyStr, List, Any, Dict, Tuple, Set, Sequence, Collection
+from typing import Generator, Union, AnyStr, List, Any, Dict, Tuple, Set, Sequence, \
+    Collection, Optional
 
 _PathLike = Union[os.PathLike, AnyStr]
 
@@ -36,6 +38,39 @@ class _Package(dict):
 
     def __eq__(self, other):
         return self is other
+
+    def get_build_patterns(self, build_type: str) -> List[str]:
+        patterns = []
+        if build_type in ["mingw-src", "msys-src"]:
+            patterns.append(f"{self['name']}-{self['version']}.src.tar.*")
+        elif build_type in ["mingw32", "mingw64", "msys"]:
+            for item in self['packages'].get(build_type, []):
+                patterns.append(f"{item}-{self['version']}-*.pkg.tar.*")
+        else:
+            assert 0
+        return patterns
+
+    def get_failed_names(self, build_type: str) -> List[str]:
+        names = []
+        if build_type in ["mingw-src", "msys-src"]:
+            names.append(f"{self['name']}-{self['version']}.failed")
+        elif build_type in ["mingw32", "mingw64", "msys"]:
+            for item in self['packages'].get(build_type, []):
+                names.append(f"{item}-{self['version']}.failed")
+        else:
+            assert 0
+        return names
+
+    def get_build_types(self) -> List[str]:
+        build_types = list(self["packages"].keys())
+        if any(k.startswith("mingw") for k in self["packages"].keys()):
+            build_types.append("mingw-src")
+        if "msys" in self["packages"].keys():
+            build_types.append("msys-src")
+        return build_types
+
+    def get_repo_type(self) -> str:
+        return "msys" if self['repo'].startswith('MSYS2') else "mingw"
 
 
 # After which we shouldn't start a new build
@@ -77,7 +112,13 @@ IGNORE_RDEP_PACKAGES: List[str] = [
 
 REPO = "msys2/msys2-autobuild"
 WORKFLOW = "build"
-RUN_ID = os.getenv('GITHUB_RUN_ID', 'oh no')
+
+
+def get_current_run_url() -> Optional[str]:
+    if "GITHUB_RUN_ID" in os.environ:
+        run_id = os.environ["GITHUB_RUN_ID"]
+        return f"https://github.com/{REPO}/actions/runs/{run_id}"
+    return None
 
 
 def run_cmd(msys2_root: _PathLike, args, **kwargs):
@@ -276,7 +317,7 @@ SigLevel=Never
             dep_type = build_type_to_dep_type(build_type)
             for name, dep in pkg['ext-depends'].get(dep_type, {}).items():
                 pattern = f"{name}-{dep['version']}-*.pkg.*"
-                repo_type = "msys" if dep['repo'].startswith('MSYS2') else "mingw"
+                repo_type = dep.get_repo_type()
                 for asset in get_cached_assets(repo, "staging-" + repo_type):
                     if fnmatch.fnmatch(get_asset_filename(asset), pattern):
                         to_add.append((repo_type, asset))
@@ -354,45 +395,29 @@ def build_package(build_type: str, pkg, msys2_root: _PathLike, builddir: _PathLi
             else:
                 assert 0
 
-            patterns = []
-            if build_type in ["mingw-src", "msys-src"]:
-                patterns.append(f"{pkg['name']}-{pkg['version']}.src.tar.*")
-            elif build_type in ["mingw32", "mingw64", "msys"]:
-                for item in pkg['packages'].get(build_type, []):
-                    patterns.append(f"{item}-{pkg['version']}-*.pkg.tar.*")
-            else:
-                assert 0
-
             entries = os.listdir(pkg_dir)
-            for pattern in patterns:
+            for pattern in pkg.get_build_patterns(build_type):
                 found = fnmatch.filter(entries, pattern)
                 if not found:
                     raise BuildError(f"{pattern} not found, likely wrong version built")
                 to_upload.extend([os.path.join(pkg_dir, e) for e in found])
 
         except (subprocess.CalledProcessError, BuildError) as e:
-            failed_entries = []
-            if build_type in ["mingw-src", "msys-src"]:
-                failed_entries.append(f"{pkg['name']}-{pkg['version']}.failed")
-            elif build_type in ["mingw32", "mingw64", "msys"]:
-                for item in pkg['packages'].get(build_type, []):
-                    failed_entries.append(f"{item}-{pkg['version']}.failed")
-            else:
-                assert 0
-
             release = repo.get_release("staging-failed")
-            for entry in failed_entries:
+            for entry in pkg.get_failed_names(build_type):
                 with tempfile.TemporaryDirectory() as tempdir:
                     failed_path = os.path.join(tempdir, entry)
+                    failed_data = {}
+                    run_url = get_current_run_url()
+                    if run_url is not None:
+                        failed_data["url"] = run_url
                     with open(failed_path, 'w') as h:
-                        # github doesn't allow empty assets
-                        h.write(f"https://github.com/{REPO}/actions/runs/{RUN_ID}")
+                        h.write(json.dumps(failed_data))
                     upload_asset(release, failed_path, text=True)
 
             raise BuildError(e)
         else:
-            release = repo.get_release(
-                "staging-msys"if build_type.startswith("msys") else "staging-mingw")
+            release = repo.get_release("staging-" + pkg.get_repo_type())
             for path in to_upload:
                 upload_asset(release, path)
 
@@ -418,10 +443,10 @@ def run_build(args: Any) -> None:
 
     done = set()
     while True:
-        todo = get_packages_to_build()[2]
+        todo = get_package_to_build()
         if not todo:
             break
-        pkg, build_type = todo[0]
+        pkg, build_type = todo
         key = pkg['repo'] + build_type + pkg['name'] + pkg['version']
         if key in done:
             raise SystemExit("ERROR: building package again in the same run", pkg)
@@ -442,7 +467,7 @@ def run_build(args: Any) -> None:
 
 def get_buildqueue() -> List[_Package]:
     pkgs = []
-    r = requests.get("https://packages.msys2.org/api/buildqueue?include_vcs=true")
+    r = requests.get("https://packages.msys2.org/api/buildqueue")
     r.raise_for_status()
     dep_mapping = {}
     for received in r.json():
@@ -526,23 +551,15 @@ def get_packages_to_build() -> Tuple[
         get_asset_filename(a) for a in get_release_assets(release)]
 
     def pkg_is_done(build_type: str, pkg: _Package) -> bool:
-        if build_type in ["mingw-src", "msys-src"]:
-            if not fnmatch.filter(assets, f"{pkg['name']}-{pkg['version']}.src.tar.*"):
+        for pattern in pkg.get_build_patterns(build_type):
+            if not fnmatch.filter(assets, pattern):
                 return False
-        else:
-            for item in pkg['packages'].get(build_type, []):
-                if not fnmatch.filter(assets, f"{item}-{pkg['version']}-*.pkg.tar.*"):
-                    return False
         return True
 
     def pkg_has_failed(build_type: str, pkg: _Package) -> bool:
-        if build_type in ["mingw-src", "msys-src"]:
-            if f"{pkg['name']}-{pkg['version']}.failed" in assets_failed:
+        for name in pkg.get_failed_names(build_type):
+            if name in assets_failed:
                 return True
-        else:
-            for item in pkg['packages'].get(build_type, []):
-                if f"{item}-{pkg['version']}.failed" in assets_failed:
-                    return True
         return False
 
     def pkg_is_skipped(build_type: str, pkg: _Package) -> bool:
@@ -552,23 +569,11 @@ def get_packages_to_build() -> Tuple[
 
         return pkg['name'] in SKIP
 
-    def pkg_needs_build(build_type: str, pkg: _Package) -> bool:
-        if build_type in pkg["packages"]:
-            return True
-        if build_type == "mingw-src" and \
-                any(k.startswith("mingw") for k in pkg["packages"].keys()):
-            return True
-        if build_type == "msys-src" and "msys" in pkg["packages"]:
-            return True
-        return False
-
     todo = []
     done = []
     skipped = []
     for pkg in get_buildqueue():
-        for build_type in ["msys", "mingw32", "mingw64", "mingw-src", "msys-src"]:
-            if not pkg_needs_build(build_type, pkg):
-                continue
+        for build_type in pkg.get_build_types():
             if pkg_is_done(build_type, pkg):
                 done.append((pkg, build_type))
             elif pkg_has_failed(build_type, pkg):
@@ -585,6 +590,14 @@ def get_packages_to_build() -> Tuple[
                     todo.append((pkg, build_type))
 
     return done, skipped, todo
+
+
+def get_package_to_build() -> Optional[Tuple[_Package, str]]:
+    done, skipped, todo = get_packages_to_build()
+    if todo:
+        return todo[0]
+    else:
+        return None
 
 
 def get_workflow():
@@ -611,8 +624,7 @@ def should_run(args: Any) -> None:
         raise SystemExit(
             f"Another workflow is currently running or has something queued: {run.html_url}")
 
-    done, skipped, todo = get_packages_to_build()
-    if not todo:
+    if not get_package_to_build():
         raise SystemExit("Nothing to build")
 
 
@@ -740,12 +752,9 @@ def get_assets_to_delete(repo: Repository) -> List[GitReleaseAsset]:
     print("Fetching packages to build...")
     patterns = []
     for pkg in get_buildqueue():
-        patterns.append(f"{pkg['name']}-{pkg['version']}.src.tar.*")
-        patterns.append(f"{pkg['name']}-{pkg['version']}.failed")
-        for items in pkg['packages'].values():
-            for item in items:
-                patterns.append(f"{item}-{pkg['version']}-*.pkg.tar.*")
-                patterns.append(f"{item}-{pkg['version']}.failed")
+        for build_type in pkg.get_build_types():
+            patterns.extend(pkg.get_failed_names(build_type))
+            patterns.extend(pkg.get_build_patterns(build_type))
 
     print("Fetching assets...")
     assets: Dict[str, List[GitReleaseAsset]] = {}
@@ -780,10 +789,8 @@ def get_finished_assets(pkgs: Collection[_Package],
         # Only returns assets for packages where everything has been
         # built already
         patterns = []
-        patterns.append(f"{pkg['name']}-{pkg['version']}.src.tar.*")
-        for repo, items in pkg['packages'].items():
-            for item in items:
-                patterns.append(f"{item}-{pkg['version']}-*.pkg.tar.*")
+        for build_type in pkg.get_build_types():
+            patterns.extend(pkg.get_build_patterns(build_type))
 
         finished_maybe = []
         for pattern in patterns:
