@@ -35,7 +35,7 @@ class PackageStatus(Enum):
     FINISHED_BUT_INCOMPLETE = 'finished-but-incomplete'
     FAILED_TO_BUILD = 'failed-to-build'
     WAITING_FOR_BUILD = 'waiting-for-build'
-    WAITING_FOR_DEPENDENCY = 'waiting-for-dependency'
+    WAITING_FOR_DEPENDENCIES = 'waiting-for-dependencies'
     MANUAL_BUILD_REQUIRED = 'manual-build-required'
     UNKNOWN = 'unknown'
 
@@ -648,7 +648,7 @@ def get_buildqueue_with_status(full_details: bool = False) -> List[Package]:
                         missing_deps.append(dep)
                 if missing_deps:
                     desc = f"Waiting for: {', '.join([d['name'] for d in missing_deps])}"
-                    pkg.set_status(build_type, PackageStatus.WAITING_FOR_DEPENDENCY, desc)
+                    pkg.set_status(build_type, PackageStatus.WAITING_FOR_DEPENDENCIES, desc)
 
     # Block packages where not every build type is finished
     for pkg in pkgs:
@@ -770,7 +770,7 @@ def show_build(args: Any) -> None:
             elif status in (PackageStatus.FINISHED, PackageStatus.FINISHED_BUT_BLOCKED,
                             PackageStatus.FINISHED_BUT_INCOMPLETE):
                 done.append((pkg, build_type, status, details))
-            elif status in (PackageStatus.WAITING_FOR_DEPENDENCY,
+            elif status in (PackageStatus.WAITING_FOR_DEPENDENCIES,
                             PackageStatus.MANUAL_BUILD_REQUIRED):
                 waiting.append((pkg, build_type, status, details))
             else:
