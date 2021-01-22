@@ -35,6 +35,12 @@ jobs:
         python -m pip install --user wheel
         python -m pip install --user -r requirements.txt
 
+    - name: Update status file
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        python autobuild.py update-status
+
     - name: Check if we should run
       id: check
       env:

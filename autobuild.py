@@ -21,6 +21,7 @@ import time
 import tempfile
 import shutil
 import json
+import io
 from enum import Enum
 from hashlib import sha256
 from typing import Generator, Union, AnyStr, List, Any, Dict, Tuple, Set, Optional
@@ -228,7 +229,7 @@ def download_text_asset(asset: GitReleaseAsset) -> str:
 
 
 def upload_asset(release: GitRelease, path: _PathLike, replace: bool = False,
-                 text: bool = False) -> None:
+                 text: bool = False, content: bytes = None) -> None:
     # type_: msys/mingw/failed
     if not environ.get("CI"):
         print("WARNING: upload skipped, not running in CI")
@@ -249,7 +250,12 @@ def upload_asset(release: GitRelease, path: _PathLike, replace: bool = False,
                 print(f"Skipping upload for {asset_name} as {asset_label}, already exists")
                 return
 
-    release.upload_asset(str(path), label=asset_label, name=asset_name)
+    if content is None:
+        release.upload_asset(str(path), label=asset_label, name=asset_name)
+    else:
+        with io.BytesIO(content) as fileobj:
+            release.upload_asset_from_memory(  # type: ignore
+                fileobj, len(content), label=asset_label, name=asset_name)
     print(f"Uploaded {asset_name} as {asset_label}")
 
 
@@ -442,15 +448,12 @@ def build_package(build_type: str, pkg, msys2_root: _PathLike, builddir: _PathLi
         except (subprocess.CalledProcessError, BuildError) as e:
             release = repo.get_release("staging-failed")
             for entry in pkg.get_failed_names(build_type):
-                with tempfile.TemporaryDirectory() as tempdir:
-                    failed_path = os.path.join(tempdir, entry)
-                    failed_data = {}
-                    run_url = get_current_run_url()
-                    if run_url is not None:
-                        failed_data["url"] = run_url
-                    with open(failed_path, 'w') as h:
-                        h.write(json.dumps(failed_data))
-                    upload_asset(release, failed_path, text=True)
+                failed_data = {}
+                run_url = get_current_run_url()
+                if run_url is not None:
+                    failed_data["url"] = run_url
+                content = json.dumps(failed_data).encode()
+                upload_asset(release, entry, text=True, content=content)
 
             raise BuildError(e)
         else:
@@ -725,6 +728,31 @@ def should_run(args: Any) -> None:
         raise SystemExit("Nothing to build")
 
 
+def update_status(args: Any) -> None:
+    repo = get_repo()
+    release = repo.get_release("status")
+
+    results = {}
+    for pkg in get_buildqueue_with_status(full_details=True):
+        pkg_result = {}
+        for build_type in pkg.get_build_types():
+            details = pkg.get_status_details(build_type)
+            details["status"] = pkg.get_status(build_type).value
+            pkg_result[build_type] = details
+        results[pkg["name"]] = pkg_result
+
+    content = json.dumps(results, indent=2).encode()
+
+    asset_name = "status.json"
+    for asset in release.get_assets():
+        if asset.name == asset_name:
+            asset.delete_asset()
+            break
+    with io.BytesIO(content) as fileobj:
+        release.upload_asset_from_memory(  # type: ignore
+            fileobj, len(content), asset_name)
+
+
 def show_build(args: Any) -> None:
     todo = []
     waiting = []
@@ -943,6 +971,10 @@ def main(argv: List[str]):
     sub = subparser.add_parser(
         "should-run", help="Fails if the workflow shouldn't run", allow_abbrev=False)
     sub.set_defaults(func=should_run)
+
+    sub = subparser.add_parser(
+        "update-status", help="Update the status file", allow_abbrev=False)
+    sub.set_defaults(func=update_status)
 
     sub = subparser.add_parser(
         "fetch-assets", help="Download all staging packages", allow_abbrev=False)
