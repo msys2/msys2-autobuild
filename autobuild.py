@@ -749,8 +749,10 @@ def update_status(args: Any) -> None:
             asset.delete_asset()
             break
     with io.BytesIO(content) as fileobj:
-        release.upload_asset_from_memory(  # type: ignore
+        new_asset = release.upload_asset_from_memory(  # type: ignore
             fileobj, len(content), asset_name)
+
+    print(f"Uploaded status file for {len(results)} packages: {new_asset.browser_download_url}")
 
 
 def show_build(args: Any) -> None:
