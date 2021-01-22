@@ -21,14 +21,28 @@ import time
 import tempfile
 import shutil
 import json
+from enum import Enum
 from hashlib import sha256
-from typing import Generator, Union, AnyStr, List, Any, Dict, Tuple, Set, Sequence, \
-    Collection, Optional
+from typing import Generator, Union, AnyStr, List, Any, Dict, Tuple, Set, Optional
 
 _PathLike = Union[os.PathLike, AnyStr]
 
 
-class _Package(dict):
+class PackageStatus(Enum):
+    FINISHED = 'finished'
+    FINISHED_BUT_BLOCKED = 'finished-but-blocked'
+    FINISHED_BUT_INCOMPLETE = 'finished-but-incomplete'
+    FAILED_TO_BUILD = 'failed-to-build'
+    WAITING_FOR_BUILD = 'waiting-for-build'
+    WAITING_FOR_DEPENDENCY = 'waiting-for-dependency'
+    MANUAL_BUILD_REQUIRED = 'manual-build-required'
+    UNKNOWN = 'unknown'
+
+    def __str__(self):
+        return self.value
+
+
+class Package(dict):
 
     def __repr__(self):
         return "Package(%r)" % self["name"]
@@ -38,6 +52,22 @@ class _Package(dict):
 
     def __eq__(self, other):
         return self is other
+
+    def get_status(self, build_type: str) -> PackageStatus:
+        return self.get("status", {}).get(build_type, PackageStatus.UNKNOWN)
+
+    def get_status_details(self, build_type: str) -> Dict[str, str]:
+        return self.get("status_details", {}).get(build_type, {})
+
+    def set_status(self, build_type: str, status: PackageStatus,
+                   description: Optional[str] = None, url: Optional[str] = None) -> None:
+        self.setdefault("status", {})[build_type] = status
+        meta = {}
+        if description:
+            meta["desc"] = description
+        if url:
+            meta["url"] = url
+        self.setdefault("status_details", {})[build_type] = meta
 
     def get_build_patterns(self, build_type: str) -> List[str]:
         patterns = []
@@ -77,7 +107,7 @@ class _Package(dict):
 SOFT_TIMEOUT = 60 * 60 * 3
 
 # Packages that take too long to build, and should be handled manually
-SKIP: List[str] = [
+MANUAL_BUILD: List[str] = [
     # 'mingw-w64-clang',
     # 'mingw-w64-arm-none-eabi-gcc',
     # 'mingw-w64-gcc',
@@ -190,6 +220,13 @@ def download_asset(asset: GitReleaseAsset, target_path: str) -> None:
                 pass
 
 
+def download_text_asset(asset: GitReleaseAsset) -> str:
+    assert asset_is_complete(asset)
+    with requests.get(asset.browser_download_url, timeout=(15, 30)) as r:
+        r.raise_for_status()
+        return r.text
+
+
 def upload_asset(release: GitRelease, path: _PathLike, replace: bool = False,
                  text: bool = False) -> None:
     # type_: msys/mingw/failed
@@ -270,7 +307,7 @@ def build_type_to_dep_type(build_type):
 
 @contextmanager
 def staging_dependencies(
-        build_type: str, pkg: _Package, msys2_root: _PathLike,
+        build_type: str, pkg: Package, msys2_root: _PathLike,
         builddir: _PathLike) -> Generator:
     repo = get_repo()
 
@@ -465,13 +502,13 @@ def run_build(args: Any) -> None:
             continue
 
 
-def get_buildqueue() -> List[_Package]:
+def get_buildqueue() -> List[Package]:
     pkgs = []
     r = requests.get("https://packages.msys2.org/api/buildqueue")
     r.raise_for_status()
     dep_mapping = {}
     for received in r.json():
-        pkg = _Package(received)
+        pkg = Package(received)
         pkg['repo'] = pkg['repo_url'].split('/')[-1]
         pkgs.append(pkg)
         for repo, names in pkg['packages'].items():
@@ -490,7 +527,7 @@ def get_buildqueue() -> List[_Package]:
 
     # link up dependencies with the real package in the queue
     for pkg in pkgs:
-        ver_depends: Dict[str, Dict[str, _Package]] = {}
+        ver_depends: Dict[str, Dict[str, Package]] = {}
         for repo, deps in pkg['depends'].items():
             for dep in deps:
                 ver_depends.setdefault(repo, {})[dep] = dep_mapping[dep]
@@ -498,7 +535,7 @@ def get_buildqueue() -> List[_Package]:
 
     # reverse dependencies
     for pkg in pkgs:
-        r_depends: Dict[str, Set[_Package]] = {}
+        r_depends: Dict[str, Set[Package]] = {}
         for pkg2 in pkgs:
             for repo, deps in pkg2['ext-depends'].items():
                 if pkg in deps.values():
@@ -537,67 +574,124 @@ def get_release_assets(release: GitRelease, include_incomplete=False) -> List[Gi
     return assets
 
 
-def get_packages_to_build() -> Tuple[
-        List[Tuple[_Package, str]], List[Tuple[_Package, str, str]],
-        List[Tuple[_Package, str]]]:
+def get_buildqueue_with_status(full_details: bool = False) -> List[Package]:
     repo = get_repo(optional_credentials=True)
     assets = []
     for name in ["msys", "mingw"]:
         release = repo.get_release('staging-' + name)
-        assets.extend([
-            get_asset_filename(a) for a in get_release_assets(release)])
+        assets.extend(get_release_assets(release))
     release = repo.get_release('staging-failed')
-    assets_failed = [
-        get_asset_filename(a) for a in get_release_assets(release)]
+    assets_failed = get_release_assets(release)
 
-    def pkg_is_done(build_type: str, pkg: _Package) -> bool:
+    failed_urls = {}
+    if full_details:
+        # This might take a while, so only in full mode
+        with ThreadPoolExecutor(8) as executor:
+            for i, (asset, content) in enumerate(
+                    zip(assets_failed, executor.map(download_text_asset, assets_failed))):
+                result = json.loads(content)
+                if result["url"]:
+                    failed_urls[get_asset_filename(asset)] = result["url"]
+
+    def pkg_is_done(build_type: str, pkg: Package) -> bool:
+        done_names = [get_asset_filename(a) for a in assets]
         for pattern in pkg.get_build_patterns(build_type):
-            if not fnmatch.filter(assets, pattern):
+            if not fnmatch.filter(done_names, pattern):
                 return False
         return True
 
-    def pkg_has_failed(build_type: str, pkg: _Package) -> bool:
+    def get_failed_url(build_type: str, pkg: Package) -> Optional[str]:
+        failed_names = [get_asset_filename(a) for a in assets_failed]
         for name in pkg.get_failed_names(build_type):
-            if name in assets_failed:
+            if name in failed_names:
+                return failed_urls.get(name)
+        return None
+
+    def pkg_has_failed(build_type: str, pkg: Package) -> bool:
+        failed_names = [get_asset_filename(a) for a in assets_failed]
+        for name in pkg.get_failed_names(build_type):
+            if name in failed_names:
                 return True
         return False
 
-    def pkg_is_skipped(build_type: str, pkg: _Package) -> bool:
-        for other, other_type, msg in skipped:
-            if build_type == other_type and pkg is other:
-                return True
+    def pkg_is_manual(build_type: str, pkg: Package) -> bool:
+        return pkg['name'] in MANUAL_BUILD
 
-        return pkg['name'] in SKIP
+    pkgs = get_buildqueue()
 
-    todo = []
-    done = []
-    skipped = []
-    for pkg in get_buildqueue():
+    # basic state
+    for pkg in pkgs:
         for build_type in pkg.get_build_types():
             if pkg_is_done(build_type, pkg):
-                done.append((pkg, build_type))
+                pkg.set_status(build_type, PackageStatus.FINISHED)
             elif pkg_has_failed(build_type, pkg):
-                skipped.append((pkg, build_type, "failed"))
-            elif pkg_is_skipped(build_type, pkg):
-                skipped.append((pkg, build_type, "skipped"))
+                url = get_failed_url(build_type, pkg)
+                pkg.set_status(build_type, PackageStatus.FAILED_TO_BUILD, url=url)
+            elif pkg_is_manual(build_type, pkg):
+                pkg.set_status(build_type, PackageStatus.MANUAL_BUILD_REQUIRED)
             else:
+                pkg.set_status(build_type, PackageStatus.WAITING_FOR_BUILD)
+
+    # wait for dependencies to be finished before starting a build
+    for pkg in pkgs:
+        for build_type in pkg.get_build_types():
+            status = pkg.get_status(build_type)
+            if status == PackageStatus.WAITING_FOR_BUILD:
+                dep_type = build_type_to_dep_type(build_type)
+                missing_deps = []
+                for dep in pkg['ext-depends'].get(dep_type, {}).values():
+                    dep_status = dep.get_status(dep_type)
+                    if dep_status != PackageStatus.FINISHED:
+                        missing_deps.append(dep)
+                if missing_deps:
+                    desc = f"Waiting for: {', '.join([d['name'] for d in missing_deps])}"
+                    pkg.set_status(build_type, PackageStatus.WAITING_FOR_DEPENDENCY, desc)
+
+    # Block packages where not every build type is finished
+    for pkg in pkgs:
+        unfinished = []
+        for build_type in pkg.get_build_types():
+            status = pkg.get_status(build_type)
+            if status != PackageStatus.FINISHED:
+                unfinished.append(build_type)
+        if unfinished:
+            for build_type in pkg.get_build_types():
+                status = pkg.get_status(build_type)
+                if status == PackageStatus.FINISHED:
+                    desc = f"Missing related builds: {', '.join(unfinished)}"
+                    pkg.set_status(build_type, PackageStatus.FINISHED_BUT_INCOMPLETE, desc)
+
+    # Block packages where not all deps/rdeps are finished
+    for pkg in pkgs:
+        for build_type in pkg.get_build_types():
+            status = pkg.get_status(build_type)
+            if status == PackageStatus.FINISHED:
+                missing_deps = []
                 dep_type = build_type_to_dep_type(build_type)
                 for dep in pkg['ext-depends'].get(dep_type, {}).values():
-                    if pkg_has_failed(dep_type, dep) or pkg_is_skipped(dep_type, dep):
-                        skipped.append((pkg, build_type, "requires: " + dep['name']))
-                        break
-                else:
-                    todo.append((pkg, build_type))
+                    dep_status = dep.get_status(dep_type)
+                    if dep_status != PackageStatus.FINISHED:
+                        missing_deps.append(dep)
+                for dep in pkg['ext-rdepends'].get(dep_type, set()):
+                    dep_status = dep.get_status(dep_type)
+                    if dep["name"] in IGNORE_RDEP_PACKAGES:
+                        continue
+                    if dep_status != PackageStatus.FINISHED:
+                        missing_deps.append(dep)
 
-    return done, skipped, todo
+                if missing_deps:
+                    desc = f"waiting on { ', '.join(missing_deps) }"
+                    pkg.set_status(build_type, PackageStatus.FINISHED_BUT_BLOCKED, desc)
+
+    return pkgs
 
 
-def get_package_to_build() -> Optional[Tuple[_Package, str]]:
-    done, skipped, todo = get_packages_to_build()
-    if todo:
-        return todo[0]
-    else:
-        return None
+def get_package_to_build() -> Optional[Tuple[Package, str]]:
+    for pkg in get_buildqueue_with_status():
+        for build_type in pkg.get_build_types():
+            if pkg.get_status(build_type) == PackageStatus.WAITING_FOR_BUILD:
+                return (pkg, build_type)
+    return None
 
 
 def get_workflow():
@@ -632,19 +726,35 @@ def should_run(args: Any) -> None:
 
 
 def show_build(args: Any) -> None:
-    done, skipped, todo = get_packages_to_build()
+    todo = []
+    waiting = []
+    done = []
+    failed = []
 
-    with gha_group(f"TODO ({len(todo)})"):
-        print(tabulate([(p["name"], bt, p["version"]) for (p, bt) in todo],
-                       headers=["Package", "Build", "Version"]))
+    for pkg in get_buildqueue_with_status(full_details=True):
+        for build_type in pkg.get_build_types():
+            status = pkg.get_status(build_type)
+            details = pkg.get_status_details(build_type)
+            if status == PackageStatus.WAITING_FOR_BUILD:
+                todo.append((pkg, build_type, status, details))
+            elif status in (PackageStatus.FINISHED, PackageStatus.FINISHED_BUT_BLOCKED,
+                            PackageStatus.FINISHED_BUT_INCOMPLETE):
+                done.append((pkg, build_type, status, details))
+            elif status in (PackageStatus.WAITING_FOR_DEPENDENCY,
+                            PackageStatus.MANUAL_BUILD_REQUIRED):
+                waiting.append((pkg, build_type, status, details))
+            else:
+                failed.append((pkg, build_type, status, details))
 
-    with gha_group(f"SKIPPED ({len(skipped)})"):
-        print(tabulate([(p["name"], bt, p["version"], r) for (p, bt, r) in skipped],
-                       headers=["Package", "Build", "Version", "Reason"]))
+    def show_table(name, items):
+        with gha_group(f"{name} ({len(items)})"):
+            print(tabulate([(p["name"], bt, p["version"], str(s), d) for (p, bt, s, d) in items],
+                           headers=["Package", "Build", "Version", "Status", "Details"]))
 
-    with gha_group(f"DONE ({len(done)})"):
-        print(tabulate([(p["name"], bt, p["version"]) for (p, bt) in done],
-                       headers=["Package", "Build", "Version"]))
+    show_table("TODO", todo)
+    show_table("WAITING", waiting)
+    show_table("FAILED", failed)
+    show_table("DONE", done)
 
 
 def get_repo_subdir(type_: str, asset: GitReleaseAsset) -> Path:
@@ -672,33 +782,57 @@ def get_repo_subdir(type_: str, asset: GitReleaseAsset) -> Path:
 
 def fetch_assets(args: Any) -> None:
     repo = get_repo(optional_credentials=True)
+    target_dir = args.targetdir
+    fetch_all = args.fetch_all
 
-    pkgs = get_buildqueue()
+    all_patterns: Dict[str, List[str]] = {}
+    all_blocked = []
+    for pkg in get_buildqueue_with_status():
+        repo_type = pkg.get_repo_type()
+        for build_type in pkg.get_build_types():
+            status = pkg.get_status(build_type)
+            pkg_patterns = pkg.get_build_patterns(build_type)
+            if status == PackageStatus.FINISHED:
+                all_patterns.setdefault(repo_type, []).extend(pkg_patterns)
+            elif status == PackageStatus.FINISHED_BUT_BLOCKED:
+                if fetch_all:
+                    all_patterns.setdefault(repo_type, []).extend(pkg_patterns)
+                else:
+                    all_blocked.append(
+                        (pkg["name"], build_type, pkg.get_status_details(build_type)))
+
+    all_assets = {}
+    to_download: Dict[str, List[GitReleaseAsset]] = {}
+    for repo_type, patterns in all_patterns.items():
+        if repo_type not in all_assets:
+            release = repo.get_release('staging-' + repo_type)
+            all_assets[repo_type] = get_release_assets(release)
+        assets = all_assets[repo_type]
+
+        assets_mapping: Dict[str, List[GitReleaseAsset]] = {}
+        for asset in assets:
+            assets_mapping.setdefault(get_asset_filename(asset), []).append(asset)
+
+        for pattern in patterns:
+            matches = fnmatch.filter(assets_mapping.keys(), pattern)
+            if matches:
+                found = assets_mapping[matches[0]]
+                to_download.setdefault(repo_type, []).extend(found)
 
     todo = []
     done = []
-    all_blocked = {}
-    for name, repo_name in [("msys", "MSYS2-packages"), ("mingw", "MINGW-packages")]:
-        p = Path(args.targetdir)
-        release = repo.get_release('staging-' + name)
-        release_assets = get_release_assets(release)
-        repo_pkgs = [p for p in pkgs if p["repo"] == repo_name]
-        finished_assets, blocked = get_finished_assets(
-            repo_pkgs, release_assets, args.fetch_all)
-        all_blocked.update(blocked)
-
-        for pkg, assets in finished_assets.items():
-            for asset in assets:
-                asset_dir = p / get_repo_subdir(name, asset)
-                asset_dir.mkdir(parents=True, exist_ok=True)
-                asset_path = asset_dir / get_asset_filename(asset)
-                if asset_path.exists():
-                    if asset_path.stat().st_size != asset.size:
-                        print(f"Warning: {asset_path} already exists "
-                              f"but has a different size")
-                    done.append(asset)
-                    continue
-                todo.append((asset, asset_path))
+    for repo_type, assets in to_download.items():
+        for asset in assets:
+            asset_dir = Path(target_dir) / get_repo_subdir(repo_type, asset)
+            asset_dir.mkdir(parents=True, exist_ok=True)
+            asset_path = asset_dir / get_asset_filename(asset)
+            if asset_path.exists():
+                if asset_path.stat().st_size != asset.size:
+                    print(f"Warning: {asset_path} already exists "
+                          f"but has a different size")
+                done.append(asset)
+                continue
+            todo.append((asset, asset_path))
 
     if args.verbose and all_blocked:
         import pprint
@@ -748,63 +882,6 @@ def get_assets_to_delete(repo: Repository) -> List[GitReleaseAsset]:
         for asset in items:
             result.append(asset)
     return result
-
-
-def get_finished_assets(pkgs: Collection[_Package],
-                        assets: Sequence[GitReleaseAsset],
-                        ignore_blocked: bool) -> Tuple[
-        Dict[_Package, List[GitReleaseAsset]], Dict[_Package, str]]:
-    """Returns assets for packages where all package results are available"""
-
-    assets_mapping: Dict[str, List[GitReleaseAsset]] = {}
-    for asset in assets:
-        assets_mapping.setdefault(get_asset_filename(asset), []).append(asset)
-
-    finished = {}
-    for pkg in pkgs:
-        # Only returns assets for packages where everything has been
-        # built already
-        patterns = []
-        for build_type in pkg.get_build_types():
-            patterns.extend(pkg.get_build_patterns(build_type))
-
-        finished_maybe = []
-        for pattern in patterns:
-            matches = fnmatch.filter(assets_mapping.keys(), pattern)
-            if matches:
-                found = assets_mapping[matches[0]]
-                finished_maybe.extend(found)
-
-        if len(finished_maybe) == len(patterns):
-            finished[pkg] = finished_maybe
-
-    blocked = {}
-
-    if not ignore_blocked:
-        for pkg in finished:
-            blocked_reason = set()
-
-            # skip packages where not all dependencies have been built
-            for repo, deps in pkg["ext-depends"].items():
-                for dep in deps.values():
-                    if dep in pkgs and dep not in finished:
-                        blocked_reason.add(dep)
-
-            # skip packages where not all reverse dependencies have been built
-            for repo, deps in pkg["ext-rdepends"].items():
-                for dep in deps:
-                    if dep["name"] in IGNORE_RDEP_PACKAGES:
-                        continue
-                    if dep in pkgs and dep not in finished:
-                        blocked_reason.add(dep)
-
-            if blocked_reason:
-                blocked[pkg] = "waiting on %r" % blocked_reason
-
-        for pkg in blocked:
-            finished.pop(pkg, None)
-
-    return finished, blocked
 
 
 def clean_gha_assets(args: Any) -> None:
