@@ -680,7 +680,7 @@ def get_buildqueue_with_status(full_details: bool = False) -> List[Package]:
                         missing_deps.append(dep)
 
                 if missing_deps:
-                    desc = f"waiting on { ', '.join(missing_deps) }"
+                    desc = f"waiting on { ', '.join(p['name'] for p in missing_deps) }"
                     pkg.set_status(build_type, PackageStatus.FINISHED_BUT_BLOCKED, desc)
 
     return pkgs
