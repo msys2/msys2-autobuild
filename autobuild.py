@@ -111,13 +111,13 @@ IGNORE_RDEP_PACKAGES: List[str] = [
 
 
 REPO = "msys2/msys2-autobuild"
-WORKFLOW = "build"
 
 
 def get_current_run_url() -> Optional[str]:
-    if "GITHUB_RUN_ID" in os.environ:
+    if "GITHUB_RUN_ID" in os.environ and "GITHUB_REPOSITORY" in os.environ:
         run_id = os.environ["GITHUB_RUN_ID"]
-        return f"https://github.com/{REPO}/actions/runs/{run_id}"
+        repo = os.environ["GITHUB_REPOSITORY"]
+        return f"https://github.com/{repo}/actions/runs/{run_id}"
     return None
 
 
@@ -601,12 +601,15 @@ def get_package_to_build() -> Optional[Tuple[_Package, str]]:
 
 
 def get_workflow():
+    workflow_name = os.environ.get("GITHUB_WORKFLOW", None)
+    if workflow_name is None:
+        raise Exception("GITHUB_WORKFLOW not set")
     repo = get_repo()
     for workflow in repo.get_workflows():
-        if workflow.name == WORKFLOW:
+        if workflow.name == workflow_name:
             return workflow
     else:
-        raise Exception("workflow not found:", WORKFLOW)
+        raise Exception("workflow not found:", workflow_name)
 
 
 def should_run(args: Any) -> None:
