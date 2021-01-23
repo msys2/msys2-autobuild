@@ -3,9 +3,11 @@
 ## autobuild.py
 
 ```console
-$ python -m pip install --user -r requirements.txt
+$ pacman -S mingw-w64-x86_64-python-tabulate mingw-w64-x86_64-python-pygithub mingw-w64-x86_64-python-requests
 # or
 $ poetry install
+# or
+$ python -m pip install --user -r requirements.txt
 ```
 
 ```console
