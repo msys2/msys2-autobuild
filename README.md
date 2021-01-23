@@ -11,8 +11,10 @@ $ python -m pip install --user -r requirements.txt
 ```
 
 ```console
-$ python autobuild.py --help
-usage: autobuild.py [-h] {build,show,should-run,fetch-assets,clean-assets} ...
+$ ./autobuild.py --help
+usage: autobuild.py [-h]
+                    {build,show,should-run,update-status,fetch-assets,upload-assets,clean-assets}
+                    ...
 
 Build packages
 
@@ -20,11 +22,13 @@ optional arguments:
   -h, --help            show this help message and exit
 
 subcommands:
-  {build,show,should-run,fetch-assets,clean-assets}
+  {build,show,should-run,update-status,fetch-assets,upload-assets,clean-assets}
     build               Build all packages
     show                Show all packages to be built
     should-run          Fails if the workflow shouldn't run
+    update-status       Update the status file
     fetch-assets        Download all staging packages
+    upload-assets       Upload packages
     clean-assets        Clean up GHA assets
 ```
 
@@ -50,9 +54,7 @@ the package and adding it to the pacman repo. We take the following precautions:
   actions, excluding the official GitHub ones. We assume the GHA images and
   official actions are safe.
 * The download tool used by the person signing the package checks that the
-  binaries where uploaded by GHA so that uploading a package with a personal
-  account leads to an error. Someone would need to push a workflow change to the
-  repo which gets run and uploads a package to the release assets to avoid that.
+  binaries where uploaded by a restricted set of GitHub users or GHA.
   We assume the bad actor doesn't have git push rights.
 * Packages too large for GHA get built/signed by MSYS2 developers on their
   machines. We assume the developer machines are safe.

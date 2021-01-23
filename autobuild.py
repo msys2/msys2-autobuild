@@ -3,6 +3,7 @@
 import sys
 import os
 import argparse
+import glob
 from os import environ
 from github import Github
 from github.GitRelease import GitRelease
@@ -29,6 +30,14 @@ from hashlib import sha256
 from typing import Generator, Union, AnyStr, List, Any, Dict, Tuple, Set, Optional
 
 _PathLike = Union[os.PathLike, AnyStr]
+
+# Feel free to add yourself here if you have permissions
+ALLOWED_UPLOADERS = [
+    ("User", "elieux"),
+    ("User", "Alexpux"),
+    ("User", "lazka"),
+    ("Bot", "github-actions[bot]"),
+]
 
 
 class PackageStatus(Enum):
@@ -232,12 +241,7 @@ def download_text_asset(asset: GitReleaseAsset) -> str:
 
 def upload_asset(release: GitRelease, path: _PathLike, replace: bool = False,
                  text: bool = False, content: bytes = None) -> None:
-    # type_: msys/mingw/failed
-    if not environ.get("CI"):
-        print("WARNING: upload skipped, not running in CI")
-        return
     path = Path(path)
-
     basename = os.path.basename(str(path))
     asset_name = get_gh_asset_name(basename, text)
     asset_label = basename
@@ -572,9 +576,12 @@ def get_release_assets(release: GitRelease, include_incomplete=False) -> List[Gi
         if not asset_is_complete(asset) and not include_incomplete:
             continue
         uploader = asset.uploader
-        if uploader.type != "Bot" or uploader.login != "github-actions[bot]":
-            raise SystemExit(f"ERROR: Asset '{get_asset_filename(asset)}' not uploaded "
-                             f"by GHA but '{uploader.login}'. Aborting.")
+        uploader_key = (uploader.type, uploader.login)
+        # We allow uploads from some users and GHA
+        if uploader_key not in ALLOWED_UPLOADERS:
+            raise SystemExit(
+                f"ERROR: Asset '{get_asset_filename(asset)}' "
+                f"uploaded by {uploader_key}'. Aborting.")
         assets.append(asset)
     return assets
 
@@ -675,13 +682,15 @@ def get_buildqueue_with_status(full_details: bool = False) -> List[Package]:
                 dep_type = build_type_to_dep_type(build_type)
                 for dep in pkg['ext-depends'].get(dep_type, {}).values():
                     dep_status = dep.get_status(dep_type)
-                    if dep_status not in (PackageStatus.FINISHED, PackageStatus.FINISHED_BUT_BLOCKED):
+                    if dep_status not in (PackageStatus.FINISHED,
+                                          PackageStatus.FINISHED_BUT_BLOCKED):
                         missing_deps.append(dep)
                 for dep in pkg['ext-rdepends'].get(dep_type, set()):
                     dep_status = dep.get_status(dep_type)
                     if dep["name"] in IGNORE_RDEP_PACKAGES:
                         continue
-                    if dep_status not in (PackageStatus.FINISHED, PackageStatus.FINISHED_BUT_BLOCKED):
+                    if dep_status not in (PackageStatus.FINISHED,
+                                          PackageStatus.FINISHED_BUT_BLOCKED):
                         missing_deps.append(dep)
 
                 if missing_deps:
@@ -810,6 +819,50 @@ def get_repo_subdir(type_: str, asset: GitReleaseAsset) -> Path:
             raise Exception("unknown file type")
     else:
         raise Exception("unknown type")
+
+
+def upload_assets(args: Any) -> None:
+    repo = get_repo()
+    package_name = args.package_name
+    src_dir = args.path
+    if src_dir is None:
+        src_dir = os.getcwd()
+    src_dir = os.path.abspath(src_dir)
+
+    for pkg in get_buildqueue_with_status():
+        if pkg["name"] == package_name:
+            break
+    else:
+        raise SystemExit(f"Package '{package_name}' not in the queue, check the 'show' command")
+
+    patterns = []
+    repo_type = pkg.get_repo_type()
+    for build_type in pkg.get_build_types():
+        status = pkg.get_status(build_type)
+
+        # ignore finished packages
+        if status in (PackageStatus.FINISHED, PackageStatus.FINISHED_BUT_BLOCKED,
+                      PackageStatus.FINISHED_BUT_INCOMPLETE):
+            continue
+
+        patterns.extend(pkg.get_build_patterns(build_type))
+
+    print(f"Looking for the following files in {src_dir}:")
+    for pattern in patterns:
+        print("  ", pattern)
+
+    matches = []
+    for pattern in patterns:
+        for match in glob.glob(os.path.join(src_dir, pattern)):
+            matches.append(match)
+    print(f"Found {len(matches)} files..")
+
+    release = repo.get_release('staging-' + repo_type)
+    for match in matches:
+        print(f"Uploading {match}")
+        if not args.dry_run:
+            upload_asset(release, match)
+    print("Done")
 
 
 def fetch_assets(args: Any) -> None:
@@ -991,6 +1044,16 @@ def main(argv: List[str]):
     sub.add_argument(
         "--fetch-all", action="store_true", help="Fetch all packages, even blocked ones")
     sub.set_defaults(func=fetch_assets)
+
+    sub = subparser.add_parser(
+        "upload-assets", help="Upload packages", allow_abbrev=False)
+    sub.add_argument("package_name")
+    sub.add_argument(
+        "--dry-run", action="store_true", help="Only show what is going to be uploaded")
+    sub.add_argument("-p", "--path", action="store", help=(
+        "Directory to look for packages in "
+        "(defaults to the current working directory by default)"))
+    sub.set_defaults(func=upload_assets)
 
     sub = subparser.add_parser("clean-assets", help="Clean up GHA assets", allow_abbrev=False)
     sub.add_argument(
