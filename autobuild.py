@@ -675,13 +675,13 @@ def get_buildqueue_with_status(full_details: bool = False) -> List[Package]:
                 dep_type = build_type_to_dep_type(build_type)
                 for dep in pkg['ext-depends'].get(dep_type, {}).values():
                     dep_status = dep.get_status(dep_type)
-                    if dep_status != PackageStatus.FINISHED:
+                    if dep_status not in (PackageStatus.FINISHED, PackageStatus.FINISHED_BUT_BLOCKED):
                         missing_deps.append(dep)
                 for dep in pkg['ext-rdepends'].get(dep_type, set()):
                     dep_status = dep.get_status(dep_type)
                     if dep["name"] in IGNORE_RDEP_PACKAGES:
                         continue
-                    if dep_status != PackageStatus.FINISHED:
+                    if dep_status not in (PackageStatus.FINISHED, PackageStatus.FINISHED_BUT_BLOCKED):
                         missing_deps.append(dep)
 
                 if missing_deps:
