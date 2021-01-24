@@ -627,6 +627,8 @@ def get_buildqueue_with_status(full_details: bool = False) -> List[Package]:
         return False
 
     def pkg_is_manual(build_type: str, pkg: Package) -> bool:
+        if build_type in ["mingw-src", "msys-src"]:
+            return False
         return pkg['name'] in MANUAL_BUILD
 
     pkgs = get_buildqueue()
