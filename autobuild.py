@@ -487,7 +487,9 @@ def run_build(args: Any) -> None:
 
     done = set()
     while True:
-        todo = get_package_to_build()
+        pkgs = get_buildqueue_with_status(full_details=True)
+        update_status(pkgs)
+        todo = get_package_to_build(pkgs)
         if not todo:
             break
         pkg, build_type = todo
@@ -700,8 +702,8 @@ def get_buildqueue_with_status(full_details: bool = False) -> List[Package]:
     return pkgs
 
 
-def get_package_to_build() -> Optional[Tuple[Package, str]]:
-    for pkg in get_buildqueue_with_status():
+def get_package_to_build(pkgs: List[Package]) -> Optional[Tuple[Package, str]]:
+    for pkg in pkgs:
         for build_type in pkg.get_build_types():
             if pkg.get_status(build_type) == PackageStatus.WAITING_FOR_BUILD:
                 return (pkg, build_type)
@@ -735,16 +737,18 @@ def should_run(args: Any) -> None:
         raise SystemExit(
             f"Another workflow is currently running or has something queued: {run.html_url}")
 
-    if not get_package_to_build():
+    pkgs = get_buildqueue_with_status(full_details=True)
+    update_status(pkgs)
+    if not get_package_to_build(pkgs):
         raise SystemExit("Nothing to build")
 
 
-def update_status(args: Any) -> None:
+def update_status(pkgs: List[Package]):
     repo = get_repo()
     release = repo.get_release("status")
 
     results = {}
-    for pkg in get_buildqueue_with_status(full_details=True):
+    for pkg in pkgs:
         pkg_result = {}
         for build_type in pkg.get_build_types():
             details = pkg.get_status_details(build_type)
@@ -764,6 +768,10 @@ def update_status(args: Any) -> None:
             fileobj, len(content), asset_name)
 
     print(f"Uploaded status file for {len(results)} packages: {new_asset.browser_download_url}")
+
+
+def run_update_status(args: Any) -> None:
+    update_status(get_buildqueue_with_status(full_details=True))
 
 
 def show_build(args: Any) -> None:
@@ -1031,7 +1039,7 @@ def main(argv: List[str]):
 
     sub = subparser.add_parser(
         "update-status", help="Update the status file", allow_abbrev=False)
-    sub.set_defaults(func=update_status)
+    sub.set_defaults(func=run_update_status)
 
     sub = subparser.add_parser(
         "fetch-assets", help="Download all staging packages", allow_abbrev=False)
