@@ -485,7 +485,6 @@ def run_build(args: Any) -> None:
     except Exception as e:
         raise SystemExit("ERROR: msys2_root not functional", e)
 
-    done = set()
     while True:
         pkgs = get_buildqueue_with_status(full_details=True)
         update_status(pkgs)
@@ -493,10 +492,6 @@ def run_build(args: Any) -> None:
         if not todo:
             break
         pkg, build_type = todo
-        key = pkg['repo'] + build_type + pkg['name'] + pkg['version']
-        if key in done:
-            raise SystemExit("ERROR: building package again in the same run", pkg)
-        done.add(key)
 
         if (time.monotonic() - start_time) >= SOFT_TIMEOUT:
             print("timeout reached")
