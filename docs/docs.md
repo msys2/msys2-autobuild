@@ -10,7 +10,7 @@ sequenceDiagram
     participant REPO as Pacman Repo
 
     GIT->>GHA: GIT push trigger
-    GHA->>GHA: parse PKBUILDs
+    GHA->>GHA: parse PKGBUILDs
     GHA-->>GIT: upload parsed PKGBUILDs
 
 loop Every 5 minutes
