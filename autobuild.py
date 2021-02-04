@@ -647,13 +647,13 @@ def get_buildqueue_with_status(full_details: bool = False) -> List[Package]:
             status = pkg.get_status(build_type)
             if status == PackageStatus.WAITING_FOR_BUILD:
                 dep_type = build_type_to_dep_type(build_type)
-                missing_deps = []
+                missing_deps = set()
                 for dep in pkg['ext-depends'].get(dep_type, {}).values():
                     dep_status = dep.get_status(dep_type)
                     if dep_status != PackageStatus.FINISHED:
-                        missing_deps.append(dep)
+                        missing_deps.add(dep)
                 if missing_deps:
-                    desc = f"Waiting for: {', '.join([d['name'] for d in missing_deps])}"
+                    desc = f"Waiting for: {', '.join(sorted(d['name'] for d in missing_deps))}"
                     pkg.set_status(build_type, PackageStatus.WAITING_FOR_DEPENDENCIES, desc)
 
     # Block packages where not every build type is finished
@@ -667,7 +667,7 @@ def get_buildqueue_with_status(full_details: bool = False) -> List[Package]:
             for build_type in pkg.get_build_types():
                 status = pkg.get_status(build_type)
                 if status == PackageStatus.FINISHED:
-                    desc = f"Missing related builds: {', '.join(unfinished)}"
+                    desc = f"Missing related builds: {', '.join(sorted(unfinished))}"
                     pkg.set_status(build_type, PackageStatus.FINISHED_BUT_INCOMPLETE, desc)
 
     # Block packages where not all deps/rdeps are finished
@@ -675,23 +675,23 @@ def get_buildqueue_with_status(full_details: bool = False) -> List[Package]:
         for build_type in pkg.get_build_types():
             status = pkg.get_status(build_type)
             if status == PackageStatus.FINISHED:
-                missing_deps = []
+                missing_deps = set()
                 dep_type = build_type_to_dep_type(build_type)
                 for dep in pkg['ext-depends'].get(dep_type, {}).values():
                     dep_status = dep.get_status(dep_type)
                     if dep_status not in (PackageStatus.FINISHED,
                                           PackageStatus.FINISHED_BUT_BLOCKED):
-                        missing_deps.append(dep)
+                        missing_deps.add(dep)
                 for dep in pkg['ext-rdepends'].get(dep_type, set()):
                     dep_status = dep.get_status(dep_type)
                     if dep["name"] in IGNORE_RDEP_PACKAGES:
                         continue
                     if dep_status not in (PackageStatus.FINISHED,
                                           PackageStatus.FINISHED_BUT_BLOCKED):
-                        missing_deps.append(dep)
+                        missing_deps.add(dep)
 
                 if missing_deps:
-                    desc = f"waiting on { ', '.join(p['name'] for p in missing_deps) }"
+                    desc = f"waiting on { ', '.join(sorted(p['name'] for p in missing_deps)) }"
                     pkg.set_status(build_type, PackageStatus.FINISHED_BUT_BLOCKED, desc)
 
     return pkgs
