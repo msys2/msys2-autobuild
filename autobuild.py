@@ -687,6 +687,7 @@ def get_buildqueue_with_status(full_details: bool = False) -> List[Package]:
                                               PackageStatus.FINISHED_BUT_BLOCKED):
                             missing_deps.add(dep)
 
+                missing_rdeps = set()
                 for dep_type in build_type_to_rdep_types(build_type):
                     for dep in pkg['ext-rdepends'].get(dep_type, set()):
                         dep_status = dep.get_status(dep_type)
@@ -694,11 +695,20 @@ def get_buildqueue_with_status(full_details: bool = False) -> List[Package]:
                             continue
                         if dep_status not in (PackageStatus.FINISHED,
                                               PackageStatus.FINISHED_BUT_BLOCKED):
-                            missing_deps.add(dep)
+                            missing_rdeps.add(dep)
 
+                descs = []
                 if missing_deps:
-                    desc = f"Waiting on { ', '.join(sorted(p['name'] for p in missing_deps)) }"
-                    pkg.set_status(build_type, PackageStatus.FINISHED_BUT_BLOCKED, desc)
+                    desc = (f"Waiting on dependencies: "
+                            f"{ ', '.join(sorted(p['name'] for p in missing_deps)) }")
+                    descs.append(desc)
+                if missing_rdeps:
+                    desc = (f"Waiting on reverse dependencies: "
+                            f"{ ', '.join(sorted(p['name'] for p in missing_rdeps)) }")
+                    descs.append(desc)
+
+                if descs:
+                    pkg.set_status(build_type, PackageStatus.FINISHED_BUT_BLOCKED, ". ".join(descs))
 
     return pkgs
 
