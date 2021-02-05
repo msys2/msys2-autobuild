@@ -305,14 +305,16 @@ keyserver-options auto-key-retrieve
             os.replace(backup, conf)
 
 
-def build_type_to_dep_type(build_type):
+def build_type_to_dep_types(build_type):
     if build_type == "mingw-src":
-        dep_type = "mingw64"
+        build_type = "mingw64"
     elif build_type == "msys-src":
-        dep_type = "msys"
+        build_type = "msys"
+
+    if build_type == "msys":
+        return build_type
     else:
-        dep_type = build_type
-    return dep_type
+        return ["msys", build_type]
 
 
 @contextmanager
@@ -361,16 +363,16 @@ SigLevel=Never
         os.makedirs(repo_root, exist_ok=True)
         with backup_pacman_conf(msys2_root):
             to_add = []
-            dep_type = build_type_to_dep_type(build_type)
-            for name, dep in pkg['ext-depends'].get(dep_type, {}).items():
-                pattern = f"{name}-{dep['version']}-*.pkg.*"
-                repo_type = dep.get_repo_type()
-                for asset in get_cached_assets(repo, "staging-" + repo_type):
-                    if fnmatch.fnmatch(get_asset_filename(asset), pattern):
-                        to_add.append((repo_type, asset))
-                        break
-                else:
-                    raise SystemExit(f"asset for {pattern} in {repo_type} not found")
+            for dep_type in build_type_to_dep_types(build_type):
+                for name, dep in pkg['ext-depends'].get(dep_type, {}).items():
+                    pattern = f"{name}-{dep['version']}-*.pkg.*"
+                    repo_type = dep.get_repo_type()
+                    for asset in get_cached_assets(repo, "staging-" + repo_type):
+                        if fnmatch.fnmatch(get_asset_filename(asset), pattern):
+                            to_add.append((repo_type, asset))
+                            break
+                    else:
+                        raise SystemExit(f"asset for {pattern} in {repo_type} not found")
 
             for repo_type, asset in to_add:
                 add_to_repo(repo_root, repo_type, asset)
@@ -646,12 +648,12 @@ def get_buildqueue_with_status(full_details: bool = False) -> List[Package]:
         for build_type in pkg.get_build_types():
             status = pkg.get_status(build_type)
             if status == PackageStatus.WAITING_FOR_BUILD:
-                dep_type = build_type_to_dep_type(build_type)
                 missing_deps = set()
-                for dep in pkg['ext-depends'].get(dep_type, {}).values():
-                    dep_status = dep.get_status(dep_type)
-                    if dep_status != PackageStatus.FINISHED:
-                        missing_deps.add(dep)
+                for dep_type in build_type_to_dep_types(build_type):
+                    for dep in pkg['ext-depends'].get(dep_type, {}).values():
+                        dep_status = dep.get_status(dep_type)
+                        if dep_status != PackageStatus.FINISHED:
+                            missing_deps.add(dep)
                 if missing_deps:
                     desc = f"Waiting for: {', '.join(sorted(d['name'] for d in missing_deps))}"
                     pkg.set_status(build_type, PackageStatus.WAITING_FOR_DEPENDENCIES, desc)
@@ -676,22 +678,22 @@ def get_buildqueue_with_status(full_details: bool = False) -> List[Package]:
             status = pkg.get_status(build_type)
             if status == PackageStatus.FINISHED:
                 missing_deps = set()
-                dep_type = build_type_to_dep_type(build_type)
-                for dep in pkg['ext-depends'].get(dep_type, {}).values():
-                    dep_status = dep.get_status(dep_type)
-                    if dep_status not in (PackageStatus.FINISHED,
-                                          PackageStatus.FINISHED_BUT_BLOCKED):
-                        missing_deps.add(dep)
-                for dep in pkg['ext-rdepends'].get(dep_type, set()):
-                    dep_status = dep.get_status(dep_type)
-                    if dep["name"] in IGNORE_RDEP_PACKAGES:
-                        continue
-                    if dep_status not in (PackageStatus.FINISHED,
-                                          PackageStatus.FINISHED_BUT_BLOCKED):
-                        missing_deps.add(dep)
+                for dep_type in build_type_to_dep_types(build_type):
+                    for dep in pkg['ext-depends'].get(dep_type, {}).values():
+                        dep_status = dep.get_status(dep_type)
+                        if dep_status not in (PackageStatus.FINISHED,
+                                              PackageStatus.FINISHED_BUT_BLOCKED):
+                            missing_deps.add(dep)
+                    for dep in pkg['ext-rdepends'].get(dep_type, set()):
+                        dep_status = dep.get_status(dep_type)
+                        if dep["name"] in IGNORE_RDEP_PACKAGES:
+                            continue
+                        if dep_status not in (PackageStatus.FINISHED,
+                                              PackageStatus.FINISHED_BUT_BLOCKED):
+                            missing_deps.add(dep)
 
                 if missing_deps:
-                    desc = f"waiting on { ', '.join(sorted(p['name'] for p in missing_deps)) }"
+                    desc = f"Waiting on { ', '.join(sorted(p['name'] for p in missing_deps)) }"
                     pkg.set_status(build_type, PackageStatus.FINISHED_BUT_BLOCKED, desc)
 
     return pkgs
