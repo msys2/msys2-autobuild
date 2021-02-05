@@ -306,6 +306,18 @@ def build_type_to_dep_types(build_type: str) -> List[str]:
         return ["msys", build_type]
 
 
+def build_type_to_rdep_types(build_type: str) -> List[str]:
+    if build_type == "mingw-src":
+        build_type = "mingw64"
+    elif build_type == "msys-src":
+        build_type = "msys"
+
+    if build_type == "msys":
+        return [build_type, "mingw32", "mingw64"]
+    else:
+        return [build_type]
+
+
 @contextmanager
 def staging_dependencies(
         build_type: str, pkg: Package, msys2_root: _PathLike,
@@ -534,7 +546,8 @@ def get_buildqueue() -> List[Package]:
         for pkg2 in pkgs:
             for repo, deps in pkg2['ext-depends'].items():
                 if pkg in deps.values():
-                    r_depends.setdefault(repo, set()).add(pkg2)
+                    for r_repo in pkg2['packages'].keys():
+                        r_depends.setdefault(r_repo, set()).add(pkg2)
         pkg['ext-rdepends'] = r_depends
 
     return pkgs
@@ -673,6 +686,8 @@ def get_buildqueue_with_status(full_details: bool = False) -> List[Package]:
                         if dep_status not in (PackageStatus.FINISHED,
                                               PackageStatus.FINISHED_BUT_BLOCKED):
                             missing_deps.add(dep)
+
+                for dep_type in build_type_to_rdep_types(build_type):
                     for dep in pkg['ext-rdepends'].get(dep_type, set()):
                         dep_status = dep.get_status(dep_type)
                         if dep["name"] in IGNORE_RDEP_PACKAGES:
