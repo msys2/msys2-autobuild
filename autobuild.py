@@ -365,15 +365,16 @@ SigLevel=Never
         with backup_pacman_conf(msys2_root):
             to_add = []
             for dep_type in build_type_to_dep_types(build_type):
-                for name, dep in pkg['ext-depends'].get(dep_type, {}).items():
-                    pattern = f"{name}-{dep['version']}-*.pkg.*"
+                for dep in pkg['ext-depends'].get(dep_type, {}).values():
                     repo_type = dep.get_repo_type()
-                    for asset in get_cached_assets(repo, "staging-" + repo_type):
-                        if fnmatch.fnmatch(get_asset_filename(asset), pattern):
-                            to_add.append((repo_type, asset))
-                            break
-                    else:
-                        raise SystemExit(f"asset for {pattern} in {repo_type} not found")
+                    assets = get_cached_assets(repo, "staging-" + repo_type)
+                    for pattern in dep.get_build_patterns(dep_type):
+                        for asset in assets:
+                            if fnmatch.fnmatch(get_asset_filename(asset), pattern):
+                                to_add.append((repo_type, asset))
+                                break
+                        else:
+                            raise SystemExit(f"asset for {pattern} in {repo_type} not found")
 
             for repo_type, asset in to_add:
                 add_to_repo(repo_root, repo_type, asset)
@@ -521,16 +522,6 @@ def get_buildqueue() -> List[Package]:
         for repo, names in pkg['packages'].items():
             for name in names:
                 dep_mapping[name] = pkg
-
-    # We need to pull in all packages of that particular build because they can
-    # depend on each other with a fixed version
-    for pkg in pkgs:
-        for repo, deps in pkg['depends'].items():
-            all_deps = set(deps)
-            for dep in deps:
-                dep_pkg = dep_mapping[dep]
-                all_deps.update(dep_pkg['packages'][repo])
-            pkg['depends'][repo] = sorted(all_deps)
 
     # link up dependencies with the real package in the queue
     for pkg in pkgs:
