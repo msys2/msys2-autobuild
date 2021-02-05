@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 
+from __future__ import annotations
+
 import sys
 import os
 import argparse
@@ -110,6 +112,12 @@ class Package(dict):
         if "msys" in self["packages"].keys():
             build_types.append("msys-src")
         return build_types
+
+    def get_depends(self, build_type) -> Set[Package]:
+        return self['ext-depends'].get(build_type, set())
+
+    def get_rdepends(self, build_type) -> Set[Package]:
+        return self['ext-rdepends'].get(build_type, set())
 
     def get_repo_type(self) -> str:
         return "msys" if self['repo'].startswith('MSYS2') else "mingw"
@@ -365,7 +373,7 @@ SigLevel=Never
         with backup_pacman_conf(msys2_root):
             to_add = []
             for dep_type in build_type_to_dep_types(build_type):
-                for dep in pkg['ext-depends'].get(dep_type, set()):
+                for dep in pkg.get_depends(dep_type):
                     repo_type = dep.get_repo_type()
                     assets = get_cached_assets(repo, "staging-" + repo_type)
                     for pattern in dep.get_build_patterns(dep_type):
@@ -643,7 +651,7 @@ def get_buildqueue_with_status(full_details: bool = False) -> List[Package]:
             if status == PackageStatus.WAITING_FOR_BUILD:
                 missing_deps = set()
                 for dep_type in build_type_to_dep_types(build_type):
-                    for dep in pkg['ext-depends'].get(dep_type, set()):
+                    for dep in pkg.get_depends(dep_type):
                         dep_status = dep.get_status(dep_type)
                         if dep_status != PackageStatus.FINISHED:
                             missing_deps.add(dep)
@@ -672,7 +680,7 @@ def get_buildqueue_with_status(full_details: bool = False) -> List[Package]:
             if status == PackageStatus.FINISHED:
                 missing_deps = set()
                 for dep_type in build_type_to_dep_types(build_type):
-                    for dep in pkg['ext-depends'].get(dep_type, set()):
+                    for dep in pkg.get_depends(dep_type):
                         dep_status = dep.get_status(dep_type)
                         if dep_status not in (PackageStatus.FINISHED,
                                               PackageStatus.FINISHED_BUT_BLOCKED):
@@ -680,7 +688,7 @@ def get_buildqueue_with_status(full_details: bool = False) -> List[Package]:
 
                 missing_rdeps = set()
                 for dep_type in build_type_to_rdep_types(build_type):
-                    for dep in pkg['ext-rdepends'].get(dep_type, set()):
+                    for dep in pkg.get_rdepends(dep_type):
                         dep_status = dep.get_status(dep_type)
                         if dep["name"] in IGNORE_RDEP_PACKAGES:
                             continue
