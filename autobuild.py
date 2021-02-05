@@ -365,7 +365,7 @@ SigLevel=Never
         with backup_pacman_conf(msys2_root):
             to_add = []
             for dep_type in build_type_to_dep_types(build_type):
-                for dep in pkg['ext-depends'].get(dep_type, {}).values():
+                for dep in pkg['ext-depends'].get(dep_type, set()):
                     repo_type = dep.get_repo_type()
                     assets = get_cached_assets(repo, "staging-" + repo_type)
                     for pattern in dep.get_build_patterns(dep_type):
@@ -525,10 +525,10 @@ def get_buildqueue() -> List[Package]:
 
     # link up dependencies with the real package in the queue
     for pkg in pkgs:
-        ver_depends: Dict[str, Dict[str, Package]] = {}
+        ver_depends: Dict[str, Set[Package]] = {}
         for repo, deps in pkg['depends'].items():
             for dep in deps:
-                ver_depends.setdefault(repo, {})[dep] = dep_mapping[dep]
+                ver_depends.setdefault(repo, set()).add(dep_mapping[dep])
         pkg['ext-depends'] = ver_depends
 
     # reverse dependencies
@@ -536,7 +536,7 @@ def get_buildqueue() -> List[Package]:
         r_depends: Dict[str, Set[Package]] = {}
         for pkg2 in pkgs:
             for repo, deps in pkg2['ext-depends'].items():
-                if pkg in deps.values():
+                if pkg in deps:
                     for r_repo in pkg2['packages'].keys():
                         r_depends.setdefault(r_repo, set()).add(pkg2)
         pkg['ext-rdepends'] = r_depends
@@ -643,7 +643,7 @@ def get_buildqueue_with_status(full_details: bool = False) -> List[Package]:
             if status == PackageStatus.WAITING_FOR_BUILD:
                 missing_deps = set()
                 for dep_type in build_type_to_dep_types(build_type):
-                    for dep in pkg['ext-depends'].get(dep_type, {}).values():
+                    for dep in pkg['ext-depends'].get(dep_type, set()):
                         dep_status = dep.get_status(dep_type)
                         if dep_status != PackageStatus.FINISHED:
                             missing_deps.add(dep)
@@ -672,7 +672,7 @@ def get_buildqueue_with_status(full_details: bool = False) -> List[Package]:
             if status == PackageStatus.FINISHED:
                 missing_deps = set()
                 for dep_type in build_type_to_dep_types(build_type):
-                    for dep in pkg['ext-depends'].get(dep_type, {}).values():
+                    for dep in pkg['ext-depends'].get(dep_type, set()):
                         dep_status = dep.get_status(dep_type)
                         if dep_status not in (PackageStatus.FINISHED,
                                               PackageStatus.FINISHED_BUT_BLOCKED):
