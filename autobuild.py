@@ -120,35 +120,24 @@ SOFT_TIMEOUT = 60 * 60 * 3
 
 # Packages that take too long to build, and should be handled manually
 MANUAL_BUILD: List[str] = [
-    # 'mingw-w64-clang',
-    # 'mingw-w64-arm-none-eabi-gcc',
-    # 'mingw-w64-gcc',
-    'mingw-w64-gcc-git',
     'mingw-w64-firebird-git',
     'mingw-w64-qt5-static',
 ]
 
-
 # FIXME: Packages that should be ignored if they depend on other things
 # in the queue. Ideally this list should be empty..
 IGNORE_RDEP_PACKAGES: List[str] = [
-    "mingw-w64-vrpn",
-    "mingw-w64-cocos2d-x",
     "mingw-w64-mlpack",
     "mingw-w64-qemu",
     "mingw-w64-ghc",
     "mingw-w64-python-notebook",
     "mingw-w64-python-pywin32",
     "mingw-w64-usbmuxd",
-    "mingw-w64-ldns",
     "mingw-w64-npm",
     "mingw-w64-yarn",
     "mingw-w64-bower",
     "mingw-w64-nodejs",
-    "mingw-w64-cross-conemu-git",
-    "mingw-w64-godot-cpp",
 ]
-
 
 REPO = "msys2/msys2-autobuild"
 
