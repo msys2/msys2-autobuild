@@ -305,14 +305,14 @@ keyserver-options auto-key-retrieve
             os.replace(backup, conf)
 
 
-def build_type_to_dep_types(build_type):
+def build_type_to_dep_types(build_type: str) -> List[str]:
     if build_type == "mingw-src":
         build_type = "mingw64"
     elif build_type == "msys-src":
         build_type = "msys"
 
     if build_type == "msys":
-        return build_type
+        return [build_type]
     else:
         return ["msys", build_type]
 
