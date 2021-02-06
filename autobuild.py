@@ -763,6 +763,7 @@ def update_status(pkgs: List[Package]):
         for build_type in pkg.get_build_types():
             details = pkg.get_status_details(build_type)
             details["status"] = pkg.get_status(build_type).value
+            details["version"] = pkg["version"]
             pkg_result[build_type] = details
         results[pkg["name"]] = pkg_result
 
