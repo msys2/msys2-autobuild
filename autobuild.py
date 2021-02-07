@@ -1,7 +1,5 @@
 #!/usr/bin/env python3
 
-from __future__ import annotations
-
 import sys
 import os
 import argparse
@@ -113,10 +111,10 @@ class Package(dict):
             build_types.append("msys-src")
         return build_types
 
-    def get_depends(self, build_type) -> Set[Package]:
+    def get_depends(self, build_type) -> "Set[Package]":
         return self['ext-depends'].get(build_type, set())
 
-    def get_rdepends(self, build_type) -> Set[Package]:
+    def get_rdepends(self, build_type) -> "Set[Package]":
         return self['ext-rdepends'].get(build_type, set())
 
     def get_repo_type(self) -> str:
@@ -158,13 +156,18 @@ def get_current_run_url() -> Optional[str]:
     return None
 
 
+def shlex_join(split_command: List[str]) -> str:
+    # shlex.join got added in 3.8 while we support 3.6
+    return ' '.join(shlex.quote(arg) for arg in split_command)
+
+
 def run_cmd(msys2_root: _PathLike, args, **kwargs):
     executable = os.path.join(msys2_root, 'usr', 'bin', 'bash.exe')
     env = kwargs.pop("env", os.environ.copy())
     env["CHERE_INVOKING"] = "1"
     env["MSYSTEM"] = "MSYS"
     env["MSYS2_PATH_TYPE"] = "minimal"
-    check_call([executable, '-lc'] + [shlex.join([str(a) for a in args])], env=env, **kwargs)
+    check_call([executable, '-lc'] + [shlex_join([str(a) for a in args])], env=env, **kwargs)
 
 
 @contextmanager
