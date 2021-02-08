@@ -735,10 +735,16 @@ def get_workflow():
         raise Exception("workflow not found:", workflow_name)
 
 
-def should_run(args: Any) -> None:
+def write_build_plan(args: Any):
+    target_file = args.target_file
+
     current_id = None
     if "GITHUB_RUN_ID" in os.environ:
         current_id = int(os.environ["GITHUB_RUN_ID"])
+
+    def write_out(result: List[Dict[str, str]]):
+        with open(target_file, "wb") as h:
+            h.write(json.dumps(result).encode())
 
     workflow = get_workflow()
     runs = list(workflow.get_runs(status="in_progress"))
@@ -747,13 +753,13 @@ def should_run(args: Any) -> None:
         if current_id is not None and current_id == run.id:
             # Ignore this run itself
             continue
-        raise SystemExit(
-            f"Another workflow is currently running or has something queued: {run.html_url}")
+        print(f"Another workflow is currently running or has something queued: {run.html_url}")
+        write_out([])
+        return
 
-    pkgs = get_buildqueue_with_status(full_details=True)
-    update_status(pkgs)
-    if not get_package_to_build(pkgs):
-        raise SystemExit("Nothing to build")
+    write_out([{
+        "name": "all"
+    }])
 
 
 def update_status(pkgs: List[Package]):
@@ -1048,8 +1054,9 @@ def main(argv: List[str]):
     sub.set_defaults(func=show_build)
 
     sub = subparser.add_parser(
-        "should-run", help="Fails if the workflow shouldn't run", allow_abbrev=False)
-    sub.set_defaults(func=should_run)
+        "write-build-plan", help="Write a GHA build matrix setup", allow_abbrev=False)
+    sub.add_argument("target_file")
+    sub.set_defaults(func=write_build_plan)
 
     sub = subparser.add_parser(
         "update-status", help="Update the status file", allow_abbrev=False)

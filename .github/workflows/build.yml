@@ -11,7 +11,7 @@ jobs:
     runs-on: windows-latest
 
     outputs:
-      skip-build: ${{ steps.check.outputs.skip-build }}
+      build-plan: ${{ steps.check.outputs.build-plan }}
 
     steps:
 
@@ -35,25 +35,24 @@ jobs:
         python -m pip install --user 'wheel==0.36.2'
         python -m pip install --user -r requirements.txt
 
-    - name: Check if we should run
+    - name: Check what we should run
       id: check
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
-        python autobuild.py should-run
-        $skipBuild = ($LASTEXITCODE -ne 0)
-        If ($skipBuild) {echo '::set-output name=skip-build::true'}
-        exit 0
+        python autobuild.py write-build-plan build_plan.json
+        $buildPlan = Get-Content build_plan.json -Raw
+        echo "::set-output name=build-plan::$buildPlan"
 
     - name: Clean up assets
-      if: steps.check.outputs.skip-build != 'true'
+      if: steps.check.outputs.build-plan != '[]'
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
         python autobuild.py clean-assets
 
     - name: Show build queue
-      if: steps.check.outputs.skip-build != 'true'
+      if: steps.check.outputs.build-plan != '[]'
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
@@ -61,10 +60,15 @@ jobs:
 
   build:
     needs: schedule
-
-    if: ${{ needs.schedule.outputs.skip-build != 'true' }}
-
     runs-on: windows-latest
+
+    if: ${{ needs.schedule.outputs.build-plan != '[]' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJson(needs.schedule.outputs.build-plan) }}
+    name: ${{ matrix.name }}
+
     steps:
 
     - uses: actions/checkout@v2

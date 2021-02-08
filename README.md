@@ -25,7 +25,6 @@ subcommands:
   {build,show,should-run,update-status,fetch-assets,upload-assets,clean-assets}
     build               Build all packages
     show                Show all packages to be built
-    should-run          Fails if the workflow shouldn't run
     update-status       Update the status file
     fetch-assets        Download all staging packages
     upload-assets       Upload packages
