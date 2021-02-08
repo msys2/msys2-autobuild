@@ -484,6 +484,11 @@ def build_package(build_type: str, pkg, msys2_root: _PathLike, builddir: _PathLi
 def run_build(args: Any) -> None:
     builddir = os.path.abspath(args.builddir)
     msys2_root = os.path.abspath(args.msys2_root)
+    if args.build_types is None:
+        build_types = None
+    else:
+        build_types = [p.strip() for p in args.build_types.split(",")]
+
     start_time = time.monotonic()
 
     if not sys.platform == "win32":
@@ -503,7 +508,7 @@ def run_build(args: Any) -> None:
     while True:
         pkgs = get_buildqueue_with_status(full_details=True)
         update_status(pkgs)
-        todo = get_package_to_build(pkgs)
+        todo = get_package_to_build(pkgs, build_types)
         if not todo:
             break
         pkg, build_type = todo
@@ -715,9 +720,12 @@ def get_buildqueue_with_status(full_details: bool = False) -> List[Package]:
     return pkgs
 
 
-def get_package_to_build(pkgs: List[Package]) -> Optional[Tuple[Package, str]]:
+def get_package_to_build(
+        pkgs: List[Package], build_types: Optional[List[str]]) -> Optional[Tuple[Package, str]]:
     for pkg in pkgs:
         for build_type in pkg.get_build_types():
+            if build_types is not None and build_type not in build_types:
+                continue
             if pkg.get_status(build_type) == PackageStatus.WAITING_FOR_BUILD:
                 return (pkg, build_type)
     return None
@@ -733,6 +741,32 @@ def get_workflow():
             return workflow
     else:
         raise Exception("workflow not found:", workflow_name)
+
+
+JOB_META: List[Dict[str, Any]] = [
+    {
+        "build-types": ["mingw64", "mingw-src"],
+        "matrix": {
+            "packages": "base-devel mingw-w64-x86_64-toolchain git",
+            "build-args": "--build-types mingw64,mingw-src",
+            "name": "mingw64"
+        }
+    }, {
+        "build-types": ["mingw32"],
+        "matrix": {
+            "packages": "base-devel mingw-w64-i686-toolchain git",
+            "build-args": "--build-types mingw32",
+            "name": "mingw32"
+        }
+    }, {
+        "build-types": ["msys", "msys-src"],
+        "matrix": {
+            "packages": "base-devel msys2-devel git",
+            "build-args": "--build-types msys,msys-src",
+            "name": "msys"
+        }
+    }
+]
 
 
 def write_build_plan(args: Any):
@@ -757,9 +791,25 @@ def write_build_plan(args: Any):
         write_out([])
         return
 
-    write_out([{
-        "name": "all"
-    }])
+    pkgs = get_buildqueue_with_status(full_details=True)
+    update_status(pkgs)
+
+    queued_build_types = set()
+    for pkg in pkgs:
+        for build_type in pkg.get_build_types():
+            if pkg.get_status(build_type) == PackageStatus.WAITING_FOR_BUILD:
+                queued_build_types.add(build_type)
+
+    if not queued_build_types:
+        write_out([])
+        return
+
+    jobs = []
+    for job_info in JOB_META:
+        if not queued_build_types & set(job_info["build-types"]):
+            jobs.append(job_info["matrix"])
+
+    write_out(jobs)
 
 
 def update_status(pkgs: List[Package]):
@@ -1041,6 +1091,7 @@ def main(argv: List[str]):
     subparser = parser.add_subparsers(title="subcommands")
 
     sub = subparser.add_parser("build", help="Build all packages")
+    sub.add_argument("-t", "--build-types", action="store")
     sub.add_argument("msys2_root", help="The MSYS2 install used for building. e.g. C:\\msys64")
     sub.add_argument(
         "builddir",

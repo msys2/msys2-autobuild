@@ -95,7 +95,7 @@ jobs:
       with:
         msystem: MSYS
         update: true
-        install: msys2-devel base-devel mingw-w64-x86_64-toolchain mingw-w64-i686-toolchain git
+        install: ${{ matrix.packages }}
 
     - name: Switch to the main mirror
       shell: msys2 {0}
@@ -125,4 +125,4 @@ jobs:
         $BUILD_ROOT='C:\_'
         $MSYS2_ROOT=(msys2 -c 'cygpath -w /')
         Get-PSDrive -PSProvider FileSystem
-        python autobuild.py build "$MSYS2_ROOT" "$BUILD_ROOT"
+        python autobuild.py build ${{ matrix.build-args }} "$MSYS2_ROOT" "$BUILD_ROOT"
