@@ -806,7 +806,7 @@ def write_build_plan(args: Any):
 
     jobs = []
     for job_info in JOB_META:
-        if not queued_build_types & set(job_info["build-types"]):
+        if queued_build_types & set(job_info["build-types"]):
             jobs.append(job_info["matrix"])
 
     write_out(jobs)
