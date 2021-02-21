@@ -39,6 +39,8 @@ ALLOWED_UPLOADERS = [
     ("Bot", "github-actions[bot]"),
 ]
 
+SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
+
 
 class PackageStatus(Enum):
     FINISHED = 'finished'
@@ -282,29 +284,6 @@ def backup_pacman_conf(msys2_root: _PathLike) -> Generator:
         os.replace(backup, conf)
 
 
-@contextmanager
-def auto_key_retrieve(msys2_root: _PathLike) -> Generator:
-    home_dir = os.path.join(msys2_root, "home", environ["USERNAME"])
-    assert os.path.exists(home_dir)
-    gnupg_dir = os.path.join(home_dir, ".gnupg")
-    os.makedirs(gnupg_dir, exist_ok=True)
-    conf = os.path.join(gnupg_dir, "gpg.conf")
-    backup = None
-    if os.path.exists(conf):
-        backup = conf + ".backup"
-        shutil.copyfile(conf, backup)
-    try:
-        with open(conf, "w", encoding="utf-8") as h:
-            h.write("""
-keyserver hkp://keys.gnupg.net
-keyserver-options auto-key-retrieve
-""")
-        yield
-    finally:
-        if backup is not None:
-            os.replace(backup, conf)
-
-
 def build_type_to_dep_types(build_type: str) -> List[str]:
     if build_type == "mingw-src":
         build_type = "mingw64"
@@ -411,11 +390,14 @@ def build_package(build_type: str, pkg, msys2_root: _PathLike, builddir: _PathLi
     repo = get_repo()
 
     with staging_dependencies(build_type, pkg, msys2_root, builddir), \
-            auto_key_retrieve(msys2_root), \
             fresh_git_repo(pkg['repo_url'], repo_dir):
         pkg_dir = os.path.join(repo_dir, pkg['repo_path'])
 
         try:
+            # Fetch all keys mentioned in the PKGBUILD
+            validpgpkeys = to_pure_posix_path(os.path.join(SCRIPT_DIR, 'fetch-validpgpkeys.sh'))
+            run_cmd(msys2_root, ['bash', validpgpkeys], cwd=pkg_dir)
+
             if build_type == "mingw-src":
                 env = environ.copy()
                 env['MINGW_INSTALLS'] = 'mingw64'
