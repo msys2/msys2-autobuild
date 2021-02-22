@@ -130,6 +130,7 @@ SOFT_TIMEOUT = 60 * 60 * 3
 MANUAL_BUILD: List[str] = [
     'mingw-w64-firebird-git',
     'mingw-w64-qt5-static',
+    'mingw-w64-arm-none-eabi-gcc',
 ]
 
 # FIXME: Packages that should be ignored if they depend on other things
@@ -145,6 +146,7 @@ IGNORE_RDEP_PACKAGES: List[str] = [
     "mingw-w64-yarn",
     "mingw-w64-bower",
     "mingw-w64-nodejs",
+    "mingw-w64-arm-none-eabi-gcc",
 ]
 
 REPO = "msys2/msys2-autobuild"
