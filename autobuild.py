@@ -147,6 +147,7 @@ IGNORE_RDEP_PACKAGES: List[str] = [
     "mingw-w64-bower",
     "mingw-w64-nodejs",
     "mingw-w64-arm-none-eabi-gcc",
+    "mingw-w64-tolua",
 ]
 
 REPO = "msys2/msys2-autobuild"
