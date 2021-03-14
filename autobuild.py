@@ -652,20 +652,6 @@ def get_buildqueue_with_status(full_details: bool = False) -> List[Package]:
                     desc = f"Waiting for: {', '.join(sorted(d['name'] for d in missing_deps))}"
                     pkg.set_status(build_type, PackageStatus.WAITING_FOR_DEPENDENCIES, desc)
 
-    # Block packages where not every build type is finished
-    for pkg in pkgs:
-        unfinished = []
-        for build_type in pkg.get_build_types():
-            status = pkg.get_status(build_type)
-            if status != PackageStatus.FINISHED:
-                unfinished.append(build_type)
-        if unfinished:
-            for build_type in pkg.get_build_types():
-                status = pkg.get_status(build_type)
-                if status == PackageStatus.FINISHED:
-                    desc = f"Missing related builds: {', '.join(sorted(unfinished))}"
-                    pkg.set_status(build_type, PackageStatus.FINISHED_BUT_INCOMPLETE, desc)
-
     # Block packages where not all deps/rdeps are finished
     for pkg in pkgs:
         for build_type in pkg.get_build_types():
@@ -700,7 +686,35 @@ def get_buildqueue_with_status(full_details: bool = False) -> List[Package]:
                     descs.append(desc)
 
                 if descs:
+                    # Block all finished deps/rdeps as well
+                    for dep_type in build_type_to_dep_types(build_type):
+                        for dep in pkg.get_depends(dep_type):
+                            dep_status = dep.get_status(dep_type)
+                            if dep_status == PackageStatus.FINISHED:
+                                desc = f"Waiting on reverse dependencies: {pkg['name']}"
+                                dep.set_status(dep_type, PackageStatus.FINISHED_BUT_BLOCKED, desc)
+                    for dep_type in build_type_to_rdep_types(build_type):
+                        for dep in pkg.get_rdepends(dep_type):
+                            dep_status = dep.get_status(dep_type)
+                            if dep_status == PackageStatus.FINISHED:
+                                desc = f"Waiting on dependencies: {pkg['name']}"
+                                dep.set_status(dep_type, PackageStatus.FINISHED_BUT_BLOCKED, desc)
+
                     pkg.set_status(build_type, PackageStatus.FINISHED_BUT_BLOCKED, ". ".join(descs))
+
+    # Block packages where not every build type is finished
+    for pkg in pkgs:
+        unfinished = []
+        for build_type in pkg.get_build_types():
+            status = pkg.get_status(build_type)
+            if status != PackageStatus.FINISHED:
+                unfinished.append(build_type)
+        if unfinished:
+            for build_type in pkg.get_build_types():
+                status = pkg.get_status(build_type)
+                if status == PackageStatus.FINISHED:
+                    desc = f"Missing related builds: {', '.join(sorted(unfinished))}"
+                    pkg.set_status(build_type, PackageStatus.FINISHED_BUT_INCOMPLETE, desc)
 
     return pkgs
 
