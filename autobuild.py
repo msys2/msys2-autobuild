@@ -41,6 +41,9 @@ ALLOWED_UPLOADERS = [
 
 SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
 
+MINGW_ARCH_LIST = ["mingw32", "mingw64", "ucrt64"]
+MINGW_SRC_ARCH = "mingw64"
+
 
 class PackageStatus(Enum):
     FINISHED = 'finished'
@@ -87,7 +90,7 @@ class Package(dict):
         patterns = []
         if build_type in ["mingw-src", "msys-src"]:
             patterns.append(f"{self['name']}-{self['version']}.src.tar.*")
-        elif build_type in ["mingw32", "mingw64", "msys"]:
+        elif build_type in (MINGW_ARCH_LIST + ["msys"]):
             for item in self['packages'].get(build_type, []):
                 patterns.append(f"{item}-{self['version']}-*.pkg.tar.*")
         else:
@@ -98,7 +101,7 @@ class Package(dict):
         names = []
         if build_type in ["mingw-src", "msys-src"]:
             names.append(f"{self['name']}-{self['version']}.failed")
-        elif build_type in ["mingw32", "mingw64", "msys"]:
+        elif build_type in (MINGW_ARCH_LIST + ["msys"]):
             for item in self['packages'].get(build_type, []):
                 names.append(f"{item}-{self['version']}.failed")
         else:
@@ -107,7 +110,7 @@ class Package(dict):
 
     def get_build_types(self) -> List[str]:
         build_types = list(self["packages"].keys())
-        if any(k.startswith("mingw") for k in self["packages"].keys()):
+        if any((k != 'msys') for k in self["packages"].keys()):
             build_types.append("mingw-src")
         if "msys" in self["packages"].keys():
             build_types.append("msys-src")
@@ -289,7 +292,7 @@ def backup_pacman_conf(msys2_root: _PathLike) -> Generator:
 
 def build_type_to_dep_types(build_type: str) -> List[str]:
     if build_type == "mingw-src":
-        build_type = "mingw64"
+        build_type = MINGW_SRC_ARCH
     elif build_type == "msys-src":
         build_type = "msys"
 
@@ -301,12 +304,12 @@ def build_type_to_dep_types(build_type: str) -> List[str]:
 
 def build_type_to_rdep_types(build_type: str) -> List[str]:
     if build_type == "mingw-src":
-        build_type = "mingw64"
+        build_type = MINGW_SRC_ARCH
     elif build_type == "msys-src":
         build_type = "msys"
 
     if build_type == "msys":
-        return [build_type, "mingw32", "mingw64"]
+        return [build_type] + MINGW_ARCH_LIST
     else:
         return [build_type]
 
@@ -403,7 +406,7 @@ def build_package(build_type: str, pkg, msys2_root: _PathLike, builddir: _PathLi
 
             if build_type == "mingw-src":
                 env = environ.copy()
-                env['MINGW_INSTALLS'] = 'mingw64'
+                env['MINGW_INSTALLS'] = MINGW_SRC_ARCH
                 run_cmd(msys2_root, [
                     'makepkg-mingw',
                     '--noconfirm',
@@ -417,7 +420,7 @@ def build_package(build_type: str, pkg, msys2_root: _PathLike, builddir: _PathLi
                     '--noprogressbar',
                     '--allsource'
                 ], cwd=pkg_dir)
-            elif build_type in ["mingw32", "mingw64"]:
+            elif build_type in MINGW_ARCH_LIST:
                 env = environ.copy()
                 env['MINGW_INSTALLS'] = build_type
                 run_cmd(msys2_root, [
@@ -747,6 +750,13 @@ JOB_META: List[Dict[str, Any]] = [
             "name": "mingw32"
         }
     }, {
+        "build-types": ["ucrt64"],
+        "matrix": {
+            "packages": "base-devel mingw-w64-ucrt-x86_64-toolchain git",
+            "build-args": "--build-types ucrt64",
+            "name": "ucrt64"
+        }
+    }, {
         "build-types": ["msys", "msys-src"],
         "matrix": {
             "packages": "base-devel msys2-devel git",
@@ -881,6 +891,8 @@ def get_repo_subdir(type_: str, asset: GitReleaseAsset) -> Path:
             return t / "x86_64"
         elif entry.startswith("mingw-w64-i686-"):
             return t / "i686"
+        elif entry.startswith("mingw-w64-ucrt-x86_64-"):
+            return t / "ucrt64"
         else:
             raise Exception("unknown file type")
     else:
