@@ -697,16 +697,26 @@ def get_buildqueue_with_status(full_details: bool = False) -> List[Package]:
     # Block packages where not every build type is finished
     for pkg in pkgs:
         unfinished = []
+        blocked = []
         for build_type in pkg.get_build_types():
             status = pkg.get_status(build_type)
             if status != PackageStatus.FINISHED:
-                unfinished.append(build_type)
+                if status == PackageStatus.FINISHED_BUT_BLOCKED:
+                    blocked.append(build_type)
+                else:
+                    unfinished.append(build_type)
         if unfinished:
             for build_type in pkg.get_build_types():
                 status = pkg.get_status(build_type)
                 if status == PackageStatus.FINISHED:
                     desc = f"Missing related builds: {', '.join(sorted(unfinished))}"
                     pkg.set_status(build_type, PackageStatus.FINISHED_BUT_INCOMPLETE, desc)
+        elif blocked:
+            for build_type in pkg.get_build_types():
+                status = pkg.get_status(build_type)
+                if status == PackageStatus.FINISHED:
+                    desc = f"Related build blocked: {', '.join(sorted(blocked))}"
+                    pkg.set_status(build_type, PackageStatus.FINISHED_BUT_BLOCKED, desc)
 
     return pkgs
 
