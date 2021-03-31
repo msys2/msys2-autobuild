@@ -708,7 +708,7 @@ def get_buildqueue_with_status(full_details: bool = False) -> List[Package]:
         if unfinished:
             for build_type in pkg.get_build_types():
                 status = pkg.get_status(build_type)
-                if status == PackageStatus.FINISHED:
+                if status in (PackageStatus.FINISHED, PackageStatus.FINISHED_BUT_BLOCKED):
                     desc = f"Missing related builds: {', '.join(sorted(unfinished))}"
                     pkg.set_status(build_type, PackageStatus.FINISHED_BUT_INCOMPLETE, desc)
         elif blocked:
