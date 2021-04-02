@@ -834,9 +834,9 @@ def write_build_plan(args: Any):
         if matching_build_types:
             build_count = sum(queued_build_types[bt] for bt in matching_build_types)
             jobs.append(job_info["matrix"])
-            # XXX: If there is more than two builds we start two jobs with the second
+            # XXX: If there is more than three builds we start two jobs with the second
             # one having a reversed build order
-            if build_count > 2:
+            if build_count > 3:
                 matrix = dict(job_info["matrix"])
                 matrix["build-args"] = matrix["build-args"] + " --reverse"
                 matrix["name"] = matrix["name"] + "-2"
