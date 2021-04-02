@@ -6,6 +6,7 @@ import argparse
 import glob
 from os import environ
 from github import Github
+from github.GithubException import GithubException
 from github.GitRelease import GitRelease
 from github.GitReleaseAsset import GitReleaseAsset
 from github.Repository import Repository
@@ -253,22 +254,31 @@ def upload_asset(release: GitRelease, path: _PathLike, replace: bool = False,
     asset_name = get_gh_asset_name(basename, text)
     asset_label = basename
 
-    for asset in get_release_assets(release, include_incomplete=True):
-        if asset_name == asset.name:
-            # We want to tread incomplete assets as if they weren't there
-            # so replace them always
-            if replace or not asset_is_complete(asset):
-                asset.delete_asset()
-            else:
-                print(f"Skipping upload for {asset_name} as {asset_label}, already exists")
-                return
+    def delete_asset_maybe() -> None:
+        for asset in get_release_assets(release, include_incomplete=True):
+            if asset_name == asset.name:
+                # We want to treat incomplete assets as if they weren't there
+                # so replace them always
+                if replace or not asset_is_complete(asset):
+                    asset.delete_asset()
+                else:
+                    print(f"Skipping upload for {asset_name} as {asset_label}, already exists")
+                    return
 
-    if content is None:
-        release.upload_asset(str(path), label=asset_label, name=asset_name)
-    else:
-        with io.BytesIO(content) as fileobj:
-            release.upload_asset_from_memory(  # type: ignore
-                fileobj, len(content), label=asset_label, name=asset_name)
+    def upload() -> None:
+        if content is None:
+            release.upload_asset(str(path), label=asset_label, name=asset_name)
+        else:
+            with io.BytesIO(content) as fileobj:
+                release.upload_asset_from_memory(  # type: ignore
+                    fileobj, len(content), label=asset_label, name=asset_name)
+
+    try:
+        upload()
+    except GithubException:
+        delete_asset_maybe()
+        upload()
+
     print(f"Uploaded {asset_name} as {asset_label}")
 
 
