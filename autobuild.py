@@ -1117,6 +1117,7 @@ def get_repo(optional_credentials: bool = False) -> Repository:
     gh = Github(**kwargs)
     if not has_creds and optional_credentials:
         print(f"[Warning] Rate limit status: {gh.get_rate_limit().core}", file=sys.stderr)
+    print(gh.get_rate_limit(), file=sys.stderr)
     return gh.get_repo(REPO, lazy=True)
 
 
