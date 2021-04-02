@@ -507,7 +507,7 @@ def run_build(args: Any) -> None:
     while True:
         pkgs = get_buildqueue_with_status(full_details=True)
         update_status(pkgs)
-        todo = get_package_to_build(pkgs, build_types)
+        todo = get_package_to_build(pkgs, build_types, args.reverse)
         if not todo:
             break
         pkg, build_type = todo
@@ -733,7 +733,12 @@ def get_buildqueue_with_status(full_details: bool = False) -> List[Package]:
 
 
 def get_package_to_build(
-        pkgs: List[Package], build_types: Optional[List[str]]) -> Optional[Tuple[Package, str]]:
+        pkgs: List[Package], build_types: Optional[List[str]],
+        reverse: bool = False) -> Optional[Tuple[Package, str]]:
+
+    if reverse:
+        pkgs = list(reversed(pkgs))
+
     for pkg in pkgs:
         for build_type in pkg.get_build_types():
             if build_types is not None and build_type not in build_types:
@@ -813,11 +818,11 @@ def write_build_plan(args: Any):
     pkgs = get_buildqueue_with_status(full_details=True)
     update_status(pkgs)
 
-    queued_build_types = set()
+    queued_build_types: Dict[str, int] = {}
     for pkg in pkgs:
         for build_type in pkg.get_build_types():
             if pkg.get_status(build_type) == PackageStatus.WAITING_FOR_BUILD:
-                queued_build_types.add(build_type)
+                queued_build_types[build_type] = queued_build_types.get(build_type, 0) + 1
 
     if not queued_build_types:
         write_out([])
@@ -825,8 +830,17 @@ def write_build_plan(args: Any):
 
     jobs = []
     for job_info in JOB_META:
-        if queued_build_types & set(job_info["build-types"]):
+        matching_build_types = set(queued_build_types) & set(job_info["build-types"])
+        if matching_build_types:
+            build_count = sum(queued_build_types[bt] for bt in matching_build_types)
             jobs.append(job_info["matrix"])
+            # XXX: If there is more than two builds we start two jobs with the second
+            # one having a reversed build order
+            if build_count > 2:
+                matrix = dict(job_info["matrix"])
+                matrix["build-args"] = matrix["build-args"] + " --reverse"
+                matrix["name"] = matrix["name"] + "-2"
+                jobs.append(matrix)
 
     write_out(jobs)
 
@@ -1113,6 +1127,8 @@ def main(argv: List[str]):
 
     sub = subparser.add_parser("build", help="Build all packages")
     sub.add_argument("-t", "--build-types", action="store")
+    sub.add_argument(
+        "--reverse", action="store_true", help="Reverse the build order")
     sub.add_argument("msys2_root", help="The MSYS2 install used for building. e.g. C:\\msys64")
     sub.add_argument(
         "builddir",
@@ -1121,8 +1137,6 @@ def main(argv: List[str]):
 
     sub = subparser.add_parser(
         "show", help="Show all packages to be built", allow_abbrev=False)
-    sub.add_argument(
-        "--fail-on-idle", action="store_true", help="Fails if there is nothing to do")
     sub.set_defaults(func=show_build)
 
     sub = subparser.add_parser(
