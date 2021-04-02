@@ -861,14 +861,19 @@ def update_status(pkgs: List[Package]):
 
     content = json.dumps(results, indent=2).encode()
 
-    asset_name = "status.json"
-    for asset in release.get_assets():
-        if asset.name == asset_name:
-            asset.delete_asset()
-            break
-    with io.BytesIO(content) as fileobj:
-        new_asset = release.upload_asset_from_memory(  # type: ignore
-            fileobj, len(content), asset_name)
+    # If multiple jobs update this at the same time things can fail
+    try:
+        asset_name = "status.json"
+        for asset in release.get_assets():
+            if asset.name == asset_name:
+                asset.delete_asset()
+                break
+        with io.BytesIO(content) as fileobj:
+            new_asset = release.upload_asset_from_memory(  # type: ignore
+                fileobj, len(content), asset_name)
+    except GithubException as e:
+        print(e)
+        return
 
     print(f"Uploaded status file for {len(results)} packages: {new_asset.browser_download_url}")
 
