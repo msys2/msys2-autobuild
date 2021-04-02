@@ -110,10 +110,11 @@ class Package(dict):
 
     def get_build_types(self) -> List[str]:
         build_types = list(self["packages"].keys())
-        if any((k != 'msys') for k in self["packages"].keys()):
-            build_types.append("mingw-src")
-        if "msys" in self["packages"].keys():
-            build_types.append("msys-src")
+        if self["source"]:
+            if any((k != 'msys') for k in self["packages"].keys()):
+                build_types.append("mingw-src")
+            if "msys" in self["packages"].keys():
+                build_types.append("msys-src")
         return build_types
 
     def get_depends(self, build_type) -> "Set[Package]":
