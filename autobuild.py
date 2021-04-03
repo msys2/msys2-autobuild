@@ -1137,18 +1137,23 @@ def get_repo(optional_credentials: bool = False) -> Repository:
     return gh.get_repo(REPO, lazy=True)
 
 
-def wait_for_api_limit_reset(min_remaining: int = 100, min_sleep: float = 60) -> None:
+def wait_for_api_limit_reset(
+        min_remaining: int = 100, min_sleep: float = 60, max_sleep: float = 300) -> None:
     gh = get_github(optional_credentials=True)
     while True:
         core = gh.get_rate_limit().core
-        if core.remaining > min_remaining:
-            break
         reset = core.reset.replace(tzinfo=timezone.utc)
         now = datetime.now(timezone.utc)
-        wait = (reset - now).total_seconds()
+        diff = (reset - now).total_seconds()
+        print(f"{core.remaining} API calls left, {diff} seconds until the next reset")
+        if core.remaining > min_remaining:
+            break
+        wait = diff
         if wait < min_sleep:
             wait = min_sleep
-        print(f"{core.remaining} API calls left, waiting for {wait} seconds")
+        elif wait > max_sleep:
+            wait = max_sleep
+        print(f"Too few API calls left, waiting for {wait} seconds")
         time.sleep(wait)
 
 
