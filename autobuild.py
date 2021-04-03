@@ -820,6 +820,8 @@ def write_build_plan(args: Any):
         write_out([])
         return
 
+    wait_for_api_limit_reset()
+
     pkgs = get_buildqueue_with_status(full_details=True)
     update_status(pkgs)
 
