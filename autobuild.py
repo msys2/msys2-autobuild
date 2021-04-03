@@ -26,6 +26,7 @@ import tempfile
 import shutil
 import json
 import io
+from datetime import datetime, timezone
 from enum import Enum
 from hashlib import sha256
 from typing import Generator, Union, AnyStr, List, Any, Dict, Tuple, Set, Optional
@@ -464,6 +465,7 @@ def build_package(build_type: str, pkg, msys2_root: _PathLike, builddir: _PathLi
                 to_upload.extend([os.path.join(pkg_dir, e) for e in found])
 
         except (subprocess.CalledProcessError, BuildError) as e:
+            wait_for_api_limit_reset()
             release = repo.get_release("staging-failed")
             for entry in pkg.get_failed_names(build_type):
                 failed_data = {}
@@ -475,6 +477,7 @@ def build_package(build_type: str, pkg, msys2_root: _PathLike, builddir: _PathLi
 
             raise BuildError(e)
         else:
+            wait_for_api_limit_reset()
             release = repo.get_release("staging-" + pkg.get_repo_type())
             for path in to_upload:
                 upload_asset(release, path)
@@ -505,16 +508,18 @@ def run_build(args: Any) -> None:
         raise SystemExit("ERROR: msys2_root not functional", e)
 
     while True:
+        wait_for_api_limit_reset()
+
+        if (time.monotonic() - start_time) >= SOFT_TIMEOUT:
+            print("timeout reached")
+            break
+
         pkgs = get_buildqueue_with_status(full_details=True)
         update_status(pkgs)
         todo = get_package_to_build(pkgs, build_types, args.reverse)
         if not todo:
             break
         pkg, build_type = todo
-
-        if (time.monotonic() - start_time) >= SOFT_TIMEOUT:
-            print("timeout reached")
-            break
 
         try:
             with gha_group(f"[{ pkg['repo'] }] [{ build_type }] { pkg['name'] }..."):
@@ -1114,7 +1119,7 @@ def get_credentials(optional: bool = False) -> Dict[str, Any]:
             raise Exception("'GITHUB_TOKEN' or 'GITHUB_USER'/'GITHUB_PASS' env vars not set")
 
 
-def get_repo(optional_credentials: bool = False) -> Repository:
+def get_github(optional_credentials: bool = False) -> Github:
     kwargs = get_credentials(optional=optional_credentials)
     has_creds = bool(kwargs)
     # 100 is the maximum allowed
@@ -1122,8 +1127,27 @@ def get_repo(optional_credentials: bool = False) -> Repository:
     gh = Github(**kwargs)
     if not has_creds and optional_credentials:
         print(f"[Warning] Rate limit status: {gh.get_rate_limit().core}", file=sys.stderr)
-    print(gh.get_rate_limit(), file=sys.stderr)
+    return gh
+
+
+def get_repo(optional_credentials: bool = False) -> Repository:
+    gh = get_github(optional_credentials=optional_credentials)
     return gh.get_repo(REPO, lazy=True)
+
+
+def wait_for_api_limit_reset(min_remaining: int = 100, min_sleep: float = 60) -> None:
+    gh = get_github(optional_credentials=True)
+    while True:
+        core = gh.get_rate_limit().core
+        if core.remaining > min_remaining:
+            break
+        reset = core.reset.replace(tzinfo=timezone.utc)
+        now = datetime.now(timezone.utc)
+        wait = (reset - now).total_seconds()
+        if wait < min_sleep:
+            wait = min_sleep
+        print(f"{core.remaining} API calls left, waiting for {wait} seconds")
+        time.sleep(wait)
 
 
 def main(argv: List[str]):
