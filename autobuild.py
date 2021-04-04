@@ -255,16 +255,18 @@ def upload_asset(release: GitRelease, path: _PathLike, replace: bool = False,
     asset_name = get_gh_asset_name(basename, text)
     asset_label = basename
 
-    def delete_asset_maybe() -> None:
+    def can_try_upload_again() -> bool:
         for asset in get_release_assets(release, include_incomplete=True):
             if asset_name == asset.name:
                 # We want to treat incomplete assets as if they weren't there
                 # so replace them always
                 if replace or not asset_is_complete(asset):
                     asset.delete_asset()
+                    break
                 else:
                     print(f"Skipping upload for {asset_name} as {asset_label}, already exists")
-                    return
+                    return False
+        return True
 
     def upload() -> None:
         if content is None:
@@ -277,8 +279,8 @@ def upload_asset(release: GitRelease, path: _PathLike, replace: bool = False,
     try:
         upload()
     except GithubException:
-        delete_asset_maybe()
-        upload()
+        if can_try_upload_again():
+            upload()
 
     print(f"Uploaded {asset_name} as {asset_label}")
 
