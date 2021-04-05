@@ -156,6 +156,9 @@ IGNORE_RDEP_PACKAGES: List[str] = [
     "mingw-w64-tolua",
 ]
 
+# Build types which are currently WIP and shouldn't block other things
+BUILD_TYPES_WIP: List[str] = ["ucrt64"]
+
 REPO = "msys2/msys2-autobuild"
 
 
@@ -694,6 +697,8 @@ def get_buildqueue_with_status(full_details: bool = False) -> List[Package]:
                             dep_status = dep.get_status(dep_type)
                             if dep["name"] in IGNORE_RDEP_PACKAGES:
                                 continue
+                            if dep_type in BUILD_TYPES_WIP:
+                                continue
                             if dep_status != PackageStatus.FINISHED:
                                 missing_rdeps.add(dep)
 
@@ -722,6 +727,8 @@ def get_buildqueue_with_status(full_details: bool = False) -> List[Package]:
                 if status == PackageStatus.FINISHED_BUT_BLOCKED:
                     blocked.append(build_type)
                 else:
+                    if build_type in BUILD_TYPES_WIP:
+                        continue
                     unfinished.append(build_type)
         if unfinished:
             for build_type in pkg.get_build_types():
