@@ -282,7 +282,7 @@ def upload_asset(release: GitRelease, path: _PathLike, replace: bool = False,
 
     try:
         upload()
-    except GithubException:
+    except (GithubException, requests.RequestException):
         if can_try_upload_again():
             upload()
 
