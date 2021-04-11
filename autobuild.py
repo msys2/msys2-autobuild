@@ -19,6 +19,7 @@ import traceback
 from tabulate import tabulate
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
+from urllib3.util import Retry
 import requests
 import shlex
 import time
@@ -1135,6 +1136,7 @@ def get_github(optional_credentials: bool = False) -> Github:
     has_creds = bool(kwargs)
     # 100 is the maximum allowed
     kwargs['per_page'] = 100
+    kwargs['retry'] = Retry(total=3, backoff_factor=1)
     gh = Github(**kwargs)
     if not has_creds and optional_credentials:
         print(f"[Warning] Rate limit status: {gh.get_rate_limit().core}", file=sys.stderr)
