@@ -39,6 +39,7 @@ jobs:
       id: check
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GITHUB_TOKEN_READONLY: ${{ secrets.GITHUBTOKENREADONLY }}
       run: |
         python autobuild.py write-build-plan build_plan.json
         $buildPlan = Get-Content build_plan.json -Raw
@@ -48,6 +49,7 @@ jobs:
       if: steps.check.outputs.build-plan != '[]'
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GITHUB_TOKEN_READONLY: ${{ secrets.GITHUBTOKENREADONLY }}
       run: |
         python autobuild.py clean-assets
 
@@ -55,6 +57,7 @@ jobs:
       if: steps.check.outputs.build-plan != '[]'
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GITHUB_TOKEN_READONLY: ${{ secrets.GITHUBTOKENREADONLY }}
       run: |
         python autobuild.py show
 
@@ -120,6 +123,7 @@ jobs:
     - name: Process build queue
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GITHUB_TOKEN_READONLY: ${{ secrets.GITHUBTOKENREADONLY }}
       run: |
         $env:PACKAGER='CI (msys2-autobuild/' + $env:GITHUB_SHA.Substring(0, 8) + '/' + $env:GITHUB_RUN_ID + ')'
         $BUILD_ROOT='C:\_'

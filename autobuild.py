@@ -6,6 +6,7 @@ import argparse
 import glob
 from os import environ
 from github import Github
+from github.GithubObject import GithubObject
 from github.GithubException import GithubException
 from github.GitRelease import GitRelease
 from github.GitReleaseAsset import GitReleaseAsset
@@ -252,6 +253,18 @@ def download_text_asset(asset: GitReleaseAsset) -> str:
         return r.text
 
 
+@contextmanager
+def make_writable(obj: GithubObject) -> Generator:
+    # XXX: This switches the read-only token with a potentially writable one
+    old_requester = obj._requester  # type: ignore
+    repo = get_repo(readonly=False)
+    try:
+        obj._requester = repo._requester  # type: ignore
+        yield
+    finally:
+        obj._requester = old_requester  # type: ignore
+
+
 def upload_asset(release: GitRelease, path: _PathLike, replace: bool = False,
                  text: bool = False, content: bytes = None) -> None:
     path = Path(path)
@@ -265,7 +278,8 @@ def upload_asset(release: GitRelease, path: _PathLike, replace: bool = False,
                 # We want to treat incomplete assets as if they weren't there
                 # so replace them always
                 if replace or not asset_is_complete(asset):
-                    asset.delete_asset()
+                    with make_writable(asset):
+                        asset.delete_asset()
                     break
                 else:
                     print(f"Skipping upload for {asset_name} as {asset_label}, already exists")
@@ -273,12 +287,13 @@ def upload_asset(release: GitRelease, path: _PathLike, replace: bool = False,
         return True
 
     def upload() -> None:
-        if content is None:
-            release.upload_asset(str(path), label=asset_label, name=asset_name)
-        else:
-            with io.BytesIO(content) as fileobj:
-                release.upload_asset_from_memory(  # type: ignore
-                    fileobj, len(content), label=asset_label, name=asset_name)
+        with make_writable(release):
+            if content is None:
+                release.upload_asset(str(path), label=asset_label, name=asset_name)
+            else:
+                with io.BytesIO(content) as fileobj:
+                    release.upload_asset_from_memory(  # type: ignore
+                        fileobj, len(content), label=asset_label, name=asset_name)
 
     try:
         upload()
@@ -603,7 +618,7 @@ def get_release_assets(release: GitRelease, include_incomplete=False) -> List[Gi
 
 
 def get_buildqueue_with_status(full_details: bool = False) -> List[Package]:
-    repo = get_repo(optional_credentials=True)
+    repo = get_repo()
     assets = []
     for name in ["msys", "mingw"]:
         release = repo.get_release('staging-' + name)
@@ -883,11 +898,13 @@ def update_status(pkgs: List[Package]):
         asset_name = "status.json"
         for asset in release.get_assets():
             if asset.name == asset_name:
-                asset.delete_asset()
+                with make_writable(asset):
+                    asset.delete_asset()
                 break
         with io.BytesIO(content) as fileobj:
-            new_asset = release.upload_asset_from_memory(  # type: ignore
-                fileobj, len(content), asset_name)
+            with make_writable(release):
+                new_asset = release.upload_asset_from_memory(  # type: ignore
+                    fileobj, len(content), asset_name)
     except GithubException as e:
         print(e)
         return
@@ -1001,7 +1018,7 @@ def upload_assets(args: Any) -> None:
 
 
 def fetch_assets(args: Any) -> None:
-    repo = get_repo(optional_credentials=True)
+    repo = get_repo()
     target_dir = args.targetdir
     fetch_all = args.fetch_all
 
@@ -1111,46 +1128,50 @@ def clean_gha_assets(args: Any) -> None:
     for asset in assets:
         print(f"Deleting {get_asset_filename(asset)}...")
         if not args.dry_run:
-            asset.delete_asset()
+            with make_writable(asset):
+                asset.delete_asset()
 
     if not assets:
         print("Nothing to delete")
 
 
-def get_credentials(optional: bool = False) -> Dict[str, Any]:
-    if "GITHUB_TOKEN" in environ:
+def get_credentials(readonly: bool = True) -> Dict[str, Any]:
+    if readonly and "GITHUB_TOKEN_READONLY" in environ:
+        return {'login_or_token': environ["GITHUB_TOKEN_READONLY"]}
+    elif "GITHUB_TOKEN" in environ:
         return {'login_or_token': environ["GITHUB_TOKEN"]}
     elif "GITHUB_USER" in environ and "GITHUB_PASS" in environ:
         return {'login_or_token': environ["GITHUB_USER"], 'password': environ["GITHUB_PASS"]}
     else:
-        if optional:
-            print("[Warning] 'GITHUB_TOKEN' or 'GITHUB_USER'/'GITHUB_PASS' env vars "
+        if readonly:
+            print("[Warning] 'GITHUB_TOKEN' or 'GITHUB_TOKEN_READONLY' or "
+                  "'GITHUB_USER'/'GITHUB_PASS' env vars "
                   "not set which might lead to API rate limiting", file=sys.stderr)
             return {}
         else:
             raise Exception("'GITHUB_TOKEN' or 'GITHUB_USER'/'GITHUB_PASS' env vars not set")
 
 
-def get_github(optional_credentials: bool = False) -> Github:
-    kwargs = get_credentials(optional=optional_credentials)
+def get_github(readonly: bool = True) -> Github:
+    kwargs = get_credentials(readonly=readonly)
     has_creds = bool(kwargs)
     # 100 is the maximum allowed
     kwargs['per_page'] = 100
     kwargs['retry'] = Retry(total=3, backoff_factor=1)
     gh = Github(**kwargs)
-    if not has_creds and optional_credentials:
+    if not has_creds and readonly:
         print(f"[Warning] Rate limit status: {gh.get_rate_limit().core}", file=sys.stderr)
     return gh
 
 
-def get_repo(optional_credentials: bool = False) -> Repository:
-    gh = get_github(optional_credentials=optional_credentials)
+def get_repo(readonly: bool = True) -> Repository:
+    gh = get_github(readonly=readonly)
     return gh.get_repo(REPO, lazy=True)
 
 
 def wait_for_api_limit_reset(
         min_remaining: int = 50, min_sleep: float = 60, max_sleep: float = 300) -> None:
-    gh = get_github(optional_credentials=True)
+    gh = get_github()
     while True:
         core = gh.get_rate_limit().core
         reset = core.reset.replace(tzinfo=timezone.utc)
