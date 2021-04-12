@@ -439,7 +439,7 @@ def build_package(build_type: str, pkg, msys2_root: _PathLike, builddir: _PathLi
 
             if build_type == "mingw-src":
                 env = environ.copy()
-                env['MINGW_INSTALLS'] = MINGW_SRC_ARCH
+                env['MINGW_ARCH'] = MINGW_SRC_ARCH
                 run_cmd(msys2_root, [
                     'makepkg-mingw',
                     '--noconfirm',
@@ -455,7 +455,7 @@ def build_package(build_type: str, pkg, msys2_root: _PathLike, builddir: _PathLi
                 ], cwd=pkg_dir)
             elif build_type in MINGW_ARCH_LIST:
                 env = environ.copy()
-                env['MINGW_INSTALLS'] = build_type
+                env['MINGW_ARCH'] = build_type
                 run_cmd(msys2_root, [
                     'makepkg-mingw',
                     '--noconfirm',
