@@ -132,7 +132,7 @@ class Package(dict):
 
 
 # After which we shouldn't start a new build
-SOFT_TIMEOUT = 60 * 60 * 3
+SOFT_TIMEOUT = 60 * 60 * 4
 
 # Packages that take too long to build, and should be handled manually
 MANUAL_BUILD: List[str] = [
