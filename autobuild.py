@@ -45,7 +45,7 @@ ALLOWED_UPLOADERS = [
 
 SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
 
-MINGW_ARCH_LIST = ["mingw32", "mingw64", "ucrt64", "clang64"]
+MINGW_ARCH_LIST = ["mingw32", "mingw64", "ucrt64", "clang64", "clang32"]
 MINGW_SRC_ARCH = "mingw64"
 
 
@@ -159,7 +159,7 @@ IGNORE_RDEP_PACKAGES: List[str] = [
 ]
 
 # Build types which are currently WIP and shouldn't block other things
-BUILD_TYPES_WIP: List[str] = ["ucrt64", "clang64"]
+BUILD_TYPES_WIP: List[str] = ["ucrt64", "clang64", "clang32"]
 
 REPO = "msys2/msys2-autobuild"
 
@@ -820,6 +820,13 @@ JOB_META: List[Dict[str, Any]] = [
             "name": "clang64"
         }
     }, {
+        "build-types": ["clang32"],
+        "matrix": {
+            "packages": "base-devel mingw-w64-clang-i686-toolchain git",
+            "build-args": "--build-types clang32",
+            "name": "clang32"
+        }
+    }, {
         "build-types": ["msys", "msys-src"],
         "matrix": {
             "packages": "base-devel msys2-devel git",
@@ -976,6 +983,8 @@ def get_repo_subdir(type_: str, asset: GitReleaseAsset) -> Path:
             return t / "ucrt64"
         elif entry.startswith("mingw-w64-clang-x86_64-"):
             return t / "clang64"
+        elif entry.startswith("mingw-w64-clang-i686-"):
+            return t / "clang32"
         else:
             raise Exception("unknown file type")
     else:
