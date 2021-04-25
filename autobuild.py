@@ -822,7 +822,7 @@ JOB_META: List[Dict[str, Any]] = [
     }, {
         "build-types": ["clang32"],
         "matrix": {
-            "packages": "base-devel mingw-w64-clang-i686-toolchain git",
+            "packages": "base-devel git",
             "build-args": "--build-types clang32",
             "name": "clang32"
         }
