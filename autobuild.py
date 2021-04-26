@@ -919,7 +919,7 @@ def update_status(pkgs: List[Package]):
             with make_writable(release):
                 new_asset = release.upload_asset_from_memory(  # type: ignore
                     fileobj, len(content), asset_name)
-    except GithubException as e:
+    except (GithubException, requests.RequestException) as e:
         print(e)
         return
 
