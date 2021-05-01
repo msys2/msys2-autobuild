@@ -77,17 +77,18 @@ class Package(dict):
     def get_status(self, build_type: str) -> PackageStatus:
         return self.get("status", {}).get(build_type, PackageStatus.UNKNOWN)
 
-    def get_status_details(self, build_type: str) -> Dict[str, str]:
+    def get_status_details(self, build_type: str) -> Dict[str, Any]:
         return self.get("status_details", {}).get(build_type, {})
 
     def set_status(self, build_type: str, status: PackageStatus,
-                   description: Optional[str] = None, url: Optional[str] = None) -> None:
+                   description: Optional[str] = None,
+                   urls: Optional[Dict[str, str]] = None) -> None:
         self.setdefault("status", {})[build_type] = status
-        meta = {}
+        meta: Dict[str, Any] = {}
         if description:
             meta["desc"] = description
-        if url:
-            meta["url"] = url
+        if urls:
+            meta["urls"] = urls
         self.setdefault("status_details", {})[build_type] = meta
 
     def get_build_patterns(self, build_type: str) -> List[str]:
@@ -164,7 +165,7 @@ BUILD_TYPES_WIP: List[str] = ["ucrt64", "clang64", "clang32"]
 REPO = "msys2/msys2-autobuild"
 
 
-def get_current_run_url() -> Optional[str]:
+def get_current_run_urls() -> Optional[Dict[str, str]]:
     # The only connection we have is the job name, so this depends
     # on unique job names in all workflows
     if "GITHUB_SHA" in os.environ and "GITHUB_RUN_NAME" in os.environ:
@@ -174,7 +175,9 @@ def get_current_run_url() -> Optional[str]:
         check_runs = commit.get_check_runs(
             check_name=run_name, status="in_progress", filter="latest")
         for run in check_runs:
-            return run.html_url
+            html = run.html_url + "?check_suite_focus=true"
+            raw = commit.html_url + "/checks/" + str(run.id) + "/logs"
+            return {"html": html, "raw": raw}
         else:
             raise Exception(f"No active job found for { run_name }")
     return None
@@ -496,11 +499,11 @@ def build_package(build_type: str, pkg, msys2_root: _PathLike, builddir: _PathLi
         except (subprocess.CalledProcessError, BuildError) as e:
             wait_for_api_limit_reset()
             release = repo.get_release("staging-failed")
-            run_url = get_current_run_url()
+            run_urls = get_current_run_urls()
             for entry in pkg.get_failed_names(build_type):
                 failed_data = {}
-                if run_url is not None:
-                    failed_data["url"] = run_url
+                if run_urls is not None:
+                    failed_data["urls"] = run_urls
                 content = json.dumps(failed_data).encode()
                 upload_asset(release, entry, text=True, content=content)
 
@@ -641,8 +644,8 @@ def get_buildqueue_with_status(full_details: bool = False) -> List[Package]:
             for i, (asset, content) in enumerate(
                     zip(assets_failed, executor.map(download_text_asset, assets_failed))):
                 result = json.loads(content)
-                if result["url"]:
-                    failed_urls[get_asset_filename(asset)] = result["url"]
+                if result["urls"]:
+                    failed_urls[get_asset_filename(asset)] = result["urls"]
 
     def pkg_is_done(build_type: str, pkg: Package) -> bool:
         done_names = [get_asset_filename(a) for a in assets]
@@ -651,7 +654,7 @@ def get_buildqueue_with_status(full_details: bool = False) -> List[Package]:
                 return False
         return True
 
-    def get_failed_url(build_type: str, pkg: Package) -> Optional[str]:
+    def get_failed_urls(build_type: str, pkg: Package) -> Optional[Dict[str, str]]:
         failed_names = [get_asset_filename(a) for a in assets_failed]
         for name in pkg.get_failed_names(build_type):
             if name in failed_names:
@@ -678,8 +681,8 @@ def get_buildqueue_with_status(full_details: bool = False) -> List[Package]:
             if pkg_is_done(build_type, pkg):
                 pkg.set_status(build_type, PackageStatus.FINISHED)
             elif pkg_has_failed(build_type, pkg):
-                url = get_failed_url(build_type, pkg)
-                pkg.set_status(build_type, PackageStatus.FAILED_TO_BUILD, url=url)
+                urls = get_failed_urls(build_type, pkg)
+                pkg.set_status(build_type, PackageStatus.FAILED_TO_BUILD, urls=urls)
             elif pkg_is_manual(build_type, pkg):
                 pkg.set_status(build_type, PackageStatus.MANUAL_BUILD_REQUIRED)
             else:
