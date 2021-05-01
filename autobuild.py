@@ -1164,6 +1164,23 @@ def clean_gha_assets(args: Any) -> None:
         print("Nothing to delete")
 
 
+def clear_failed_state(args: Any) -> None:
+    build_type = args.build_type
+    repo = get_repo()
+    release = repo.get_release('staging-failed')
+    assets_failed = get_release_assets(release)
+    failed_map = dict((get_asset_filename(a), a) for a in assets_failed)
+
+    for pkg in get_buildqueue_with_status():
+        for name in pkg.get_failed_names(build_type):
+            if name in failed_map:
+                asset = failed_map[name]
+                print(f"Deleting {get_asset_filename(asset)}...")
+                if not args.dry_run:
+                    with make_writable(asset):
+                        asset.delete_asset()
+
+
 def get_credentials(readonly: bool = True) -> Dict[str, Any]:
     if readonly and "GITHUB_TOKEN_READONLY" in environ:
         return {'login_or_token': environ["GITHUB_TOKEN_READONLY"]}
@@ -1275,6 +1292,13 @@ def main(argv: List[str]):
     sub.add_argument(
         "--dry-run", action="store_true", help="Only show what is going to be deleted")
     sub.set_defaults(func=clean_gha_assets)
+
+    sub = subparser.add_parser(
+        "clear-failed", help="Clear the failed state for a build type", allow_abbrev=False)
+    sub.add_argument(
+        "--dry-run", action="store_true", help="Only show what is going to be deleted")
+    sub.add_argument("build_type")
+    sub.set_defaults(func=clear_failed_state)
 
     args = parser.parse_args(argv[1:])
     return args.func(args)
