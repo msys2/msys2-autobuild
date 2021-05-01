@@ -165,6 +165,17 @@ REPO = "msys2/msys2-autobuild"
 
 
 def get_current_run_url() -> Optional[str]:
+    # The only connection we have is the job name, so this depends
+    # on unique job names in all workflows
+    if "GITHUB_SHA" in os.environ and "GITHUB_JOB" in os.environ:
+        sha = os.environ["GITHUB_SHA"]
+        job = os.environ["GITHUB_JOB"]
+        commit = get_repo().get_commit(sha)
+        check_runs = commit.get_check_runs(
+            check_name=job, status="in_progress", filter="latest")
+        for run in check_runs:
+            return run.html_url
+
     if "GITHUB_RUN_ID" in os.environ and "GITHUB_REPOSITORY" in os.environ:
         run_id = os.environ["GITHUB_RUN_ID"]
         repo = os.environ["GITHUB_REPOSITORY"]
@@ -488,9 +499,9 @@ def build_package(build_type: str, pkg, msys2_root: _PathLike, builddir: _PathLi
         except (subprocess.CalledProcessError, BuildError) as e:
             wait_for_api_limit_reset()
             release = repo.get_release("staging-failed")
+            run_url = get_current_run_url()
             for entry in pkg.get_failed_names(build_type):
                 failed_data = {}
-                run_url = get_current_run_url()
                 if run_url is not None:
                     failed_data["url"] = run_url
                 content = json.dumps(failed_data).encode()
