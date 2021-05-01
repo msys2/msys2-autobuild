@@ -167,19 +167,16 @@ REPO = "msys2/msys2-autobuild"
 def get_current_run_url() -> Optional[str]:
     # The only connection we have is the job name, so this depends
     # on unique job names in all workflows
-    if "GITHUB_SHA" in os.environ and "GITHUB_JOB" in os.environ:
+    if "GITHUB_SHA" in os.environ and "GITHUB_RUN_NAME" in os.environ:
         sha = os.environ["GITHUB_SHA"]
-        job = os.environ["GITHUB_JOB"]
+        run_name = os.environ["GITHUB_RUN_NAME"]
         commit = get_repo().get_commit(sha)
         check_runs = commit.get_check_runs(
-            check_name=job, status="in_progress", filter="latest")
+            check_name=run_name, status="in_progress", filter="latest")
         for run in check_runs:
             return run.html_url
-
-    if "GITHUB_RUN_ID" in os.environ and "GITHUB_REPOSITORY" in os.environ:
-        run_id = os.environ["GITHUB_RUN_ID"]
-        repo = os.environ["GITHUB_REPOSITORY"]
-        return f"https://github.com/{repo}/actions/runs/{run_id}"
+        else:
+            raise Exception(f"No active job found for { run_name }")
     return None
 
 
