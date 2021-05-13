@@ -45,7 +45,7 @@ ALLOWED_UPLOADERS = [
 
 SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
 
-MINGW_ARCH_LIST = ["mingw32", "mingw64", "ucrt64", "clang64", "clang32"]
+MINGW_ARCH_LIST = ["mingw32", "mingw64", "ucrt64", "clang64", "clang32", "clangarm64"]
 MINGW_SRC_ARCH = "mingw64"
 
 
@@ -141,6 +141,9 @@ MANUAL_BUILD: List[str] = [
     'mingw-w64-qt5-static',
     'mingw-w64-arm-none-eabi-gcc',
 ]
+
+# Build types that can't be built in CI
+MANUAL_BUILD_TYPE: List[str] = ['clangarm64']
 
 # FIXME: Packages that should be ignored if they depend on other things
 # in the queue. Ideally this list should be empty..
@@ -671,7 +674,7 @@ def get_buildqueue_with_status(full_details: bool = False) -> List[Package]:
     def pkg_is_manual(build_type: str, pkg: Package) -> bool:
         if build_type in ["mingw-src", "msys-src"]:
             return False
-        return pkg['name'] in MANUAL_BUILD
+        return pkg['name'] in MANUAL_BUILD or build_type in MANUAL_BUILD_TYPE
 
     pkgs = get_buildqueue()
 
@@ -996,6 +999,8 @@ def get_repo_subdir(type_: str, asset: GitReleaseAsset) -> Path:
             return t / "clang64"
         elif entry.startswith("mingw-w64-clang-i686-"):
             return t / "clang32"
+        elif entry.startswith("mingw-w64-clang-aarch64-"):
+            return t / "clangarm64"
         else:
             raise Exception("unknown file type")
     else:
