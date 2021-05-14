@@ -167,7 +167,7 @@ IGNORE_RDEP_PACKAGES: List[str] = [
 ]
 
 # Build types which are currently WIP and shouldn't block other things
-BUILD_TYPES_WIP: List[str] = ["ucrt64", "clang64", "clang32"]
+BUILD_TYPES_WIP: List[str] = ["ucrt64", "clang64", "clang32", "clangarm64"]
 
 REPO = "msys2/msys2-autobuild"
 
