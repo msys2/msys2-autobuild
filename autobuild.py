@@ -1199,16 +1199,13 @@ def get_credentials(readonly: bool = True) -> Dict[str, Any]:
         return {'login_or_token': environ["GITHUB_TOKEN_READONLY"]}
     elif "GITHUB_TOKEN" in environ:
         return {'login_or_token': environ["GITHUB_TOKEN"]}
-    elif "GITHUB_USER" in environ and "GITHUB_PASS" in environ:
-        return {'login_or_token': environ["GITHUB_USER"], 'password': environ["GITHUB_PASS"]}
     else:
         if readonly:
-            print("[Warning] 'GITHUB_TOKEN' or 'GITHUB_TOKEN_READONLY' or "
-                  "'GITHUB_USER'/'GITHUB_PASS' env vars "
+            print("[Warning] 'GITHUB_TOKEN' or 'GITHUB_TOKEN_READONLY' env vars "
                   "not set which might lead to API rate limiting", file=sys.stderr)
             return {}
         else:
-            raise Exception("'GITHUB_TOKEN' or 'GITHUB_USER'/'GITHUB_PASS' env vars not set")
+            raise Exception("'GITHUB_TOKEN' env var not set")
 
 
 def get_github(readonly: bool = True) -> Github:
