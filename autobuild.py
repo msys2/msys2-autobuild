@@ -95,6 +95,9 @@ class Package(dict):
             meta["urls"] = urls
         self.setdefault("status_details", {})[build_type] = meta
 
+    def is_new(self, build_type: str) -> bool:
+        return build_type in self.get("new", [])
+
     def get_build_patterns(self, build_type: str) -> List[str]:
         patterns = []
         if build_type_is_src(build_type):
@@ -165,9 +168,6 @@ IGNORE_RDEP_PACKAGES: List[str] = [
     "mingw-w64-arm-none-eabi-gcc",
     "mingw-w64-tolua",
 ]
-
-# Build types which are currently WIP and shouldn't block other things
-BUILD_TYPES_WIP: List[str] = ["ucrt64", "clang64", "clang32", "clangarm64"]
 
 REPO = "msys2/msys2-autobuild"
 
@@ -732,12 +732,12 @@ def get_buildqueue_with_status(full_details: bool = False) -> List[Package]:
                     missing_rdeps = set()
                     for dep_type in build_type_to_rdep_types(build_type):
                         for dep in pkg.get_rdepends(dep_type):
-                            dep_status = dep.get_status(dep_type)
                             if dep["name"] in IGNORE_RDEP_PACKAGES:
                                 continue
-                            if dep_type in BUILD_TYPES_WIP:
-                                continue
-                            if dep_status != PackageStatus.FINISHED:
+                            dep_status = dep.get_status(dep_type)
+                            dep_new = dep.is_new(dep_type)
+                            # if the rdep isn't in the repo we can't break it by uploading
+                            if dep_status != PackageStatus.FINISHED and not dep_new:
                                 missing_rdeps.add(dep)
 
                     descs = []
@@ -764,9 +764,8 @@ def get_buildqueue_with_status(full_details: bool = False) -> List[Package]:
             if status != PackageStatus.FINISHED:
                 if status == PackageStatus.FINISHED_BUT_BLOCKED:
                     blocked.append(build_type)
-                else:
-                    if build_type in BUILD_TYPES_WIP:
-                        continue
+                # if the package isn't in the repo better not block on it
+                elif not pkg.is_new(build_type):
                     unfinished.append(build_type)
         if unfinished:
             for build_type in pkg.get_build_types():
