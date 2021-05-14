@@ -169,6 +169,9 @@ IGNORE_RDEP_PACKAGES: List[str] = [
     "mingw-w64-tolua",
 ]
 
+# We can't build this easily, so don't make it block other things
+BUILD_TYPES_WIP: List[str] = ["clangarm64"]
+
 REPO = "msys2/msys2-autobuild"
 
 
@@ -766,7 +769,8 @@ def get_buildqueue_with_status(full_details: bool = False) -> List[Package]:
                     blocked.append(build_type)
                 # if the package isn't in the repo better not block on it
                 elif not pkg.is_new(build_type):
-                    unfinished.append(build_type)
+                    if build_type not in BUILD_TYPES_WIP:
+                        unfinished.append(build_type)
         if unfinished:
             for build_type in pkg.get_build_types():
                 status = pkg.get_status(build_type)
