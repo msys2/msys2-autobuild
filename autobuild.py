@@ -63,6 +63,10 @@ class PackageStatus(Enum):
         return self.value
 
 
+def build_type_is_src(build_type: str) -> bool:
+    return build_type in ["mingw-src", "msys-src"]
+
+
 class Package(dict):
 
     def __repr__(self):
@@ -93,7 +97,7 @@ class Package(dict):
 
     def get_build_patterns(self, build_type: str) -> List[str]:
         patterns = []
-        if build_type in ["mingw-src", "msys-src"]:
+        if build_type_is_src(build_type):
             patterns.append(f"{self['name']}-{self['version']}.src.tar.*")
         elif build_type in (MINGW_ARCH_LIST + ["msys"]):
             for item in self['packages'].get(build_type, []):
@@ -104,7 +108,7 @@ class Package(dict):
 
     def get_failed_names(self, build_type: str) -> List[str]:
         names = []
-        if build_type in ["mingw-src", "msys-src"]:
+        if build_type_is_src(build_type):
             names.append(f"{self['name']}-{self['version']}.failed")
         elif build_type in (MINGW_ARCH_LIST + ["msys"]):
             for item in self['packages'].get(build_type, []):
@@ -672,7 +676,7 @@ def get_buildqueue_with_status(full_details: bool = False) -> List[Package]:
         return False
 
     def pkg_is_manual(build_type: str, pkg: Package) -> bool:
-        if build_type in ["mingw-src", "msys-src"]:
+        if build_type_is_src(build_type):
             return False
         return pkg['name'] in MANUAL_BUILD or build_type in MANUAL_BUILD_TYPE
 
@@ -714,6 +718,10 @@ def get_buildqueue_with_status(full_details: bool = False) -> List[Package]:
             for build_type in pkg.get_build_types():
                 status = pkg.get_status(build_type)
                 if status == PackageStatus.FINISHED:
+                    # src builds are independent
+                    if build_type_is_src(build_type):
+                        continue
+
                     missing_deps = set()
                     for dep_type in build_type_to_dep_types(build_type):
                         for dep in pkg.get_depends(dep_type):
