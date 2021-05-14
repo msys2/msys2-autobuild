@@ -762,6 +762,7 @@ def get_buildqueue_with_status(full_details: bool = False) -> List[Package]:
     for pkg in pkgs:
         unfinished = []
         blocked = []
+        finished = []
         for build_type in pkg.get_build_types():
             status = pkg.get_status(build_type)
             if status != PackageStatus.FINISHED:
@@ -771,6 +772,15 @@ def get_buildqueue_with_status(full_details: bool = False) -> List[Package]:
                 elif not pkg.is_new(build_type):
                     if build_type not in BUILD_TYPES_WIP:
                         unfinished.append(build_type)
+            else:
+                finished.append(build_type)
+
+        # We track source packages by assuming they are in the repo if there is
+        # at least one binary package in the repo. Uploading lone source
+        # packages will not change anything, so block them.
+        if not unfinished and finished and all(build_type_is_src(bt) for bt in finished):
+            unfinished.append("any")
+
         if unfinished:
             for build_type in pkg.get_build_types():
                 status = pkg.get_status(build_type)
