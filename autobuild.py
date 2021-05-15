@@ -1086,7 +1086,8 @@ def fetch_assets(args: Any) -> None:
             pkg_patterns = pkg.get_build_patterns(build_type)
             if status == PackageStatus.FINISHED:
                 all_patterns.setdefault(repo_type, []).extend(pkg_patterns)
-            elif status == PackageStatus.FINISHED_BUT_BLOCKED:
+            elif status in [PackageStatus.FINISHED_BUT_BLOCKED,
+                            PackageStatus.FINISHED_BUT_INCOMPLETE]:
                 if fetch_all:
                     all_patterns.setdefault(repo_type, []).extend(pkg_patterns)
                 else:
