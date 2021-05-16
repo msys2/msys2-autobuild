@@ -778,7 +778,8 @@ def get_buildqueue_with_status(full_details: bool = False) -> List[Package]:
         # We track source packages by assuming they are in the repo if there is
         # at least one binary package in the repo. Uploading lone source
         # packages will not change anything, so block them.
-        if not unfinished and finished and all(build_type_is_src(bt) for bt in finished):
+        if not blocked and not unfinished and finished and \
+                all(build_type_is_src(bt) for bt in finished):
             unfinished.append("any")
 
         if unfinished:
