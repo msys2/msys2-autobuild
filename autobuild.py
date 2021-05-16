@@ -139,6 +139,8 @@ class Package(dict):
         return "msys" if self['repo'].startswith('MSYS2') else "mingw"
 
 
+REQUESTS_TIMEOUT = (15, 30)
+
 # After which we shouldn't start a new build
 SOFT_TIMEOUT = 60 * 60 * 4
 
@@ -251,7 +253,7 @@ def asset_is_complete(asset: GitReleaseAsset) -> bool:
 
 def download_asset(asset: GitReleaseAsset, target_path: str) -> None:
     assert asset_is_complete(asset)
-    with requests.get(asset.browser_download_url, stream=True, timeout=(15, 30)) as r:
+    with requests.get(asset.browser_download_url, stream=True, timeout=REQUESTS_TIMEOUT) as r:
         r.raise_for_status()
         fd, temppath = tempfile.mkstemp()
         try:
@@ -269,7 +271,7 @@ def download_asset(asset: GitReleaseAsset, target_path: str) -> None:
 
 def download_text_asset(asset: GitReleaseAsset) -> str:
     assert asset_is_complete(asset)
-    with requests.get(asset.browser_download_url, timeout=(15, 30)) as r:
+    with requests.get(asset.browser_download_url, timeout=REQUESTS_TIMEOUT) as r:
         r.raise_for_status()
         return r.text
 
@@ -574,7 +576,7 @@ def run_build(args: Any) -> None:
 
 def get_buildqueue() -> List[Package]:
     pkgs = []
-    r = requests.get("https://packages.msys2.org/api/buildqueue")
+    r = requests.get("https://packages.msys2.org/api/buildqueue", timeout=REQUESTS_TIMEOUT)
     r.raise_for_status()
     dep_mapping = {}
     for received in r.json():
@@ -927,6 +929,11 @@ def write_build_plan(args: Any):
     write_out(jobs)
 
 
+def queue_website_update():
+    r = requests.post('https://packages.msys2.org/api/trigger_update', timeout=REQUESTS_TIMEOUT)
+    r.raise_for_status()
+
+
 def update_status(pkgs: List[Package]):
     repo = get_repo()
     release = repo.get_release("status")
@@ -960,6 +967,8 @@ def update_status(pkgs: List[Package]):
         return
 
     print(f"Uploaded status file for {len(results)} packages: {new_asset.browser_download_url}")
+
+    queue_website_update()
 
 
 def run_update_status(args: Any) -> None:
