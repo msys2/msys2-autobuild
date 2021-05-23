@@ -737,7 +737,8 @@ def get_buildqueue_with_status(full_details: bool = False) -> List[Package]:
                     missing_rdeps = set()
                     for dep_type in build_type_to_rdep_types(build_type):
                         for dep in pkg.get_rdepends(dep_type):
-                            if dep["name"] in IGNORE_RDEP_PACKAGES:
+                            if dep["name"] in IGNORE_RDEP_PACKAGES or \
+                                    (build_type != dep_type and dep_type in BUILD_TYPES_WIP):
                                 continue
                             dep_status = dep.get_status(dep_type)
                             dep_new = dep.is_new(dep_type)
