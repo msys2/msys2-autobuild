@@ -121,7 +121,7 @@ jobs:
         msys2 -c 'pacman -Qkq'
 
     - name: Install extra packages
-      if: ${{ matrix.name == 'clang32' }}
+      if: ${{ startsWith(matrix.name, 'clang32') }}
       run: |
         msys2 -c 'pacman --noconfirm -S mingw-w64-clang-i686-toolchain'
 
