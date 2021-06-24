@@ -716,7 +716,7 @@ def get_buildqueue_with_status(full_details: bool = False) -> List[Package]:
                     desc = f"Waiting for: {', '.join(sorted(d['name'] for d in missing_deps))}"
                     pkg.set_status(build_type, PackageStatus.WAITING_FOR_DEPENDENCIES, desc)
 
-    # Block packages where not all deps/rdeps are finished
+    # Block packages where not all deps/rdeps/related are finished
     changed = True
     while changed:
         changed = False
@@ -762,42 +762,44 @@ def get_buildqueue_with_status(full_details: bool = False) -> List[Package]:
                         pkg.set_status(
                             build_type, PackageStatus.FINISHED_BUT_BLOCKED, ". ".join(descs))
 
-    # Block packages where not every build type is finished
-    for pkg in pkgs:
-        unfinished = []
-        blocked = []
-        finished = []
-        for build_type in pkg.get_build_types():
-            status = pkg.get_status(build_type)
-            if status != PackageStatus.FINISHED:
-                if status == PackageStatus.FINISHED_BUT_BLOCKED:
-                    blocked.append(build_type)
-                # if the package isn't in the repo better not block on it
-                elif not pkg.is_new(build_type):
-                    if build_type not in BUILD_TYPES_WIP:
-                        unfinished.append(build_type)
-            else:
-                finished.append(build_type)
-
-        # We track source packages by assuming they are in the repo if there is
-        # at least one binary package in the repo. Uploading lone source
-        # packages will not change anything, so block them.
-        if not blocked and not unfinished and finished and \
-                all(build_type_is_src(bt) for bt in finished):
-            unfinished.append("any")
-
-        if unfinished:
+        # Block packages where not every build type is finished
+        for pkg in pkgs:
+            unfinished = []
+            blocked = []
+            finished = []
             for build_type in pkg.get_build_types():
                 status = pkg.get_status(build_type)
-                if status in (PackageStatus.FINISHED, PackageStatus.FINISHED_BUT_BLOCKED):
-                    desc = f"Missing related builds: {', '.join(sorted(unfinished))}"
-                    pkg.set_status(build_type, PackageStatus.FINISHED_BUT_INCOMPLETE, desc)
-        elif blocked:
-            for build_type in pkg.get_build_types():
-                status = pkg.get_status(build_type)
-                if status == PackageStatus.FINISHED:
-                    desc = f"Related build blocked: {', '.join(sorted(blocked))}"
-                    pkg.set_status(build_type, PackageStatus.FINISHED_BUT_BLOCKED, desc)
+                if status != PackageStatus.FINISHED:
+                    if status == PackageStatus.FINISHED_BUT_BLOCKED:
+                        blocked.append(build_type)
+                    # if the package isn't in the repo better not block on it
+                    elif not pkg.is_new(build_type):
+                        if build_type not in BUILD_TYPES_WIP:
+                            unfinished.append(build_type)
+                else:
+                    finished.append(build_type)
+
+            # We track source packages by assuming they are in the repo if there is
+            # at least one binary package in the repo. Uploading lone source
+            # packages will not change anything, so block them.
+            if not blocked and not unfinished and finished and \
+                    all(build_type_is_src(bt) for bt in finished):
+                unfinished.append("any")
+
+            if unfinished:
+                for build_type in pkg.get_build_types():
+                    status = pkg.get_status(build_type)
+                    if status in (PackageStatus.FINISHED, PackageStatus.FINISHED_BUT_BLOCKED):
+                        desc = f"Missing related builds: {', '.join(sorted(unfinished))}"
+                        changed = True
+                        pkg.set_status(build_type, PackageStatus.FINISHED_BUT_INCOMPLETE, desc)
+            elif blocked:
+                for build_type in pkg.get_build_types():
+                    status = pkg.get_status(build_type)
+                    if status == PackageStatus.FINISHED:
+                        desc = f"Related build blocked: {', '.join(sorted(blocked))}"
+                        changed = True
+                        pkg.set_status(build_type, PackageStatus.FINISHED_BUT_BLOCKED, desc)
 
     return pkgs
 
