@@ -11,8 +11,10 @@ tabulate = "^0.8.7"
 requests = "^2.25.1"
 
 [tool.poetry.dev-dependencies]
-mypy = "^0.812"
+mypy = "^0.910"
 flake8 = "^3.8.4"
+types-tabulate = "^0.1.1"
+types-requests = "^2.25.0"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
