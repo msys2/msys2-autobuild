@@ -173,7 +173,7 @@ IGNORE_RDEP_PACKAGES: List[str] = [
 ]
 
 # We can't build this easily, so don't make it block other things
-BUILD_TYPES_WIP: List[str] = ["clangarm64", "clang32"]
+BUILD_TYPES_WIP: List[str] = ["clangarm64"]
 
 REPO = "msys2/msys2-autobuild"
 
