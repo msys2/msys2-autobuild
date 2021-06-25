@@ -1280,7 +1280,7 @@ def clean_environ(environ: Dict[str, str]) -> Dict[str, str]:
     """Returns an environment without any CI related variables.
 
     This is to avoid leaking secrets to package build scripts we call.
-    While in theory we turst them this can't hurt.
+    While in theory we trust them this can't hurt.
     """
 
     new_env = environ.copy()
