@@ -203,7 +203,7 @@ def shlex_join(split_command: List[str]) -> str:
 
 def run_cmd(msys2_root: _PathLike, args, **kwargs):
     executable = os.path.join(msys2_root, 'usr', 'bin', 'bash.exe')
-    env = kwargs.pop("env", os.environ.copy())
+    env = clean_environ(kwargs.pop("env", os.environ.copy()))
     env["CHERE_INVOKING"] = "1"
     env["MSYSTEM"] = "MSYS"
     env["MSYS2_PATH_TYPE"] = "minimal"
@@ -1274,6 +1274,20 @@ def wait_for_api_limit_reset(
                 wait = max_sleep
             print(f"Too few API calls left, waiting for {wait} seconds", flush=True)
             time.sleep(wait)
+
+
+def clean_environ(environ: Dict[str, str]) -> Dict[str, str]:
+    """Returns an environment without any CI related variables.
+
+    This is to avoid leaking secrets to package build scripts we call.
+    While in theory we turst them this can't hurt.
+    """
+
+    new_env = environ.copy()
+    for key in list(new_env):
+        if key.startswith(("GITHUB_", "RUNNER_")):
+            del new_env[key]
+    return new_env
 
 
 def main(argv: List[str]):
