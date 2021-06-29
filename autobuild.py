@@ -101,10 +101,10 @@ class Package(dict):
     def get_build_patterns(self, build_type: str) -> List[str]:
         patterns = []
         if build_type_is_src(build_type):
-            patterns.append(f"{self['name']}-{self['version']}.src.tar.*")
+            patterns.append(f"{self['name']}-{self['version']}.src.tar.gz")
         elif build_type in (MINGW_ARCH_LIST + ["msys"]):
             for item in self['packages'].get(build_type, []):
-                patterns.append(f"{item}-{self['version']}-*.pkg.tar.*")
+                patterns.append(f"{item}-{self['version']}-*.pkg.tar.zst")
         else:
             assert 0
         return patterns
@@ -1044,29 +1044,32 @@ def get_repo_subdir(type_: str, asset: GitReleaseAsset) -> Path:
 
 def upload_assets(args: Any) -> None:
     repo = get_repo()
-    package_name = args.package_name
+    package_name = args.package
     src_dir = args.path
-    if src_dir is None:
-        src_dir = os.getcwd()
     src_dir = os.path.abspath(src_dir)
 
-    for pkg in get_buildqueue_with_status():
-        if pkg["name"] == package_name:
-            break
-    else:
-        raise SystemExit(f"Package '{package_name}' not in the queue, check the 'show' command")
+    pkgs = get_buildqueue_with_status()
+
+    if package_name is not None:
+        for pkg in pkgs:
+            if pkg["name"] == package_name:
+                break
+        else:
+            raise SystemExit(f"Package '{package_name}' not in the queue, check the 'show' command")
+        pkgs = [pkg]
 
     patterns = []
-    repo_type = pkg.get_repo_type()
-    for build_type in pkg.get_build_types():
-        status = pkg.get_status(build_type)
+    for pkg in pkgs:
+        repo_type = pkg.get_repo_type()
+        for build_type in pkg.get_build_types():
+            status = pkg.get_status(build_type)
 
-        # ignore finished packages
-        if status in (PackageStatus.FINISHED, PackageStatus.FINISHED_BUT_BLOCKED,
-                      PackageStatus.FINISHED_BUT_INCOMPLETE):
-            continue
+            # ignore finished packages
+            if status in (PackageStatus.FINISHED, PackageStatus.FINISHED_BUT_BLOCKED,
+                          PackageStatus.FINISHED_BUT_INCOMPLETE):
+                continue
 
-        patterns.extend(pkg.get_build_patterns(build_type))
+            patterns.extend(pkg.get_build_patterns(build_type))
 
     print(f"Looking for the following files in {src_dir}:")
     for pattern in patterns:
@@ -1332,12 +1335,11 @@ def main(argv: List[str]):
 
     sub = subparser.add_parser(
         "upload-assets", help="Upload packages", allow_abbrev=False)
-    sub.add_argument("package_name")
+    sub.add_argument("path", help="Directory to look for packages in")
     sub.add_argument(
         "--dry-run", action="store_true", help="Only show what is going to be uploaded")
-    sub.add_argument("-p", "--path", action="store", help=(
-        "Directory to look for packages in "
-        "(defaults to the current working directory by default)"))
+    sub.add_argument("-p", "--package", action="store", help=(
+        "Only upload files belonging to a particualr package (pkgbase)"))
     sub.set_defaults(func=upload_assets)
 
     sub = subparser.add_parser("clean-assets", help="Clean up GHA assets", allow_abbrev=False)
