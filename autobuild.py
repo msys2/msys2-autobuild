@@ -33,20 +33,65 @@ from enum import Enum
 from hashlib import sha256
 from typing import Generator, Union, AnyStr, List, Any, Dict, Tuple, Set, Optional
 
-_PathLike = Union[os.PathLike, AnyStr]
 
-# Feel free to add yourself here if you have permissions
-ALLOWED_UPLOADERS = [
-    ("User", "elieux"),
-    ("User", "Alexpux"),
-    ("User", "lazka"),
-    ("Bot", "github-actions[bot]"),
-]
+class Config:
+
+    ALLOWED_UPLOADERS = [
+        ("User", "elieux"),
+        ("User", "Alexpux"),
+        ("User", "lazka"),
+        ("Bot", "github-actions[bot]"),
+    ]
+    """Users that are allowed to upload assets. This is checked at download time"""
+
+    MINGW_ARCH_LIST = ["mingw32", "mingw64", "ucrt64", "clang64", "clang32", "clangarm64"]
+    """Arches we try to build"""
+
+    MINGW_SRC_ARCH = "mingw64"
+    """The arch that is used to build the source package (any mingw one should work)"""
+
+    REPO = "msys2/msys2-autobuild"
+    """The path of this repo (used for accessing the assets)"""
+
+    SOFT_JOB_TIMEOUT = 60 * 60 * 4
+    """Runtime after which we shouldn't start a new build"""
+
+    MANUAL_BUILD: List[str] = [
+        'mingw-w64-firebird-git',
+        'mingw-w64-qt5-static',
+        'mingw-w64-arm-none-eabi-gcc',
+    ]
+    """Packages that take too long to build, and should be handled manually"""
+
+    MANUAL_BUILD_TYPE: List[str] = ['clangarm64']
+    """Build types that can't be built in CI"""
+
+    IGNORE_RDEP_PACKAGES: List[str] = [
+        "mingw-w64-mlpack",
+        "mingw-w64-qemu",
+        "mingw-w64-ghc",
+        "mingw-w64-python-notebook",
+        "mingw-w64-python-pywin32",
+        "mingw-w64-usbmuxd",
+        "mingw-w64-npm",
+        "mingw-w64-yarn",
+        "mingw-w64-bower",
+        "mingw-w64-nodejs",
+        "mingw-w64-arm-none-eabi-gcc",
+        "mingw-w64-tolua",
+        "mingw-w64-kirigami2-qt5",
+    ]
+    """XXX: These would in theory block rdeps, but no one fixed them, so we ignore them"""
+
+    BUILD_TYPES_WIP: List[str] = ["clangarm64"]
+    """XXX: These build types don't block other things, even if they fail/don't get built"""
+
+
+_PathLike = Union[os.PathLike, AnyStr]
 
 SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
 
-MINGW_ARCH_LIST = ["mingw32", "mingw64", "ucrt64", "clang64", "clang32", "clangarm64"]
-MINGW_SRC_ARCH = "mingw64"
+REQUESTS_TIMEOUT = (15, 30)
 
 
 class PackageStatus(Enum):
@@ -102,7 +147,7 @@ class Package(dict):
         patterns = []
         if build_type_is_src(build_type):
             patterns.append(f"{self['name']}-{self['version']}.src.tar.gz")
-        elif build_type in (MINGW_ARCH_LIST + ["msys"]):
+        elif build_type in (Config.MINGW_ARCH_LIST + ["msys"]):
             for item in self['packages'].get(build_type, []):
                 patterns.append(f"{item}-{self['version']}-*.pkg.tar.zst")
         else:
@@ -113,7 +158,7 @@ class Package(dict):
         names = []
         if build_type_is_src(build_type):
             names.append(f"{self['name']}-{self['version']}.failed")
-        elif build_type in (MINGW_ARCH_LIST + ["msys"]):
+        elif build_type in (Config.MINGW_ARCH_LIST + ["msys"]):
             for item in self['packages'].get(build_type, []):
                 names.append(f"{item}-{self['version']}.failed")
         else:
@@ -137,45 +182,6 @@ class Package(dict):
 
     def get_repo_type(self) -> str:
         return "msys" if self['repo'].startswith('MSYS2') else "mingw"
-
-
-REQUESTS_TIMEOUT = (15, 30)
-
-# After which we shouldn't start a new build
-SOFT_TIMEOUT = 60 * 60 * 4
-
-# Packages that take too long to build, and should be handled manually
-MANUAL_BUILD: List[str] = [
-    'mingw-w64-firebird-git',
-    'mingw-w64-qt5-static',
-    'mingw-w64-arm-none-eabi-gcc',
-]
-
-# Build types that can't be built in CI
-MANUAL_BUILD_TYPE: List[str] = ['clangarm64']
-
-# FIXME: Packages that should be ignored if they depend on other things
-# in the queue. Ideally this list should be empty..
-IGNORE_RDEP_PACKAGES: List[str] = [
-    "mingw-w64-mlpack",
-    "mingw-w64-qemu",
-    "mingw-w64-ghc",
-    "mingw-w64-python-notebook",
-    "mingw-w64-python-pywin32",
-    "mingw-w64-usbmuxd",
-    "mingw-w64-npm",
-    "mingw-w64-yarn",
-    "mingw-w64-bower",
-    "mingw-w64-nodejs",
-    "mingw-w64-arm-none-eabi-gcc",
-    "mingw-w64-tolua",
-    "mingw-w64-kirigami2-qt5",
-]
-
-# We can't build this easily, so don't make it block other things
-BUILD_TYPES_WIP: List[str] = ["clangarm64"]
-
-REPO = "msys2/msys2-autobuild"
 
 
 def get_current_run_urls() -> Optional[Dict[str, str]]:
@@ -349,7 +355,7 @@ def backup_pacman_conf(msys2_root: _PathLike) -> Generator:
 
 def build_type_to_dep_types(build_type: str) -> List[str]:
     if build_type == "mingw-src":
-        build_type = MINGW_SRC_ARCH
+        build_type = Config.MINGW_SRC_ARCH
     elif build_type == "msys-src":
         build_type = "msys"
 
@@ -361,12 +367,12 @@ def build_type_to_dep_types(build_type: str) -> List[str]:
 
 def build_type_to_rdep_types(build_type: str) -> List[str]:
     if build_type == "mingw-src":
-        build_type = MINGW_SRC_ARCH
+        build_type = Config.MINGW_SRC_ARCH
     elif build_type == "msys-src":
         build_type = "msys"
 
     if build_type == "msys":
-        return [build_type] + MINGW_ARCH_LIST
+        return [build_type] + Config.MINGW_ARCH_LIST
     else:
         return [build_type]
 
@@ -463,7 +469,7 @@ def build_package(build_type: str, pkg, msys2_root: _PathLike, builddir: _PathLi
 
             if build_type == "mingw-src":
                 env = environ.copy()
-                env['MINGW_ARCH'] = MINGW_SRC_ARCH
+                env['MINGW_ARCH'] = Config.MINGW_SRC_ARCH
                 run_cmd(msys2_root, [
                     'makepkg-mingw',
                     '--noconfirm',
@@ -477,7 +483,7 @@ def build_package(build_type: str, pkg, msys2_root: _PathLike, builddir: _PathLi
                     '--noprogressbar',
                     '--allsource'
                 ], cwd=pkg_dir)
-            elif build_type in MINGW_ARCH_LIST:
+            elif build_type in Config.MINGW_ARCH_LIST:
                 env = environ.copy()
                 env['MINGW_ARCH'] = build_type
                 run_cmd(msys2_root, [
@@ -555,7 +561,7 @@ def run_build(args: Any) -> None:
     while True:
         wait_for_api_limit_reset()
 
-        if (time.monotonic() - start_time) >= SOFT_TIMEOUT:
+        if (time.monotonic() - start_time) >= Config.SOFT_JOB_TIMEOUT:
             print("timeout reached")
             break
 
@@ -633,7 +639,7 @@ def get_release_assets(release: GitRelease, include_incomplete=False) -> List[Gi
         uploader = asset.uploader
         uploader_key = (uploader.type, uploader.login)
         # We allow uploads from some users and GHA
-        if uploader_key not in ALLOWED_UPLOADERS:
+        if uploader_key not in Config.ALLOWED_UPLOADERS:
             raise SystemExit(
                 f"ERROR: Asset '{get_asset_filename(asset)}' "
                 f"uploaded by {uploader_key}'. Aborting.")
@@ -684,7 +690,7 @@ def get_buildqueue_with_status(full_details: bool = False) -> List[Package]:
     def pkg_is_manual(build_type: str, pkg: Package) -> bool:
         if build_type_is_src(build_type):
             return False
-        return pkg['name'] in MANUAL_BUILD or build_type in MANUAL_BUILD_TYPE
+        return pkg['name'] in Config.MANUAL_BUILD or build_type in Config.MANUAL_BUILD_TYPE
 
     pkgs = get_buildqueue()
 
@@ -738,8 +744,8 @@ def get_buildqueue_with_status(full_details: bool = False) -> List[Package]:
                     missing_rdeps = set()
                     for dep_type in build_type_to_rdep_types(build_type):
                         for dep in pkg.get_rdepends(dep_type):
-                            if dep["name"] in IGNORE_RDEP_PACKAGES or \
-                                    (build_type != dep_type and dep_type in BUILD_TYPES_WIP):
+                            if dep["name"] in Config.IGNORE_RDEP_PACKAGES or \
+                                    (build_type != dep_type and dep_type in Config.BUILD_TYPES_WIP):
                                 continue
                             dep_status = dep.get_status(dep_type)
                             dep_new = dep.is_new(dep_type)
@@ -774,7 +780,7 @@ def get_buildqueue_with_status(full_details: bool = False) -> List[Package]:
                         blocked.append(build_type)
                     # if the package isn't in the repo better not block on it
                     elif not pkg.is_new(build_type):
-                        if build_type not in BUILD_TYPES_WIP:
+                        if build_type not in Config.BUILD_TYPES_WIP:
                             unfinished.append(build_type)
                 else:
                     finished.append(build_type)
@@ -934,7 +940,7 @@ def write_build_plan(args: Any):
 
 
 def queue_website_update():
-    r = requests.post('https://packages.msys2.org/api/trigger_update', timeout=REQUESTS_TIMEOUT)
+    r = requests.post('https://packages.msys2.org/api/trigger_update', timeout=Config.REQUESTS_TIMEOUT)
     r.raise_for_status()
 
 
@@ -1253,7 +1259,7 @@ def get_github(readonly: bool = True) -> Github:
 
 def get_repo(readonly: bool = True) -> Repository:
     gh = get_github(readonly=readonly)
-    return gh.get_repo(REPO, lazy=True)
+    return gh.get_repo(Config.REPO, lazy=True)
 
 
 def wait_for_api_limit_reset(
