@@ -833,10 +833,10 @@ def get_workflow():
 
 JOB_META: List[Dict[str, Any]] = [
     {
-        "build-types": ["mingw64", "mingw-src"],
+        "build-types": ["mingw64"],
         "matrix": {
             "packages": "base-devel mingw-w64-x86_64-toolchain git",
-            "build-args": "--build-types mingw64,mingw-src",
+            "build-args": "--build-types mingw64",
             "name": "mingw64"
         }
     }, {
@@ -876,6 +876,16 @@ JOB_META: List[Dict[str, Any]] = [
         }
     }
 ]
+
+
+# The job matching MINGW_SRC_ARCH should also build mingw-src
+for meta in JOB_META:
+    if Config.MINGW_SRC_ARCH in meta["build-types"]:
+        meta["build-types"].append("mingw-src")
+        meta["matrix"]["build-args"] = meta["matrix"]["build-args"] + ",mingw-src"
+        break
+else:
+    raise Exception("Didn't find arch for building mingw-src")
 
 
 def write_build_plan(args: Any):
