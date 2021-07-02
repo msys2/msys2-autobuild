@@ -944,7 +944,7 @@ def write_build_plan(args: Any):
 
 
 def queue_website_update():
-    r = requests.post('https://packages.msys2.org/api/trigger_update', timeout=Config.REQUESTS_TIMEOUT)
+    r = requests.post('https://packages.msys2.org/api/trigger_update', timeout=REQUESTS_TIMEOUT)
     r.raise_for_status()
 
 
