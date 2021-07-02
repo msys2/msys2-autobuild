@@ -159,11 +159,12 @@ class Package(dict):
         return names
 
     def get_build_types(self) -> List[str]:
-        build_types = list(self["packages"].keys())
+        build_types = [
+            t for t in self["packages"] if t in (Config.MINGW_ARCH_LIST + ["msys"])]
         if self["source"]:
-            if any((k != 'msys') for k in self["packages"].keys()):
+            if any((k != 'msys') for k in self["packages"]):
                 build_types.append("mingw-src")
-            if "msys" in self["packages"].keys():
+            if "msys" in self["packages"]:
                 build_types.append("msys-src")
         return build_types
 
