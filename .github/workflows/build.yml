@@ -68,7 +68,6 @@ jobs:
 
   build:
     needs: schedule
-    runs-on: windows-latest
 
     if: ${{ needs.schedule.outputs.build-plan != '[]' }}
     strategy:
@@ -76,6 +75,7 @@ jobs:
       matrix:
         include: ${{ fromJson(needs.schedule.outputs.build-plan) }}
     name: ${{ matrix.name }}
+    runs-on: ${{ matrix.runner }}
 
     steps:
 
@@ -84,6 +84,7 @@ jobs:
     - uses: actions/setup-python@v2
       with:
         python-version: '3.8'
+        architecture: ${{ startsWith(matrix.name, 'clangarm') && 'x86' || 'x64' }}
 
     - uses: actions/cache@v2
       with:
@@ -99,6 +100,7 @@ jobs:
         python -m pip install --user 'wheel==0.36.2'
         python -m pip install --user -r requirements.txt
 
+    # Note that released ARM64 requires x86 msys, but this will install x64
     - uses: msys2/setup-msys2@v2
       with:
         msystem: MSYS
@@ -112,6 +114,7 @@ jobs:
         sed -e "s|Include = /etc/pacman.d/mirrorlist.mingw64|Server = http://repo.msys2.org/mingw/x86_64/|g" -i /etc/pacman.conf
         sed -e "s|Include = /etc/pacman.d/mirrorlist.msys|Server = http://repo.msys2.org/msys/\$arch/|g" -i /etc/pacman.conf
         sed -i '1s|^|[clang32]\nServer = http://repo.msys2.org/mingw/clang32/\n|' /etc/pacman.conf
+        sed -i '1s|^|[clangarm64]\nServer = http://repo.msys2.org/mingw/clangarm64/\n|' /etc/pacman.conf
         pacman-conf.exe
 
     - name: Update using the main mirror & Check install
@@ -121,9 +124,9 @@ jobs:
         msys2 -c 'pacman -Qkq'
 
     - name: Install extra packages
-      if: ${{ startsWith(matrix.name, 'clang32') }}
+      if: ${{ startsWith(matrix.name, 'clang32') || startsWith(matrix.name, 'clangarm64') }}
       run: |
-        msys2 -c 'pacman --noconfirm -S mingw-w64-clang-i686-toolchain'
+        msys2 -c 'pacman --noconfirm -S mingw-w64-clang-${{ startsWith(matrix.name, 'clangarm64') && 'aarch64' || 'i686' }}-toolchain'
 
     - name: Init git
       shell: msys2 {0}

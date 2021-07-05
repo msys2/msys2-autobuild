@@ -838,42 +838,56 @@ JOB_META: List[Dict[str, Any]] = [
         "matrix": {
             "packages": "base-devel mingw-w64-x86_64-toolchain git",
             "build-args": "--build-types mingw64",
-            "name": "mingw64"
+            "name": "mingw64",
+            "runner": "windows-latest"
         }
     }, {
         "build-types": ["mingw32"],
         "matrix": {
             "packages": "base-devel mingw-w64-i686-toolchain git",
             "build-args": "--build-types mingw32",
-            "name": "mingw32"
+            "name": "mingw32",
+            "runner": "windows-latest"
         }
     }, {
         "build-types": ["ucrt64"],
         "matrix": {
             "packages": "base-devel mingw-w64-ucrt-x86_64-toolchain git",
             "build-args": "--build-types ucrt64",
-            "name": "ucrt64"
+            "name": "ucrt64",
+            "runner": "windows-latest"
         }
     }, {
         "build-types": ["clang64"],
         "matrix": {
             "packages": "base-devel mingw-w64-clang-x86_64-toolchain git",
             "build-args": "--build-types clang64",
-            "name": "clang64"
+            "name": "clang64",
+            "runner": "windows-latest"
         }
     }, {
         "build-types": ["clang32"],
         "matrix": {
             "packages": "base-devel git",
             "build-args": "--build-types clang32",
-            "name": "clang32"
+            "name": "clang32",
+            "runner": "windows-latest"
+        }
+    }, {
+        "build-types": ["clangarm64"],
+        "matrix": {
+            "packages": "base-devel git",
+            "build-args": "--build-types clangarm64",
+            "name": "clangarm64",
+            "runner": ["Windows", "ARM64"]
         }
     }, {
         "build-types": ["msys", "msys-src"],
         "matrix": {
             "packages": "base-devel msys2-devel git",
             "build-args": "--build-types msys,msys-src",
-            "name": "msys"
+            "name": "msys",
+            "runner": "windows-latest"
         }
     }
 ]
