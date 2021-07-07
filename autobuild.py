@@ -1320,6 +1320,9 @@ def clean_environ(environ: Dict[str, str]) -> Dict[str, str]:
 def main(argv: List[str]):
     parser = argparse.ArgumentParser(description="Build packages", allow_abbrev=False)
     parser.set_defaults(func=lambda *x: parser.print_help())
+    parser.add_argument(
+           "-R", "--repo", action="store",
+           help=f"msys2-autobuild repository to target (default '{Config.REPO}')", default=Config.REPO)
     subparser = parser.add_subparsers(title="subcommands")
 
     sub = subparser.add_parser("build", help="Build all packages")
@@ -1379,6 +1382,7 @@ def main(argv: List[str]):
     sub.set_defaults(func=clear_failed_state)
 
     args = parser.parse_args(argv[1:])
+    Config.REPO = args.repo
     return args.func(args)
 
 
