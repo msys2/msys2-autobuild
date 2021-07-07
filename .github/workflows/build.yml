@@ -68,6 +68,7 @@ jobs:
 
   build:
     needs: schedule
+    timeout-minutes: 4320
 
     if: ${{ needs.schedule.outputs.build-plan != '[]' }}
     strategy:
@@ -113,8 +114,8 @@ jobs:
         sed -e "s|Include = /etc/pacman.d/mirrorlist.mingw32|Server = http://repo.msys2.org/mingw/i686/|g" -i /etc/pacman.conf
         sed -e "s|Include = /etc/pacman.d/mirrorlist.mingw64|Server = http://repo.msys2.org/mingw/x86_64/|g" -i /etc/pacman.conf
         sed -e "s|Include = /etc/pacman.d/mirrorlist.msys|Server = http://repo.msys2.org/msys/\$arch/|g" -i /etc/pacman.conf
-        sed -i '1s|^|[clang32]\nServer = http://repo.msys2.org/mingw/clang32/\n|' /etc/pacman.conf
-        sed -i '1s|^|[clangarm64]\nServer = http://repo.msys2.org/mingw/clangarm64/\n|' /etc/pacman.conf
+        grep -qF '[clang32]' /etc/pacman.conf || sed -i '1s|^|[clang32]\nServer = http://repo.msys2.org/mingw/clang32/\n|' /etc/pacman.conf
+        grep -qF '[clangarm64]' /etc/pacman.conf || sed -i '1s|^|[clangarm64]\nServer = http://repo.msys2.org/mingw/clangarm64/\n|' /etc/pacman.conf
         pacman-conf.exe
 
     - name: Update using the main mirror & Check install
@@ -126,7 +127,7 @@ jobs:
     - name: Install extra packages
       if: ${{ startsWith(matrix.name, 'clang32') || startsWith(matrix.name, 'clangarm64') }}
       run: |
-        msys2 -c 'pacman --noconfirm -S mingw-w64-clang-${{ startsWith(matrix.name, 'clangarm64') && 'aarch64' || 'i686' }}-toolchain'
+        msys2 -c 'pacman --noconfirm -S --needed mingw-w64-clang-${{ startsWith(matrix.name, 'clangarm64') && 'aarch64' || 'i686' }}-toolchain'
 
     - name: Init git
       shell: msys2 {0}
