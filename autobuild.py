@@ -40,6 +40,7 @@ class Config:
         ("User", "elieux"),
         ("User", "Alexpux"),
         ("User", "lazka"),
+        ("User", "jeremyd2019"),
         ("Bot", "github-actions[bot]"),
     ]
     """Users that are allowed to upload assets. This is checked at download time"""
