@@ -31,7 +31,7 @@ import io
 from datetime import datetime, timezone
 from enum import Enum
 from hashlib import sha256
-from typing import Generator, Union, AnyStr, List, Any, Dict, Tuple, Set, Optional
+from typing import Generator, Union, AnyStr, List, Any, Dict, Tuple, Set, Optional, TypeVar
 
 
 class Config:
@@ -562,7 +562,7 @@ def run_build(args: Any) -> None:
 
         pkgs = get_buildqueue_with_status(full_details=True)
         update_status(pkgs)
-        todo = get_package_to_build(pkgs, build_types, args.reverse)
+        todo = get_package_to_build(pkgs, build_types, args.build_from)
         if not todo:
             break
         pkg, build_type = todo
@@ -805,12 +805,32 @@ def get_buildqueue_with_status(full_details: bool = False) -> List[Package]:
     return pkgs
 
 
+T = TypeVar('T')
+
+
+def middle_first(seq: List[T]) -> List[T]:
+    """Same list but starts with elements from the middle alternating in both directions"""
+
+    tmp = list(seq)
+    end = list(reversed(tmp[:len(tmp)//2]))
+    start = tmp[len(tmp)//2:]
+    tmp[0:len(start)*2:2] = start
+    tmp[1:len(end)*2+1:2] = end
+    return tmp
+
+
 def get_package_to_build(
         pkgs: List[Package], build_types: Optional[List[str]],
-        reverse: bool = False) -> Optional[Tuple[Package, str]]:
+        build_from: str) -> Optional[Tuple[Package, str]]:
 
-    if reverse:
+    if build_from == "end":
         pkgs = list(reversed(pkgs))
+    elif build_from == "middle":
+        pkgs = middle_first(pkgs)
+    elif build_from == "start":
+        pkgs = list(pkgs)
+    else:
+        raise Exception("Unknown order:", build_from)
 
     for pkg in pkgs:
         for build_type in pkg.get_build_types():
@@ -951,8 +971,13 @@ def write_build_plan(args: Any):
             # one having a reversed build order
             if build_count > 3:
                 matrix = dict(job_info["matrix"])
-                matrix["build-args"] = matrix["build-args"] + " --reverse"
+                matrix["build-args"] = matrix["build-args"] + " --build-from end"
                 matrix["name"] = matrix["name"] + "-2"
+                jobs.append(matrix)
+            if build_count > 15:
+                matrix = dict(job_info["matrix"])
+                matrix["build-args"] = matrix["build-args"] + " --build-from middle"
+                matrix["name"] = matrix["name"] + "-3"
                 jobs.append(matrix)
 
     write_out(jobs)
@@ -1329,7 +1354,7 @@ def main(argv: List[str]):
     sub = subparser.add_parser("build", help="Build all packages")
     sub.add_argument("-t", "--build-types", action="store")
     sub.add_argument(
-        "--reverse", action="store_true", help="Reverse the build order")
+        "--build-from", action="store", default="start", help="Start building from start|end|middle")
     sub.add_argument("msys2_root", help="The MSYS2 install used for building. e.g. C:\\msys64")
     sub.add_argument(
         "builddir",
