@@ -553,6 +553,8 @@ def run_build(args: Any) -> None:
     except Exception as e:
         raise SystemExit("ERROR: msys2_root not functional", e)
 
+    print(f"Building {build_types} starting from {args.build_from}")
+
     while True:
         wait_for_api_limit_reset()
 
