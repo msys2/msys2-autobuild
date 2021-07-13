@@ -976,11 +976,6 @@ def write_build_plan(args: Any):
                 matrix["build-args"] = matrix["build-args"] + " --build-from end"
                 matrix["name"] = matrix["name"] + "-2"
                 jobs.append(matrix)
-            if build_count > 15:
-                matrix = dict(job_info["matrix"])
-                matrix["build-args"] = matrix["build-args"] + " --build-from middle"
-                matrix["name"] = matrix["name"] + "-3"
-                jobs.append(matrix)
 
     write_out(jobs)
 
