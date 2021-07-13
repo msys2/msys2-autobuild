@@ -1309,7 +1309,7 @@ def get_repo(readonly: bool = True) -> Repository:
 
 
 def wait_for_api_limit_reset(
-        min_remaining: int = 50, min_sleep: float = 60, max_sleep: float = 300) -> None:
+        min_remaining: int = 100, min_sleep: float = 60, max_sleep: float = 300) -> None:
 
     for readonly in [True, False]:
         gh = get_github(readonly=readonly)
