@@ -1309,7 +1309,8 @@ def get_repo(readonly: bool = True) -> Repository:
 
 
 def wait_for_api_limit_reset(
-        min_remaining: int = 100, min_sleep: float = 60, max_sleep: float = 300) -> None:
+        min_remaining: int = 50, min_remaining_readonly: int = 250, min_sleep: float = 60,
+        max_sleep: float = 300) -> None:
 
     for readonly in [True, False]:
         gh = get_github(readonly=readonly)
@@ -1320,7 +1321,7 @@ def wait_for_api_limit_reset(
             diff = (reset - now).total_seconds()
             print(f"{core.remaining} API calls left (readonly={readonly}), "
                   f"{diff} seconds until the next reset")
-            if core.remaining > min_remaining:
+            if core.remaining > (min_remaining_readonly if readonly else min_remaining):
                 break
             wait = diff
             if wait < min_sleep:
