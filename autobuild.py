@@ -74,6 +74,7 @@ class Config:
         "mingw-w64-arm-none-eabi-gcc",
         "mingw-w64-tolua",
         "mingw-w64-kirigami2-qt5",
+        "mingw-w64-libgda",
     ]
     """XXX: These would in theory block rdeps, but no one fixed them, so we ignore them"""
 
