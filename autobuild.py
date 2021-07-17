@@ -199,17 +199,17 @@ def get_current_run_urls() -> Optional[Dict[str, str]]:
     return None
 
 
-def shlex_join(split_command: List[str]) -> str:
-    # shlex.join got added in 3.8 while we support 3.6
-    return ' '.join(shlex.quote(arg) for arg in split_command)
-
-
 def run_cmd(msys2_root: _PathLike, args: List[_PathLike], **kwargs: Any) -> None:
     executable = os.path.join(msys2_root, 'usr', 'bin', 'bash.exe')
     env = clean_environ(kwargs.pop("env", os.environ.copy()))
     env["CHERE_INVOKING"] = "1"
     env["MSYSTEM"] = "MSYS"
     env["MSYS2_PATH_TYPE"] = "minimal"
+
+    def shlex_join(split_command: List[str]) -> str:
+        # shlex.join got added in 3.8 while we support 3.6
+        return ' '.join(shlex.quote(arg) for arg in split_command)
+
     check_call([executable, '-lc'] + [shlex_join([str(a) for a in args])], env=env, **kwargs)
 
 
