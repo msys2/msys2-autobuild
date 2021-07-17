@@ -1219,6 +1219,9 @@ def fetch_assets(args: Any) -> None:
                 if asset_path.stat().st_size != asset.size:
                     print(f"Warning: {asset_path} already exists "
                           f"but has a different size")
+                if get_asset_mtime_ns(asset) != asset_path.stat().st_mtime_ns:
+                    print(f"Warning: {asset_path} already exists "
+                          f"but has a different mtime")
                 done.append(asset)
                 continue
             todo.append((asset, asset_path))
