@@ -7,7 +7,7 @@ import glob
 from os import environ
 from github import Github
 from github.GithubObject import GithubObject
-from github.GithubException import GithubException
+from github.GithubException import GithubException, UnknownObjectException
 from github.GitRelease import GitRelease
 from github.GitReleaseAsset import GitReleaseAsset
 from github.Repository import Repository
@@ -410,7 +410,7 @@ SigLevel=Never
             repo: Repository, release_name: str, *, _cache={}) -> List[GitReleaseAsset]:
         key = (repo.full_name, release_name)
         if key not in _cache:
-            release = repo.get_release(release_name)
+            release = get_release(repo, release_name)
             _cache[key] = get_release_assets(release)
         return _cache[key]
 
@@ -514,7 +514,7 @@ def build_package(build_type: str, pkg: Package, msys2_root: _PathLike, builddir
 
         except (subprocess.CalledProcessError, BuildError) as e:
             wait_for_api_limit_reset()
-            release = repo.get_release("staging-failed")
+            release = get_release(repo, "staging-failed")
             run_urls = get_current_run_urls()
             for entry in pkg.get_failed_names(build_type):
                 failed_data = {}
@@ -646,13 +646,25 @@ def get_release_assets(release: GitRelease, include_incomplete: bool = False) ->
     return assets
 
 
+def get_release(repo: Repository, name: str, create: bool = True) -> GitRelease:
+    """Like Repository.get_release() but creates the referenced release if needed"""
+
+    try:
+        return repo.get_release(name)
+    except UnknownObjectException:
+        if not create:
+            raise
+        with make_writable(repo):
+            return repo.create_git_release(name, name, name, prerelease=True)
+
+
 def get_buildqueue_with_status(full_details: bool = False) -> List[Package]:
     repo = get_repo()
     assets = []
     for name in ["msys", "mingw"]:
-        release = repo.get_release('staging-' + name)
+        release = get_release(repo, 'staging-' + name)
         assets.extend(get_release_assets(release))
-    release = repo.get_release('staging-failed')
+    release = get_release(repo, 'staging-failed')
     assets_failed = get_release_assets(release)
 
     failed_urls = {}
@@ -991,7 +1003,7 @@ def queue_website_update() -> None:
 
 def update_status(pkgs: List[Package]) -> None:
     repo = get_repo()
-    release = repo.get_release("status")
+    release = get_release(repo, "status")
 
     results = {}
     for pkg in pkgs:
@@ -1132,7 +1144,7 @@ def upload_assets(args: Any) -> None:
             matches.append(match)
     print(f"Found {len(matches)} files..")
 
-    release = repo.get_release('staging-' + repo_type)
+    release = get_release(repo, 'staging-' + repo_type)
     for match in matches:
         print(f"Uploading {match}")
         if not args.dry_run:
@@ -1166,7 +1178,7 @@ def fetch_assets(args: Any) -> None:
     to_download: Dict[str, List[GitReleaseAsset]] = {}
     for repo_type, patterns in all_patterns.items():
         if repo_type not in all_assets:
-            release = repo.get_release('staging-' + repo_type)
+            release = get_release(repo, 'staging-' + repo_type)
             all_assets[repo_type] = get_release_assets(release)
         assets = all_assets[repo_type]
 
@@ -1230,7 +1242,7 @@ def get_assets_to_delete(repo: Repository) -> List[GitReleaseAsset]:
     print("Fetching assets...")
     assets: Dict[str, List[GitReleaseAsset]] = {}
     for release_name in ['staging-msys', 'staging-mingw', 'staging-failed']:
-        release = repo.get_release(release_name)
+        release = get_release(repo, release_name)
         for asset in get_release_assets(release, include_incomplete=True):
             assets.setdefault(get_asset_filename(asset), []).append(asset)
 
@@ -1262,7 +1274,7 @@ def clean_gha_assets(args: Any) -> None:
 def clear_failed_state(args: Any) -> None:
     build_type = args.build_type
     repo = get_repo()
-    release = repo.get_release('staging-failed')
+    release = get_release(repo, 'staging-failed')
     assets_failed = get_release_assets(release)
     failed_map = dict((get_asset_filename(a), a) for a in assets_failed)
 
