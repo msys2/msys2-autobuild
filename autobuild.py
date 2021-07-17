@@ -849,7 +849,7 @@ def get_package_to_build(
             if pkg.get_status(build_type) == PackageStatus.WAITING_FOR_BUILD:
                 can_build.append((pkg, build_type))
 
-    if can_build:
+    if not can_build:
         return None
 
     if build_from == "end":
