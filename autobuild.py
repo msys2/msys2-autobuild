@@ -856,75 +856,77 @@ def get_workflow():
         raise Exception("workflow not found:", workflow_name)
 
 
-JOB_META: List[Dict[str, Any]] = [
-    {
-        "build-types": ["mingw64"],
-        "matrix": {
-            "packages": "base-devel mingw-w64-x86_64-toolchain git",
-            "build-args": "--build-types mingw64",
-            "name": "mingw64",
-            "runner": "windows-latest"
+def get_job_meta() -> List[Dict[str, Any]]:
+    job_meta: List[Dict[str, Any]] = [
+        {
+            "build-types": ["mingw64"],
+            "matrix": {
+                "packages": "base-devel mingw-w64-x86_64-toolchain git",
+                "build-args": "--build-types mingw64",
+                "name": "mingw64",
+                "runner": "windows-latest"
+            }
+        }, {
+            "build-types": ["mingw32"],
+            "matrix": {
+                "packages": "base-devel mingw-w64-i686-toolchain git",
+                "build-args": "--build-types mingw32",
+                "name": "mingw32",
+                "runner": "windows-latest"
+            }
+        }, {
+            "build-types": ["ucrt64"],
+            "matrix": {
+                "packages": "base-devel mingw-w64-ucrt-x86_64-toolchain git",
+                "build-args": "--build-types ucrt64",
+                "name": "ucrt64",
+                "runner": "windows-latest"
+            }
+        }, {
+            "build-types": ["clang64"],
+            "matrix": {
+                "packages": "base-devel mingw-w64-clang-x86_64-toolchain git",
+                "build-args": "--build-types clang64",
+                "name": "clang64",
+                "runner": "windows-latest"
+            }
+        }, {
+            "build-types": ["clang32"],
+            "matrix": {
+                "packages": "base-devel git",
+                "build-args": "--build-types clang32",
+                "name": "clang32",
+                "runner": "windows-latest"
+            }
+        }, {
+            "build-types": ["clangarm64"],
+            "matrix": {
+                "packages": "base-devel git",
+                "build-args": "--build-types clangarm64",
+                "name": "clangarm64",
+                "runner": ["Windows", "ARM64"]
+            }
+        }, {
+            "build-types": ["msys", "msys-src"],
+            "matrix": {
+                "packages": "base-devel msys2-devel git",
+                "build-args": "--build-types msys,msys-src",
+                "name": "msys",
+                "runner": "windows-latest"
+            }
         }
-    }, {
-        "build-types": ["mingw32"],
-        "matrix": {
-            "packages": "base-devel mingw-w64-i686-toolchain git",
-            "build-args": "--build-types mingw32",
-            "name": "mingw32",
-            "runner": "windows-latest"
-        }
-    }, {
-        "build-types": ["ucrt64"],
-        "matrix": {
-            "packages": "base-devel mingw-w64-ucrt-x86_64-toolchain git",
-            "build-args": "--build-types ucrt64",
-            "name": "ucrt64",
-            "runner": "windows-latest"
-        }
-    }, {
-        "build-types": ["clang64"],
-        "matrix": {
-            "packages": "base-devel mingw-w64-clang-x86_64-toolchain git",
-            "build-args": "--build-types clang64",
-            "name": "clang64",
-            "runner": "windows-latest"
-        }
-    }, {
-        "build-types": ["clang32"],
-        "matrix": {
-            "packages": "base-devel git",
-            "build-args": "--build-types clang32",
-            "name": "clang32",
-            "runner": "windows-latest"
-        }
-    }, {
-        "build-types": ["clangarm64"],
-        "matrix": {
-            "packages": "base-devel git",
-            "build-args": "--build-types clangarm64",
-            "name": "clangarm64",
-            "runner": ["Windows", "ARM64"]
-        }
-    }, {
-        "build-types": ["msys", "msys-src"],
-        "matrix": {
-            "packages": "base-devel msys2-devel git",
-            "build-args": "--build-types msys,msys-src",
-            "name": "msys",
-            "runner": "windows-latest"
-        }
-    }
-]
+    ]
 
+    # The job matching MINGW_SRC_ARCH should also build mingw-src
+    for meta in job_meta:
+        if Config.MINGW_SRC_ARCH in meta["build-types"]:
+            meta["build-types"].append("mingw-src")
+            meta["matrix"]["build-args"] = meta["matrix"]["build-args"] + ",mingw-src"
+            break
+    else:
+        raise Exception("Didn't find arch for building mingw-src")
 
-# The job matching MINGW_SRC_ARCH should also build mingw-src
-for meta in JOB_META:
-    if Config.MINGW_SRC_ARCH in meta["build-types"]:
-        meta["build-types"].append("mingw-src")
-        meta["matrix"]["build-args"] = meta["matrix"]["build-args"] + ",mingw-src"
-        break
-else:
-    raise Exception("Didn't find arch for building mingw-src")
+    return job_meta
 
 
 def write_build_plan(args: Any):
@@ -965,7 +967,7 @@ def write_build_plan(args: Any):
         return
 
     jobs = []
-    for job_info in JOB_META:
+    for job_info in get_job_meta():
         matching_build_types = set(queued_build_types) & set(job_info["build-types"])
         if matching_build_types:
             build_count = sum(queued_build_types[bt] for bt in matching_build_types)
