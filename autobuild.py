@@ -11,6 +11,7 @@ from github.GithubException import GithubException
 from github.GitRelease import GitRelease
 from github.GitReleaseAsset import GitReleaseAsset
 from github.Repository import Repository
+from github.Workflow import Workflow
 from pathlib import Path, PurePosixPath, PurePath
 from subprocess import check_call
 import subprocess
@@ -99,7 +100,7 @@ class PackageStatus(Enum):
     MANUAL_BUILD_REQUIRED = 'manual-build-required'
     UNKNOWN = 'unknown'
 
-    def __str__(self):
+    def __str__(self) -> str:
         return self.value
 
 
@@ -109,13 +110,13 @@ def build_type_is_src(build_type: str) -> bool:
 
 class Package(dict):
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return "Package(%r)" % self["name"]
 
-    def __hash__(self):
+    def __hash__(self) -> int:  # type: ignore
         return id(self)
 
-    def __eq__(self, other):
+    def __eq__(self, other: object) -> bool:
         return self is other
 
     def get_status(self, build_type: str) -> PackageStatus:
@@ -170,10 +171,10 @@ class Package(dict):
                 build_types.append("msys-src")
         return build_types
 
-    def get_depends(self, build_type) -> "Set[Package]":
+    def get_depends(self, build_type: str) -> "Set[Package]":
         return self['ext-depends'].get(build_type, set())
 
-    def get_rdepends(self, build_type) -> "Set[Package]":
+    def get_rdepends(self, build_type: str) -> "Set[Package]":
         return self['ext-rdepends'].get(build_type, set())
 
     def get_repo_type(self) -> str:
@@ -203,7 +204,7 @@ def shlex_join(split_command: List[str]) -> str:
     return ' '.join(shlex.quote(arg) for arg in split_command)
 
 
-def run_cmd(msys2_root: _PathLike, args, **kwargs):
+def run_cmd(msys2_root: _PathLike, args: List[_PathLike], **kwargs: Any) -> None:
     executable = os.path.join(msys2_root, 'usr', 'bin', 'bash.exe')
     env = clean_environ(kwargs.pop("env", os.environ.copy()))
     env["CHERE_INVOKING"] = "1"
@@ -443,7 +444,7 @@ SigLevel=Never
         run_cmd(msys2_root, ["pacman", "--noconfirm", "-Suuy"])
 
 
-def build_package(build_type: str, pkg, msys2_root: _PathLike, builddir: _PathLike) -> None:
+def build_package(build_type: str, pkg: Package, msys2_root: _PathLike, builddir: _PathLike) -> None:
     assert os.path.isabs(builddir)
     assert os.path.isabs(msys2_root)
     os.makedirs(builddir, exist_ok=True)
@@ -628,7 +629,7 @@ def get_asset_filename(asset: GitReleaseAsset) -> str:
         return asset.label
 
 
-def get_release_assets(release: GitRelease, include_incomplete=False) -> List[GitReleaseAsset]:
+def get_release_assets(release: GitRelease, include_incomplete: bool = False) -> List[GitReleaseAsset]:
     assets = []
     for asset in release.get_assets():
         # skip in case not fully uploaded yet (or uploading failed)
@@ -844,7 +845,7 @@ def get_package_to_build(
     return None
 
 
-def get_workflow():
+def get_workflow() -> Workflow:
     workflow_name = os.environ.get("GITHUB_WORKFLOW", None)
     if workflow_name is None:
         raise Exception("GITHUB_WORKFLOW not set")
@@ -929,14 +930,14 @@ def get_job_meta() -> List[Dict[str, Any]]:
     return job_meta
 
 
-def write_build_plan(args: Any):
+def write_build_plan(args: Any) -> None:
     target_file = args.target_file
 
     current_id = None
     if "GITHUB_RUN_ID" in os.environ:
         current_id = int(os.environ["GITHUB_RUN_ID"])
 
-    def write_out(result: List[Dict[str, str]]):
+    def write_out(result: List[Dict[str, str]]) -> None:
         with open(target_file, "wb") as h:
             h.write(json.dumps(result).encode())
 
@@ -983,12 +984,12 @@ def write_build_plan(args: Any):
     write_out(jobs)
 
 
-def queue_website_update():
+def queue_website_update() -> None:
     r = requests.post('https://packages.msys2.org/api/trigger_update', timeout=REQUESTS_TIMEOUT)
     r.raise_for_status()
 
 
-def update_status(pkgs: List[Package]):
+def update_status(pkgs: List[Package]) -> None:
     repo = get_repo()
     release = repo.get_release("status")
 
@@ -1050,7 +1051,7 @@ def show_build(args: Any) -> None:
             else:
                 failed.append((pkg, build_type, status, details))
 
-    def show_table(name, items):
+    def show_table(name: str, items: List) -> None:
         with gha_group(f"{name} ({len(items)})"):
             print(tabulate([(p["name"], bt, p["version"], str(s), d) for (p, bt, s, d) in items],
                            headers=["Package", "Build", "Version", "Status", "Details"]))
@@ -1344,7 +1345,7 @@ def clean_environ(environ: Dict[str, str]) -> Dict[str, str]:
     return new_env
 
 
-def main(argv: List[str]):
+def main(argv: List[str]) -> None:
     parser = argparse.ArgumentParser(description="Build packages", allow_abbrev=False)
     parser.set_defaults(func=lambda *x: parser.print_help())
     parser.add_argument(
@@ -1410,7 +1411,7 @@ def main(argv: List[str]):
 
     args = parser.parse_args(argv[1:])
     Config.REPO = args.repo
-    return args.func(args)
+    args.func(args)
 
 
 if __name__ == "__main__":
