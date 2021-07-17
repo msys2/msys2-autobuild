@@ -255,6 +255,20 @@ def asset_is_complete(asset: GitReleaseAsset) -> bool:
     return asset.state == "uploaded"
 
 
+def fixup_datetime(dt: datetime) -> datetime:
+    # pygithub returns datetime objects without a timezone
+    # https://github.com/PyGithub/PyGithub/issues/1905
+    assert dt.tzinfo is None
+    return dt.replace(tzinfo=timezone.utc)
+
+
+def get_asset_mtime_ns(asset: GitReleaseAsset) -> int:
+    """Returns the mtime of an asset in nanoseconds"""
+
+    updated_at = fixup_datetime(asset.updated_at)
+    return int(updated_at.timestamp() * (1000 ** 3))
+
+
 def download_asset(asset: GitReleaseAsset, target_path: str) -> None:
     assert asset_is_complete(asset)
     with requests.get(asset.browser_download_url, stream=True, timeout=REQUESTS_TIMEOUT) as r:
@@ -265,6 +279,8 @@ def download_asset(asset: GitReleaseAsset, target_path: str) -> None:
             with os.fdopen(fd, "wb") as h:
                 for chunk in r.iter_content(4096):
                     h.write(chunk)
+            mtime_ns = get_asset_mtime_ns(asset)
+            os.utime(temppath, ns=(mtime_ns, mtime_ns))
             shutil.move(temppath, target_path)
         finally:
             try:
@@ -1327,7 +1343,7 @@ def wait_for_api_limit_reset(
         gh = get_github(readonly=readonly)
         while True:
             core = gh.get_rate_limit().core
-            reset = core.reset.replace(tzinfo=timezone.utc)
+            reset = fixup_datetime(core.reset)
             now = datetime.now(timezone.utc)
             diff = (reset - now).total_seconds()
             print(f"{core.remaining} API calls left (readonly={readonly}), "
