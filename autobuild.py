@@ -32,7 +32,7 @@ import io
 from datetime import datetime, timezone
 from enum import Enum
 from hashlib import sha256
-from typing import Generator, Union, AnyStr, List, Any, Dict, Tuple, Set, Optional, TypeVar
+from typing import Generator, Union, AnyStr, List, Any, Dict, Tuple, Set, Optional
 
 
 class Config:
@@ -837,40 +837,29 @@ def get_buildqueue_with_status(full_details: bool = False) -> List[Package]:
     return pkgs
 
 
-T = TypeVar('T')
-
-
-def middle_first(seq: List[T]) -> List[T]:
-    """Same list but starts with elements from the middle alternating in both directions"""
-
-    tmp = list(seq)
-    end = list(reversed(tmp[:len(tmp)//2]))
-    start = tmp[len(tmp)//2:]
-    tmp[0:len(start)*2:2] = start
-    tmp[1:len(end)*2+1:2] = end
-    return tmp
-
-
 def get_package_to_build(
         pkgs: List[Package], build_types: Optional[List[str]],
         build_from: str) -> Optional[Tuple[Package, str]]:
 
-    if build_from == "end":
-        pkgs = list(reversed(pkgs))
-    elif build_from == "middle":
-        pkgs = middle_first(pkgs)
-    elif build_from == "start":
-        pkgs = list(pkgs)
-    else:
-        raise Exception("Unknown order:", build_from)
-
+    can_build = []
     for pkg in pkgs:
         for build_type in pkg.get_build_types():
             if build_types is not None and build_type not in build_types:
                 continue
             if pkg.get_status(build_type) == PackageStatus.WAITING_FOR_BUILD:
-                return (pkg, build_type)
-    return None
+                can_build.append((pkg, build_type))
+
+    if can_build:
+        return None
+
+    if build_from == "end":
+        return can_build[-1]
+    elif build_from == "middle":
+        return can_build[len(can_build)//2]
+    elif build_from == "start":
+        return can_build[0]
+    else:
+        raise Exception("Unknown order:", build_from)
 
 
 def get_workflow() -> Workflow:
