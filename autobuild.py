@@ -142,7 +142,7 @@ class Package(dict):
     def get_build_patterns(self, build_type: str) -> List[str]:
         patterns = []
         if build_type_is_src(build_type):
-            patterns.append(f"{self['name']}-{self['version']}.src.tar.gz")
+            patterns.append(f"{self['name']}-{self['version']}.src.tar.[!s]*")
         elif build_type in (Config.MINGW_ARCH_LIST + ["msys"]):
             for item in self['packages'].get(build_type, []):
                 patterns.append(f"{item}-{self['version']}-*.pkg.tar.zst")
