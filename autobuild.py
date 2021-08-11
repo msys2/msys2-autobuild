@@ -1164,7 +1164,7 @@ def upload_assets(args: Any) -> None:
 
 def fetch_assets(args: Any) -> None:
     repo = get_repo()
-    target_dir = args.targetdir
+    target_dir = os.path.abspath(args.targetdir)
     fetch_all = args.fetch_all
 
     all_patterns: Dict[str, List[str]] = {}
@@ -1185,7 +1185,7 @@ def fetch_assets(args: Any) -> None:
                         (pkg["name"], build_type, pkg.get_status_details(build_type)))
 
     all_assets = {}
-    to_download: Dict[str, List[GitReleaseAsset]] = {}
+    assets_to_download: Dict[str, List[GitReleaseAsset]] = {}
     for repo_type, patterns in all_patterns.items():
         if repo_type not in all_assets:
             release = get_release(repo, 'staging-' + repo_type)
@@ -1200,46 +1200,82 @@ def fetch_assets(args: Any) -> None:
             matches = fnmatch.filter(assets_mapping.keys(), pattern)
             if matches:
                 found = assets_mapping[matches[0]]
-                to_download.setdefault(repo_type, []).extend(found)
+                assets_to_download.setdefault(repo_type, []).extend(found)
 
-    todo = []
-    done = []
-    for repo_type, assets in to_download.items():
+    to_fetch = {}
+    for repo_type, assets in assets_to_download.items():
         for asset in assets:
             asset_dir = Path(target_dir) / get_repo_subdir(repo_type, asset)
-            asset_dir.mkdir(parents=True, exist_ok=True)
             asset_path = asset_dir / get_asset_filename(asset)
-            if asset_path.exists():
-                if asset_path.stat().st_size != asset.size:
-                    print(f"Warning: {asset_path} already exists "
-                          f"but has a different size")
-                if get_asset_mtime_ns(asset) != asset_path.stat().st_mtime_ns:
-                    print(f"Warning: {asset_path} already exists "
-                          f"but has a different mtime")
-                done.append(asset)
-                continue
-            todo.append((asset, asset_path))
+            to_fetch[str(asset_path)] = asset
+
+    def file_is_uptodate(path, asset):
+        asset_path = Path(path)
+        if not asset_path.exists():
+            return False
+        if asset_path.stat().st_size != asset.size:
+            return False
+        if get_asset_mtime_ns(asset) != asset_path.stat().st_mtime_ns:
+            return False
+        return True
+
+    # find files that are either wrong or not what we want
+    to_delete = []
+    not_uptodate = []
+    for root, dirs, files in os.walk(target_dir):
+        for name in files:
+            existing = os.path.join(root, name)
+            if existing in to_fetch:
+                asset = to_fetch[existing]
+                if not file_is_uptodate(existing, asset):
+                    to_delete.append(existing)
+                    not_uptodate.append(existing)
+            else:
+                to_delete.append(existing)
+
+    if args.delete and not args.pretend:
+        # delete unwanted files
+        for path in to_delete:
+            os.remove(path)
+
+        # delete empty directories
+        for root, dirs, files in os.walk(target_dir, topdown=False):
+            for name in dirs:
+                path = os.path.join(root, name)
+                if not os.listdir(path):
+                    os.rmdir(path)
+
+    # Finally figure out what to download
+    todo = {}
+    done = []
+    for path, asset in to_fetch.items():
+        if not os.path.exists(path) or path in not_uptodate:
+            todo[path] = asset
+            Path(path).parent.mkdir(parents=True, exist_ok=True)
+        else:
+            done.append(path)
 
     if args.verbose and all_blocked:
         import pprint
         print("Packages that are blocked and why:")
         pprint.pprint(all_blocked)
 
-    print(f"downloading: {len(todo)}, done: {len(done)}, "
+    print(f"downloading: {len(todo)}, done: {len(done)} "
           f"blocked: {len(all_blocked)} (related builds missing)")
 
     print("Pass --verbose to see the list of blocked packages.")
     print("Pass --fetch-all to also fetch blocked packages.")
+    print("Pass --delete to clear the target directory")
 
     def fetch_item(item):
-        asset, asset_path = item
+        asset_path, asset = item
         if not args.pretend:
             download_asset(asset, asset_path)
         return item
 
     with ThreadPoolExecutor(8) as executor:
-        for i, item in enumerate(executor.map(fetch_item, todo)):
-            print(f"[{i + 1}/{len(todo)}] {get_asset_filename(item[0])}")
+        for i, item in enumerate(executor.map(fetch_item, todo.items())):
+            print(f"[{i + 1}/{len(todo)}] {get_asset_filename(item[1])}")
 
     print("done")
 
@@ -1404,6 +1440,8 @@ def main(argv: List[str]) -> None:
     sub = subparser.add_parser(
         "fetch-assets", help="Download all staging packages", allow_abbrev=False)
     sub.add_argument("targetdir")
+    sub.add_argument(
+        "--delete", action="store_true", help="Clear targetdir of unneeded files")
     sub.add_argument(
         "--verbose", action="store_true", help="Show why things are blocked")
     sub.add_argument(
