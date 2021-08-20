@@ -927,7 +927,7 @@ def get_job_meta() -> List[Dict[str, Any]]:
         }, {
             "build-types": ["msys", "msys-src"],
             "matrix": {
-                "packages": "base-devel msys2-devel git",
+                "packages": "base-devel msys2-devel VCS",
                 "build-args": "--build-types msys,msys-src",
                 "name": "msys",
                 "runner": "windows-latest"
@@ -940,6 +940,7 @@ def get_job_meta() -> List[Dict[str, Any]]:
         if Config.MINGW_SRC_ARCH in meta["build-types"]:
             meta["build-types"].append("mingw-src")
             meta["matrix"]["build-args"] = meta["matrix"]["build-args"] + ",mingw-src"
+            meta["matrix"]["packages"] = meta["matrix"]["packages"] + " VCS"
             break
     else:
         raise Exception("Didn't find arch for building mingw-src")
