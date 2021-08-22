@@ -1341,7 +1341,7 @@ def clear_failed_state(args: Any) -> None:
 
 
 def get_credentials(readonly: bool = True) -> Dict[str, Any]:
-    if readonly and "GITHUB_TOKEN_READONLY" in environ:
+    if readonly and environ.get("GITHUB_TOKEN_READONLY", ""):
         return {'login_or_token': environ["GITHUB_TOKEN_READONLY"]}
     elif "GITHUB_TOKEN" in environ:
         return {'login_or_token': environ["GITHUB_TOKEN"]}
