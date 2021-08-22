@@ -392,12 +392,22 @@ def staging_dependencies(
         repo_dir = Path(repo_root) / repo_type
         os.makedirs(repo_dir, exist_ok=True)
 
-        package_paths = []
+        todo = []
         for asset in assets:
-            print(f"Downloading {get_asset_filename(asset)}...")
-            package_path = os.path.join(repo_dir, get_asset_filename(asset))
-            download_asset(asset, package_path)
-            package_paths.append(package_path)
+            asset_path = os.path.join(repo_dir, get_asset_filename(asset))
+            todo.append((asset_path, asset))
+
+        def fetch_item(item):
+            asset_path, asset = item
+            download_asset(asset, asset_path)
+            return item
+
+        package_paths = []
+        with ThreadPoolExecutor(8) as executor:
+            for i, item in enumerate(executor.map(fetch_item, todo)):
+                asset_path, asset = item
+                print(f"[{i + 1}/{len(todo)}] {get_asset_filename(asset)}")
+                package_paths.append(asset_path)
 
         repo_name = f"autobuild-{repo_type}"
         repo_db_path = os.path.join(repo_dir, f"{repo_name}.db.tar.gz")
