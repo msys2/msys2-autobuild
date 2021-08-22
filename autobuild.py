@@ -119,32 +119,39 @@ class Package(dict):
     def __eq__(self, other: object) -> bool:
         return self is other
 
+    def _get_build(self, build_type: str) -> Dict:
+        return self["builds"].get(build_type, {})
+
     def get_status(self, build_type: str) -> PackageStatus:
-        return self.get("status", {}).get(build_type, PackageStatus.UNKNOWN)
+        build = self._get_build(build_type)
+        return build.get("status", PackageStatus.UNKNOWN)
 
     def get_status_details(self, build_type: str) -> Dict[str, Any]:
-        return self.get("status_details", {}).get(build_type, {})
+        build = self._get_build(build_type)
+        return build.get("status_details", {})
 
     def set_status(self, build_type: str, status: PackageStatus,
                    description: Optional[str] = None,
                    urls: Optional[Dict[str, str]] = None) -> None:
-        self.setdefault("status", {})[build_type] = status
+        build = self["builds"].setdefault(build_type, {})
+        build["status"] = status
         meta: Dict[str, Any] = {}
         if description:
             meta["desc"] = description
         if urls:
             meta["urls"] = urls
-        self.setdefault("status_details", {})[build_type] = meta
+        build["status_details"] = meta
 
     def is_new(self, build_type: str) -> bool:
-        return build_type in self.get("new", [])
+        build = self._get_build(build_type)
+        return build.get("new", False)
 
     def get_build_patterns(self, build_type: str) -> List[str]:
         patterns = []
         if build_type_is_src(build_type):
             patterns.append(f"{self['name']}-{self['version']}.src.tar.[!s]*")
         elif build_type in (Config.MINGW_ARCH_LIST + ["msys"]):
-            for item in self['packages'].get(build_type, []):
+            for item in self._get_build(build_type).get('packages', []):
                 patterns.append(f"{item}-{self['version']}-*.pkg.tar.zst")
         else:
             assert 0
@@ -155,7 +162,7 @@ class Package(dict):
         if build_type_is_src(build_type):
             names.append(f"{self['name']}-{self['version']}.failed")
         elif build_type in (Config.MINGW_ARCH_LIST + ["msys"]):
-            for item in self['packages'].get(build_type, []):
+            for item in self._get_build(build_type).get('packages', []):
                 names.append(f"{item}-{self['version']}.failed")
         else:
             assert 0
@@ -163,19 +170,27 @@ class Package(dict):
 
     def get_build_types(self) -> List[str]:
         build_types = [
-            t for t in self["packages"] if t in (Config.MINGW_ARCH_LIST + ["msys"])]
+            t for t in self["builds"] if t in (Config.MINGW_ARCH_LIST + ["msys"])]
         if self["source"]:
-            if any((k != 'msys') for k in self["packages"]):
+            if any((k != 'msys') for k in build_types):
                 build_types.append("mingw-src")
-            if "msys" in self["packages"]:
+            if "msys" in build_types:
                 build_types.append("msys-src")
         return build_types
 
     def get_depends(self, build_type: str) -> "Set[Package]":
-        return self['ext-depends'].get(build_type, set())
+        build = self._get_build(build_type)
+        ext_deps = set()
+        for repo, deps in build.get('ext-depends', {}).items():
+            ext_deps.update(deps)
+        return ext_deps
 
     def get_rdepends(self, build_type: str) -> "Set[Package]":
-        return self['ext-rdepends'].get(build_type, set())
+        build = self._get_build(build_type)
+        ext_rdeps = set()
+        for repo, deps in build.get('ext-rdepends', {}).items():
+            ext_rdeps.update(deps)
+        return ext_rdeps
 
     def get_repo_type(self) -> str:
         return "msys" if self['repo'].startswith('MSYS2') else "mingw"
@@ -598,34 +613,40 @@ def run_build(args: Any) -> None:
 
 def get_buildqueue() -> List[Package]:
     pkgs = []
-    r = requests.get("https://packages.msys2.org/api/buildqueue", timeout=REQUESTS_TIMEOUT)
+    r = requests.get("https://packages.msys2.org/api/buildqueue2", timeout=REQUESTS_TIMEOUT)
     r.raise_for_status()
-    dep_mapping = {}
+
     for received in r.json():
         pkg = Package(received)
         pkg['repo'] = pkg['repo_url'].split('/')[-1]
         pkgs.append(pkg)
-        for repo, names in pkg['packages'].items():
-            for name in names:
+
+    # extract the package mapping
+    dep_mapping = {}
+    for pkg in pkgs:
+        for build in pkg['builds'].values():
+            for name in build['packages']:
                 dep_mapping[name] = pkg
 
     # link up dependencies with the real package in the queue
     for pkg in pkgs:
-        ver_depends: Dict[str, Set[Package]] = {}
-        for repo, deps in pkg['depends'].items():
-            for dep in deps:
-                ver_depends.setdefault(repo, set()).add(dep_mapping[dep])
-        pkg['ext-depends'] = ver_depends
+        for build in pkg['builds'].values():
+            ver_depends: Dict[str, Set[Package]] = {}
+            for repo, deps in build['depends'].items():
+                for dep in deps:
+                    ver_depends.setdefault(repo, set()).add(dep_mapping[dep])
+            build['ext-depends'] = ver_depends
 
     # reverse dependencies
     for pkg in pkgs:
-        r_depends: Dict[str, Set[Package]] = {}
-        for pkg2 in pkgs:
-            for repo, deps in pkg2['ext-depends'].items():
-                if pkg in deps:
-                    for r_repo in pkg2['packages'].keys():
-                        r_depends.setdefault(r_repo, set()).add(pkg2)
-        pkg['ext-rdepends'] = r_depends
+        for build in pkg['builds'].values():
+            r_depends: Dict[str, Set[Package]] = {}
+            for pkg2 in pkgs:
+                for r_repo, build2 in pkg2['builds'].items():
+                    for repo, deps in build2['ext-depends'].items():
+                        if pkg in deps:
+                            r_depends.setdefault(r_repo, set()).add(pkg2)
+            build['ext-rdepends'] = r_depends
 
     return pkgs
 
