@@ -32,7 +32,7 @@ import io
 from datetime import datetime, timezone
 from enum import Enum
 from hashlib import sha256
-from typing import Generator, Union, AnyStr, List, Any, Dict, Tuple, Set, Optional
+from typing import Generator, Union, AnyStr, List, Any, Dict, Tuple, Set, Optional, Sequence
 
 
 class Config:
@@ -215,14 +215,14 @@ def get_current_run_urls() -> Optional[Dict[str, str]]:
     return None
 
 
-def run_cmd(msys2_root: _PathLike, args: List[_PathLike], **kwargs: Any) -> None:
+def run_cmd(msys2_root: _PathLike, args: Sequence[_PathLike], **kwargs: Any) -> None:
     executable = os.path.join(msys2_root, 'usr', 'bin', 'bash.exe')
     env = clean_environ(kwargs.pop("env", os.environ.copy()))
     env["CHERE_INVOKING"] = "1"
     env["MSYSTEM"] = "MSYS"
     env["MSYS2_PATH_TYPE"] = "minimal"
 
-    def shlex_join(split_command: List[str]) -> str:
+    def shlex_join(split_command: Sequence[str]) -> str:
         # shlex.join got added in 3.8 while we support 3.6
         return ' '.join(shlex.quote(arg) for arg in split_command)
 
@@ -388,15 +388,18 @@ def staging_dependencies(
         builddir: _PathLike) -> Generator:
     repo = get_repo()
 
-    def add_to_repo(repo_root, repo_type, asset):
-        repo_dir = Path(repo_root) / get_repo_subdir(repo_type, asset)
+    def add_to_repo(repo_root: str, repo_type: str, assets: List[GitReleaseAsset]) -> None:
+        repo_dir = Path(repo_root) / repo_type
         os.makedirs(repo_dir, exist_ok=True)
-        print(f"Downloading {get_asset_filename(asset)}...")
-        package_path = os.path.join(repo_dir, get_asset_filename(asset))
-        download_asset(asset, package_path)
 
-        repo_name = "autobuild-" + (
-            str(get_repo_subdir(repo_type, asset)).replace("/", "-").replace("\\", "-"))
+        package_paths = []
+        for asset in assets:
+            print(f"Downloading {get_asset_filename(asset)}...")
+            package_path = os.path.join(repo_dir, get_asset_filename(asset))
+            download_asset(asset, package_path)
+            package_paths.append(package_path)
+
+        repo_name = f"autobuild-{repo_type}"
         repo_db_path = os.path.join(repo_dir, f"{repo_name}.db.tar.gz")
 
         conf = get_python_path(msys2_root, "/etc/pacman.conf")
@@ -411,8 +414,9 @@ SigLevel=Never
 """)
                     h2.write(text)
 
-        run_cmd(msys2_root, ["repo-add", to_pure_posix_path(repo_db_path),
-                             to_pure_posix_path(package_path)], cwd=repo_dir)
+        args: List[_PathLike] = ["repo-add", to_pure_posix_path(repo_db_path)]
+        args += [to_pure_posix_path(p) for p in package_paths]
+        run_cmd(msys2_root, args, cwd=repo_dir)
 
     def get_cached_assets(
             repo: Repository, release_name: str, *, _cache={}) -> List[GitReleaseAsset]:
@@ -427,7 +431,7 @@ SigLevel=Never
         shutil.rmtree(repo_root, ignore_errors=True)
         os.makedirs(repo_root, exist_ok=True)
         with backup_pacman_conf(msys2_root):
-            to_add = []
+            to_add: Dict[str, List[GitReleaseAsset]] = {}
             for dep_type, deps in pkg.get_depends(build_type).items():
                 for dep in deps:
                     repo_type = dep.get_repo_type()
@@ -435,13 +439,13 @@ SigLevel=Never
                     for pattern in dep.get_build_patterns(dep_type):
                         for asset in assets:
                             if fnmatch.fnmatch(get_asset_filename(asset), pattern):
-                                to_add.append((repo_type, asset))
+                                to_add.setdefault(repo_type, []).append(asset)
                                 break
                         else:
                             raise SystemExit(f"asset for {pattern} in {repo_type} not found")
 
-            for repo_type, asset in to_add:
-                add_to_repo(repo_root, repo_type, asset)
+            for repo_type, assets in to_add.items():
+                add_to_repo(repo_root, repo_type, assets)
 
             # in case they are already installed we need to upgrade
             run_cmd(msys2_root, ["pacman", "--noconfirm", "-Suy"])
