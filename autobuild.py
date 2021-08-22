@@ -178,19 +178,20 @@ class Package(dict):
                 build_types.append("msys-src")
         return build_types
 
-    def get_depends(self, build_type: str) -> "Set[Package]":
-        build = self._get_build(build_type)
-        ext_deps = set()
-        for repo, deps in build.get('ext-depends', {}).items():
-            ext_deps.update(deps)
-        return ext_deps
+    def _get_dep_build(self, build_type: str) -> Dict:
+        if build_type == "mingw-src":
+            build_type = Config.MINGW_SRC_ARCH
+        elif build_type == "msys-src":
+            build_type = "msys"
+        return self._get_build(build_type)
 
-    def get_rdepends(self, build_type: str) -> "Set[Package]":
-        build = self._get_build(build_type)
-        ext_rdeps = set()
-        for repo, deps in build.get('ext-rdepends', {}).items():
-            ext_rdeps.update(deps)
-        return ext_rdeps
+    def get_depends(self, build_type: str) -> "Dict[str, Set[Package]]":
+        build = self._get_dep_build(build_type)
+        return build.get('ext-depends', {})
+
+    def get_rdepends(self, build_type: str) -> "Dict[str, Set[Package]]":
+        build = self._get_dep_build(build_type)
+        return build.get('ext-rdepends', {})
 
     def get_repo_type(self) -> str:
         return "msys" if self['repo'].startswith('MSYS2') else "mingw"
@@ -381,30 +382,6 @@ def backup_pacman_conf(msys2_root: _PathLike) -> Generator:
         os.replace(backup, conf)
 
 
-def build_type_to_dep_types(build_type: str) -> List[str]:
-    if build_type == "mingw-src":
-        build_type = Config.MINGW_SRC_ARCH
-    elif build_type == "msys-src":
-        build_type = "msys"
-
-    if build_type == "msys":
-        return [build_type]
-    else:
-        return ["msys", build_type]
-
-
-def build_type_to_rdep_types(build_type: str) -> List[str]:
-    if build_type == "mingw-src":
-        build_type = Config.MINGW_SRC_ARCH
-    elif build_type == "msys-src":
-        build_type = "msys"
-
-    if build_type == "msys":
-        return [build_type] + Config.MINGW_ARCH_LIST
-    else:
-        return [build_type]
-
-
 @contextmanager
 def staging_dependencies(
         build_type: str, pkg: Package, msys2_root: _PathLike,
@@ -451,8 +428,8 @@ SigLevel=Never
         os.makedirs(repo_root, exist_ok=True)
         with backup_pacman_conf(msys2_root):
             to_add = []
-            for dep_type in build_type_to_dep_types(build_type):
-                for dep in pkg.get_depends(dep_type):
+            for dep_type, deps in pkg.get_depends(build_type).items():
+                for dep in deps:
                     repo_type = dep.get_repo_type()
                     assets = get_cached_assets(repo, "staging-" + repo_type)
                     for pattern in dep.get_build_patterns(dep_type):
@@ -761,8 +738,8 @@ def get_buildqueue_with_status(full_details: bool = False) -> List[Package]:
             status = pkg.get_status(build_type)
             if status == PackageStatus.WAITING_FOR_BUILD:
                 missing_deps = set()
-                for dep_type in build_type_to_dep_types(build_type):
-                    for dep in pkg.get_depends(dep_type):
+                for dep_type, deps in pkg.get_depends(build_type).items():
+                    for dep in deps:
                         dep_status = dep.get_status(dep_type)
                         if dep_status != PackageStatus.FINISHED:
                             missing_deps.add(dep)
@@ -783,15 +760,15 @@ def get_buildqueue_with_status(full_details: bool = False) -> List[Package]:
                         continue
 
                     missing_deps = set()
-                    for dep_type in build_type_to_dep_types(build_type):
-                        for dep in pkg.get_depends(dep_type):
+                    for dep_type, deps in pkg.get_depends(build_type).items():
+                        for dep in deps:
                             dep_status = dep.get_status(dep_type)
                             if dep_status != PackageStatus.FINISHED:
                                 missing_deps.add(dep)
 
                     missing_rdeps = set()
-                    for dep_type in build_type_to_rdep_types(build_type):
-                        for dep in pkg.get_rdepends(dep_type):
+                    for dep_type, deps in pkg.get_rdepends(build_type).items():
+                        for dep in deps:
                             if dep["name"] in Config.IGNORE_RDEP_PACKAGES or \
                                     (build_type != dep_type and dep_type in Config.BUILD_TYPES_WIP):
                                 continue
