@@ -70,12 +70,8 @@ class Config:
 
     IGNORE_RDEP_PACKAGES: List[str] = [
         "mingw-w64-mlpack",
-        "mingw-w64-qemu",
-        "mingw-w64-usbmuxd",
         "mingw-w64-arm-none-eabi-gcc",
-        "mingw-w64-tolua",
-        "mingw-w64-kirigami2-qt5",
-        "mingw-w64-libgda",
+        "mingw-w64-kirigami2-qt5"
     ]
     """XXX: These would in theory block rdeps, but no one fixed them, so we ignore them"""
 
