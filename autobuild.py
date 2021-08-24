@@ -58,15 +58,13 @@ class Config:
     SOFT_JOB_TIMEOUT = 60 * 60 * 4
     """Runtime after which we shouldn't start a new build"""
 
-    MANUAL_BUILD: List[str] = [
-        'mingw-w64-firebird-git',
-        'mingw-w64-qt5-static',
-        'mingw-w64-arm-none-eabi-gcc',
+    MANUAL_BUILD: List[Tuple[str, List[str]]] = [
+        ('mingw-w64-firebird-git', []),
+        ('mingw-w64-qt5-static', ['mingw32', 'mingw64', 'ucrt64']),
+        ('mingw-w64-arm-none-eabi-gcc', []),
+        ('*', ['clangarm64']),
     ]
-    """Packages that take too long to build, and should be handled manually"""
-
-    MANUAL_BUILD_TYPE: List[str] = ['clangarm64']
-    """Build types that can't be built in CI"""
+    """Packages that take too long to build, or can't be build and should be handled manually"""
 
     IGNORE_RDEP_PACKAGES: List[str] = [
         "mingw-w64-mlpack",
@@ -725,7 +723,11 @@ def get_buildqueue_with_status(full_details: bool = False) -> List[Package]:
     def pkg_is_manual(build_type: str, pkg: Package) -> bool:
         if build_type_is_src(build_type):
             return False
-        return pkg['name'] in Config.MANUAL_BUILD or build_type in Config.MANUAL_BUILD_TYPE
+        for pattern, types in Config.MANUAL_BUILD:
+            type_matches = not types or build_type in types
+            if type_matches and fnmatch.fnmatchcase(pkg['name'], pattern):
+                return True
+        return False
 
     pkgs = get_buildqueue()
 
