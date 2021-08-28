@@ -15,7 +15,6 @@ from github.Workflow import Workflow
 from pathlib import Path, PurePosixPath, PurePath
 from subprocess import check_call
 import subprocess
-from sys import stdout
 import fnmatch
 import traceback
 from tabulate import tabulate
