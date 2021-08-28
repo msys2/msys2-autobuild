@@ -246,12 +246,10 @@ def fresh_git_repo(url: str, path: _PathLike) -> Generator:
 @contextmanager
 def gha_group(title: str) -> Generator:
     print(f'\n::group::{title}')
-    stdout.flush()
     try:
         yield
     finally:
         print('::endgroup::')
-        stdout.flush()
 
 
 class BuildError(Exception):
@@ -354,7 +352,7 @@ def upload_asset(release: GitRelease, path: _PathLike, replace: bool = False,
         if can_try_upload_again():
             upload()
 
-    print(f"Uploaded {asset_name} as {asset_label}", flush=True)
+    print(f"Uploaded {asset_name} as {asset_label}")
 
 
 def get_python_path(msys2_root: _PathLike, msys2_path: _PathLike) -> Path:
@@ -400,7 +398,7 @@ def staging_dependencies(
         with ThreadPoolExecutor(8) as executor:
             for i, item in enumerate(executor.map(fetch_item, todo)):
                 asset_path, asset = item
-                print(f"[{i + 1}/{len(todo)}] {get_asset_filename(asset)}", flush=True)
+                print(f"[{i + 1}/{len(todo)}] {get_asset_filename(asset)}")
                 package_paths.append(asset_path)
 
         repo_name = f"autobuild-{repo_type}"
@@ -1399,9 +1397,8 @@ def wait_for_api_limit_reset(
                 wait = min_sleep
             elif wait > max_sleep:
                 wait = max_sleep
-            print(f"Too few API calls left, waiting for {wait} seconds", flush=True)
+            print(f"Too few API calls left, waiting for {wait} seconds")
             time.sleep(wait)
-    stdout.flush()
 
 
 def clean_environ(environ: Dict[str, str]) -> Dict[str, str]:

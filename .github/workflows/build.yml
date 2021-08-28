@@ -46,7 +46,7 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         GITHUB_TOKEN_READONLY: ${{ secrets.GITHUBTOKENREADONLY }}
       run: |
-        python autobuild.py write-build-plan build_plan.json
+        python -u autobuild.py write-build-plan build_plan.json
         $buildPlan = Get-Content build_plan.json -Raw
         echo "::set-output name=build-plan::$buildPlan"
 
@@ -56,7 +56,7 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         GITHUB_TOKEN_READONLY: ${{ secrets.GITHUBTOKENREADONLY }}
       run: |
-        python autobuild.py clean-assets
+        python -u autobuild.py clean-assets
 
     - name: Show build queue
       if: steps.check.outputs.build-plan != '[]'
@@ -64,7 +64,7 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         GITHUB_TOKEN_READONLY: ${{ secrets.GITHUBTOKENREADONLY }}
       run: |
-        python autobuild.py show
+        python -u autobuild.py show
 
   build:
     needs: schedule
@@ -145,4 +145,4 @@ jobs:
         $BUILD_ROOT='C:\_'
         $MSYS2_ROOT=(msys2 -c 'cygpath -w /')
         Get-PSDrive -PSProvider FileSystem
-        python autobuild.py build ${{ matrix.build-args }} "$MSYS2_ROOT" "$BUILD_ROOT"
+        python -u autobuild.py build ${{ matrix.build-args }} "$MSYS2_ROOT" "$BUILD_ROOT"
