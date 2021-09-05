@@ -60,16 +60,14 @@ class Config:
     MANUAL_BUILD: List[Tuple[str, List[str]]] = [
         ('mingw-w64-firebird-git', []),
         ('mingw-w64-qt5-static', ['mingw32', 'mingw64', 'ucrt64']),
-        ('mingw-w64-arm-none-eabi-gcc', []),
+        ('
+         ', []),
         ('*', ['clangarm64']),
     ]
     """Packages that take too long to build, or can't be build and should be handled manually"""
 
     IGNORE_RDEP_PACKAGES: List[str] = [
         "mingw-w64-mlpack",
-        "mingw-w64-arm-none-eabi-gcc",
-        "mingw-w64-kirigami2-qt5",
-        "mingw-w64-plasma-framework-qt5",
     ]
     """XXX: These would in theory block rdeps, but no one fixed them, so we ignore them"""
 
