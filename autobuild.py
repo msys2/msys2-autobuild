@@ -60,8 +60,7 @@ class Config:
     MANUAL_BUILD: List[Tuple[str, List[str]]] = [
         ('mingw-w64-firebird-git', []),
         ('mingw-w64-qt5-static', ['mingw32', 'mingw64', 'ucrt64']),
-        ('
-         ', []),
+        ('mingw-w64-arm-none-eabi-gcc', []),
         ('*', ['clangarm64']),
     ]
     """Packages that take too long to build, or can't be build and should be handled manually"""
