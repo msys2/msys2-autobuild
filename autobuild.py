@@ -37,7 +37,6 @@ from typing import Generator, Union, AnyStr, List, Any, Dict, Tuple, Set, Option
 ArchType = Literal["mingw32", "mingw64", "ucrt64", "clang64", "clang32", "clangarm64", "msys"]
 SourceType = Literal["mingw-src", "msys-src"]
 BuildType = Union[ArchType, SourceType]
-RepoType = Literal["mingw", "msys"]
 
 
 class Config:
@@ -189,9 +188,6 @@ class Package(dict):
     def get_rdepends(self, build_type: BuildType) -> "Dict[ArchType, Set[Package]]":
         build = self._get_dep_build(build_type)
         return build.get('ext-rdepends', {})
-
-    def get_repo_type(self) -> RepoType:
-        return "msys" if self['repo'].startswith('MSYS2') else "mingw"
 
 
 def get_current_run_urls() -> Optional[Dict[str, str]]:
@@ -383,8 +379,8 @@ def staging_dependencies(
         builddir: _PathLike) -> Generator:
     repo = get_repo()
 
-    def add_to_repo(repo_root: str, repo_type: str, assets: List[GitReleaseAsset]) -> None:
-        repo_dir = Path(repo_root) / repo_type
+    def add_to_repo(repo_root: str, repo_name: str, assets: List[GitReleaseAsset]) -> None:
+        repo_dir = Path(repo_root) / repo_name
         os.makedirs(repo_dir, exist_ok=True)
 
         todo = []
@@ -404,7 +400,7 @@ def staging_dependencies(
                 print(f"[{i + 1}/{len(todo)}] {get_asset_filename(asset)}")
                 package_paths.append(asset_path)
 
-        repo_name = f"autobuild-{repo_type}"
+        repo_name = f"autobuild-{repo_name}"
         repo_db_path = os.path.join(repo_dir, f"{repo_name}.db.tar.gz")
 
         conf = get_python_path(msys2_root, "/etc/pacman.conf")
@@ -423,34 +419,26 @@ SigLevel=Never
         args += [to_pure_posix_path(p) for p in package_paths]
         run_cmd(msys2_root, args, cwd=repo_dir)
 
-    def get_cached_assets(
-            repo: Repository, release_name: str, *, _cache={}) -> List[GitReleaseAsset]:
-        key = (repo.full_name, release_name)
-        if key not in _cache:
-            release = get_release(repo, release_name)
-            _cache[key] = get_release_assets(release)
-        return _cache[key]
-
+    cached_assets = CachedAssets(repo)
     repo_root = os.path.join(builddir, "_REPO")
     try:
         shutil.rmtree(repo_root, ignore_errors=True)
         os.makedirs(repo_root, exist_ok=True)
         with backup_pacman_conf(msys2_root):
-            to_add: Dict[str, List[GitReleaseAsset]] = {}
+            to_add: Dict[ArchType, List[GitReleaseAsset]] = {}
             for dep_type, deps in pkg.get_depends(build_type).items():
                 for dep in deps:
-                    repo_type = dep.get_repo_type()
-                    assets = get_cached_assets(repo, "staging-" + repo_type)
+                    assets = cached_assets.get_assets(dep_type)
                     for pattern in dep.get_build_patterns(dep_type):
                         for asset in assets:
                             if fnmatch.fnmatch(get_asset_filename(asset), pattern):
-                                to_add.setdefault(repo_type, []).append(asset)
+                                to_add.setdefault(dep_type, []).append(asset)
                                 break
                         else:
-                            raise SystemExit(f"asset for {pattern} in {repo_type} not found")
+                            raise SystemExit(f"asset for {pattern} in {dep_type} not found")
 
-            for repo_type, assets in to_add.items():
-                add_to_repo(repo_root, repo_type, assets)
+            for dep_type, assets in to_add.items():
+                add_to_repo(repo_root, dep_type, assets)
 
             # in case they are already installed we need to upgrade
             run_cmd(msys2_root, ["pacman", "--noconfirm", "-Suy"])
@@ -543,7 +531,7 @@ def build_package(build_type: BuildType, pkg: Package, msys2_root: _PathLike, bu
             raise BuildError(e)
         else:
             wait_for_api_limit_reset()
-            release = repo.get_release("staging-" + pkg.get_repo_type())
+            release = repo.get_release("staging-" + build_type)
             for path in to_upload:
                 upload_asset(release, path)
 
@@ -681,14 +669,30 @@ def get_release(repo: Repository, name: str, create: bool = True) -> GitRelease:
             return repo.create_git_release(name, name, name, prerelease=True)
 
 
+class CachedAssets:
+
+    def __init__(self, repo):
+        self._repo = repo
+        self._assets = {}
+        self._failed = None
+
+    def get_assets(self, build_type: BuildType) -> List[GitReleaseAsset]:
+        if build_type not in self._assets:
+            release = get_release(self._repo, 'staging-' + build_type)
+            self._assets[build_type] = get_release_assets(release)
+        return self._assets[build_type]
+
+    def get_failed_assets(self) -> List[GitReleaseAsset]:
+        if self._failed is None:
+            release = get_release(self._repo, 'staging-failed')
+            self._failed = get_release_assets(release)
+        return self._failed
+
+
 def get_buildqueue_with_status(full_details: bool = False) -> List[Package]:
     repo = get_repo()
-    assets = []
-    for name in ["msys", "mingw"]:
-        release = get_release(repo, 'staging-' + name)
-        assets.extend(get_release_assets(release))
-    release = get_release(repo, 'staging-failed')
-    assets_failed = get_release_assets(release)
+    cached_assets = CachedAssets(repo)
+    assets_failed = cached_assets.get_failed_assets()
 
     failed_urls = {}
     if full_details:
@@ -701,7 +705,7 @@ def get_buildqueue_with_status(full_details: bool = False) -> List[Package]:
                     failed_urls[get_asset_filename(asset)] = result["urls"]
 
     def pkg_is_done(build_type: BuildType, pkg: Package) -> bool:
-        done_names = [get_asset_filename(a) for a in assets]
+        done_names = [get_asset_filename(a) for a in cached_assets.get_assets(build_type)]
         for pattern in pkg.get_build_patterns(build_type):
             if not fnmatch.filter(done_names, pattern):
                 return False
@@ -1099,33 +1103,15 @@ def show_build(args: Any) -> None:
     show_table("DONE", done)
 
 
-def get_repo_subdir(type_: RepoType, asset: GitReleaseAsset) -> Path:
-    entry = get_asset_filename(asset)
-    t = Path(type_)
-    if type_ == "msys":
-        if fnmatch.fnmatch(entry, '*.pkg.tar.*'):
-            return t / "x86_64"
-        elif fnmatch.fnmatch(entry, '*.src.tar.*'):
-            return t / "sources"
-        else:
-            raise Exception("unknown file type")
-    elif type_ == "mingw":
-        if fnmatch.fnmatch(entry, '*.src.tar.*'):
-            return t / "sources"
-        elif entry.startswith("mingw-w64-x86_64-"):
-            return t / "x86_64"
-        elif entry.startswith("mingw-w64-i686-"):
-            return t / "i686"
-        elif entry.startswith("mingw-w64-ucrt-x86_64-"):
-            return t / "ucrt64"
-        elif entry.startswith("mingw-w64-clang-x86_64-"):
-            return t / "clang64"
-        elif entry.startswith("mingw-w64-clang-i686-"):
-            return t / "clang32"
-        elif entry.startswith("mingw-w64-clang-aarch64-"):
-            return t / "clangarm64"
-        else:
-            raise Exception("unknown file type")
+def get_repo_subdir(build_type: BuildType) -> Path:
+    if build_type == "msys":
+        return Path("msys") / "x86_64"
+    elif build_type == "msys-src":
+        return Path("msys") / "sources"
+    elif build_type == "mingw-src":
+        return Path("mingw") / "sources"
+    elif build_type in Config.MINGW_ARCH_LIST:
+        return Path("mingw") / build_type
     else:
         raise Exception("unknown type")
 
@@ -1146,9 +1132,8 @@ def upload_assets(args: Any) -> None:
             raise SystemExit(f"Package '{package_name}' not in the queue, check the 'show' command")
         pkgs = [pkg]
 
-    patterns = []
+    pattern_entries = []
     for pkg in pkgs:
-        repo_type = pkg.get_repo_type()
         for build_type in pkg.get_build_types():
             status = pkg.get_status(build_type)
 
@@ -1157,20 +1142,22 @@ def upload_assets(args: Any) -> None:
                           PackageStatus.FINISHED_BUT_INCOMPLETE):
                 continue
 
-            patterns.extend(pkg.get_build_patterns(build_type))
+            pattern_entries.append((build_type, pkg.get_build_patterns(build_type)))
 
     print(f"Looking for the following files in {src_dir}:")
-    for pattern in patterns:
-        print("  ", pattern)
+    for build_type, patterns in pattern_entries:
+        for pattern in patterns:
+            print("  ", pattern)
 
     matches = []
-    for pattern in patterns:
-        for match in glob.glob(os.path.join(src_dir, pattern)):
-            matches.append(match)
+    for build_type, patterns in pattern_entries:
+        for pattern in patterns:
+            for match in glob.glob(os.path.join(src_dir, pattern)):
+                matches.append((build_type, match))
     print(f"Found {len(matches)} files..")
 
-    release = get_release(repo, 'staging-' + repo_type)
-    for match in matches:
+    for build_type, match in matches:
+        release = get_release(repo, 'staging-' + build_type)
         print(f"Uploading {match}")
         if not args.dry_run:
             upload_asset(release, match)
@@ -1182,30 +1169,29 @@ def fetch_assets(args: Any) -> None:
     target_dir = os.path.abspath(args.targetdir)
     fetch_all = args.fetch_all
 
-    all_patterns: Dict[RepoType, List[str]] = {}
+    all_patterns: Dict[BuildType, List[str]] = {}
     all_blocked = []
     for pkg in get_buildqueue_with_status():
-        repo_type = pkg.get_repo_type()
         for build_type in pkg.get_build_types():
             status = pkg.get_status(build_type)
             pkg_patterns = pkg.get_build_patterns(build_type)
             if status == PackageStatus.FINISHED:
-                all_patterns.setdefault(repo_type, []).extend(pkg_patterns)
+                all_patterns.setdefault(build_type, []).extend(pkg_patterns)
             elif status in [PackageStatus.FINISHED_BUT_BLOCKED,
                             PackageStatus.FINISHED_BUT_INCOMPLETE]:
                 if fetch_all:
-                    all_patterns.setdefault(repo_type, []).extend(pkg_patterns)
+                    all_patterns.setdefault(build_type, []).extend(pkg_patterns)
                 else:
                     all_blocked.append(
                         (pkg["name"], build_type, pkg.get_status_details(build_type)))
 
     all_assets = {}
-    assets_to_download: Dict[RepoType, List[GitReleaseAsset]] = {}
-    for repo_type, patterns in all_patterns.items():
-        if repo_type not in all_assets:
-            release = get_release(repo, 'staging-' + repo_type)
-            all_assets[repo_type] = get_release_assets(release)
-        assets = all_assets[repo_type]
+    cached_assets = CachedAssets(repo)
+    assets_to_download: Dict[BuildType, List[GitReleaseAsset]] = {}
+    for build_type, patterns in all_patterns.items():
+        if build_type not in all_assets:
+            all_assets[build_type] = cached_assets.get_assets(build_type)
+        assets = all_assets[build_type]
 
         assets_mapping: Dict[str, List[GitReleaseAsset]] = {}
         for asset in assets:
@@ -1215,12 +1201,12 @@ def fetch_assets(args: Any) -> None:
             matches = fnmatch.filter(assets_mapping.keys(), pattern)
             if matches:
                 found = assets_mapping[matches[0]]
-                assets_to_download.setdefault(repo_type, []).extend(found)
+                assets_to_download.setdefault(build_type, []).extend(found)
 
     to_fetch = {}
-    for repo_type, assets in assets_to_download.items():
+    for build_type, assets in assets_to_download.items():
         for asset in assets:
-            asset_dir = Path(target_dir) / get_repo_subdir(repo_type, asset)
+            asset_dir = Path(target_dir) / get_repo_subdir(build_type)
             asset_path = asset_dir / get_asset_filename(asset)
             to_fetch[str(asset_path)] = asset
 
@@ -1305,8 +1291,10 @@ def get_assets_to_delete(repo: Repository) -> List[GitReleaseAsset]:
 
     print("Fetching assets...")
     assets: Dict[str, List[GitReleaseAsset]] = {}
-    for release_name in ['staging-msys', 'staging-mingw', 'staging-failed']:
-        release = get_release(repo, release_name)
+    all_build_types: List[BuildType] = ["msys", "msys-src", "mingw-src"]
+    all_build_types.extend(Config.MINGW_ARCH_LIST)
+    for build_type in all_build_types:
+        release = get_release(repo, "staging-" + build_type)
         for asset in get_release_assets(release, include_incomplete=True):
             assets.setdefault(get_asset_filename(asset), []).append(asset)
 
