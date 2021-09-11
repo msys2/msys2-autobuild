@@ -31,7 +31,13 @@ import io
 from datetime import datetime, timezone
 from enum import Enum
 from hashlib import sha256
-from typing import Generator, Union, AnyStr, List, Any, Dict, Tuple, Set, Optional, Sequence
+from typing import Generator, Union, AnyStr, List, Any, Dict, Tuple, Set, Optional, Sequence, Literal
+
+
+ArchType = Literal["mingw32", "mingw64", "ucrt64", "clang64", "clang32", "clangarm64", "msys"]
+SourceType = Literal["mingw-src", "msys-src"]
+BuildType = Union[ArchType, SourceType]
+RepoType = Literal["mingw", "msys"]
 
 
 class Config:
@@ -45,10 +51,10 @@ class Config:
     ]
     """Users that are allowed to upload assets. This is checked at download time"""
 
-    MINGW_ARCH_LIST = ["mingw32", "mingw64", "ucrt64", "clang64", "clang32", "clangarm64"]
+    MINGW_ARCH_LIST: List[ArchType] = ["mingw32", "mingw64", "ucrt64", "clang64", "clang32", "clangarm64"]
     """Arches we try to build"""
 
-    MINGW_SRC_ARCH = "mingw64"
+    MINGW_SRC_ARCH: ArchType = "mingw64"
     """The arch that is used to build the source package (any mingw one should work)"""
 
     REPO = "msys2/msys2-autobuild"
@@ -57,7 +63,7 @@ class Config:
     SOFT_JOB_TIMEOUT = 60 * 60 * 4
     """Runtime after which we shouldn't start a new build"""
 
-    MANUAL_BUILD: List[Tuple[str, List[str]]] = [
+    MANUAL_BUILD: List[Tuple[str, List[BuildType]]] = [
         ('mingw-w64-firebird-git', []),
         ('mingw-w64-qt5-static', ['mingw32', 'mingw64', 'ucrt64']),
         ('mingw-w64-arm-none-eabi-gcc', []),
@@ -70,7 +76,7 @@ class Config:
     ]
     """XXX: These would in theory block rdeps, but no one fixed them, so we ignore them"""
 
-    BUILD_TYPES_WIP: List[str] = ["clangarm64"]
+    BUILD_TYPES_WIP: List[BuildType] = ["clangarm64"]
     """XXX: These build types don't block other things, even if they fail/don't get built"""
 
 
@@ -95,7 +101,7 @@ class PackageStatus(Enum):
         return self.value
 
 
-def build_type_is_src(build_type: str) -> bool:
+def build_type_is_src(build_type: BuildType) -> bool:
     return build_type in ["mingw-src", "msys-src"]
 
 
@@ -110,18 +116,18 @@ class Package(dict):
     def __eq__(self, other: object) -> bool:
         return self is other
 
-    def _get_build(self, build_type: str) -> Dict:
+    def _get_build(self, build_type: BuildType) -> Dict:
         return self["builds"].get(build_type, {})
 
-    def get_status(self, build_type: str) -> PackageStatus:
+    def get_status(self, build_type: BuildType) -> PackageStatus:
         build = self._get_build(build_type)
         return build.get("status", PackageStatus.UNKNOWN)
 
-    def get_status_details(self, build_type: str) -> Dict[str, Any]:
+    def get_status_details(self, build_type: BuildType) -> Dict[str, Any]:
         build = self._get_build(build_type)
         return build.get("status_details", {})
 
-    def set_status(self, build_type: str, status: PackageStatus,
+    def set_status(self, build_type: BuildType, status: PackageStatus,
                    description: Optional[str] = None,
                    urls: Optional[Dict[str, str]] = None) -> None:
         build = self["builds"].setdefault(build_type, {})
@@ -133,11 +139,11 @@ class Package(dict):
             meta["urls"] = urls
         build["status_details"] = meta
 
-    def is_new(self, build_type: str) -> bool:
+    def is_new(self, build_type: BuildType) -> bool:
         build = self._get_build(build_type)
         return build.get("new", False)
 
-    def get_build_patterns(self, build_type: str) -> List[str]:
+    def get_build_patterns(self, build_type: BuildType) -> List[str]:
         patterns = []
         if build_type_is_src(build_type):
             patterns.append(f"{self['name']}-{self['version']}.src.tar.[!s]*")
@@ -148,7 +154,7 @@ class Package(dict):
             assert 0
         return patterns
 
-    def get_failed_names(self, build_type: str) -> List[str]:
+    def get_failed_names(self, build_type: BuildType) -> List[str]:
         names = []
         if build_type_is_src(build_type):
             names.append(f"{self['name']}-{self['version']}.failed")
@@ -159,7 +165,7 @@ class Package(dict):
             assert 0
         return names
 
-    def get_build_types(self) -> List[str]:
+    def get_build_types(self) -> List[BuildType]:
         build_types = [
             t for t in self["builds"] if t in (Config.MINGW_ARCH_LIST + ["msys"])]
         if self["source"]:
@@ -169,22 +175,22 @@ class Package(dict):
                 build_types.append("msys-src")
         return build_types
 
-    def _get_dep_build(self, build_type: str) -> Dict:
+    def _get_dep_build(self, build_type: BuildType) -> Dict:
         if build_type == "mingw-src":
             build_type = Config.MINGW_SRC_ARCH
         elif build_type == "msys-src":
             build_type = "msys"
         return self._get_build(build_type)
 
-    def get_depends(self, build_type: str) -> "Dict[str, Set[Package]]":
+    def get_depends(self, build_type: BuildType) -> "Dict[ArchType, Set[Package]]":
         build = self._get_dep_build(build_type)
         return build.get('ext-depends', {})
 
-    def get_rdepends(self, build_type: str) -> "Dict[str, Set[Package]]":
+    def get_rdepends(self, build_type: BuildType) -> "Dict[ArchType, Set[Package]]":
         build = self._get_dep_build(build_type)
         return build.get('ext-rdepends', {})
 
-    def get_repo_type(self) -> str:
+    def get_repo_type(self) -> RepoType:
         return "msys" if self['repo'].startswith('MSYS2') else "mingw"
 
 
@@ -373,7 +379,7 @@ def backup_pacman_conf(msys2_root: _PathLike) -> Generator:
 
 @contextmanager
 def staging_dependencies(
-        build_type: str, pkg: Package, msys2_root: _PathLike,
+        build_type: BuildType, pkg: Package, msys2_root: _PathLike,
         builddir: _PathLike) -> Generator:
     repo = get_repo()
 
@@ -455,7 +461,7 @@ SigLevel=Never
         run_cmd(msys2_root, ["pacman", "--noconfirm", "-Suuy"])
 
 
-def build_package(build_type: str, pkg: Package, msys2_root: _PathLike, builddir: _PathLike) -> None:
+def build_package(build_type: BuildType, pkg: Package, msys2_root: _PathLike, builddir: _PathLike) -> None:
     assert os.path.isabs(builddir)
     assert os.path.isabs(msys2_root)
     os.makedirs(builddir, exist_ok=True)
@@ -694,28 +700,28 @@ def get_buildqueue_with_status(full_details: bool = False) -> List[Package]:
                 if result["urls"]:
                     failed_urls[get_asset_filename(asset)] = result["urls"]
 
-    def pkg_is_done(build_type: str, pkg: Package) -> bool:
+    def pkg_is_done(build_type: BuildType, pkg: Package) -> bool:
         done_names = [get_asset_filename(a) for a in assets]
         for pattern in pkg.get_build_patterns(build_type):
             if not fnmatch.filter(done_names, pattern):
                 return False
         return True
 
-    def get_failed_urls(build_type: str, pkg: Package) -> Optional[Dict[str, str]]:
+    def get_failed_urls(build_type: BuildType, pkg: Package) -> Optional[Dict[str, str]]:
         failed_names = [get_asset_filename(a) for a in assets_failed]
         for name in pkg.get_failed_names(build_type):
             if name in failed_names:
                 return failed_urls.get(name)
         return None
 
-    def pkg_has_failed(build_type: str, pkg: Package) -> bool:
+    def pkg_has_failed(build_type: BuildType, pkg: Package) -> bool:
         failed_names = [get_asset_filename(a) for a in assets_failed]
         for name in pkg.get_failed_names(build_type):
             if name in failed_names:
                 return True
         return False
 
-    def pkg_is_manual(build_type: str, pkg: Package) -> bool:
+    def pkg_is_manual(build_type: BuildType, pkg: Package) -> bool:
         if build_type_is_src(build_type):
             return False
         for pattern, types in Config.MANUAL_BUILD:
@@ -802,7 +808,7 @@ def get_buildqueue_with_status(full_details: bool = False) -> List[Package]:
 
         # Block packages where not every build type is finished
         for pkg in pkgs:
-            unfinished = []
+            unfinished: List[str] = []
             blocked = []
             finished = []
             for build_type in pkg.get_build_types():
@@ -842,9 +848,12 @@ def get_buildqueue_with_status(full_details: bool = False) -> List[Package]:
     return pkgs
 
 
+BuildFrom = Literal["start", "middle", "end"]
+
+
 def get_package_to_build(
-        pkgs: List[Package], build_types: Optional[List[str]],
-        build_from: str) -> Optional[Tuple[Package, str]]:
+        pkgs: List[Package], build_types: Optional[List[BuildType]],
+        build_from: BuildFrom) -> Optional[Tuple[Package, BuildType]]:
 
     can_build = []
     for pkg in pkgs:
@@ -1090,7 +1099,7 @@ def show_build(args: Any) -> None:
     show_table("DONE", done)
 
 
-def get_repo_subdir(type_: str, asset: GitReleaseAsset) -> Path:
+def get_repo_subdir(type_: RepoType, asset: GitReleaseAsset) -> Path:
     entry = get_asset_filename(asset)
     t = Path(type_)
     if type_ == "msys":
@@ -1173,7 +1182,7 @@ def fetch_assets(args: Any) -> None:
     target_dir = os.path.abspath(args.targetdir)
     fetch_all = args.fetch_all
 
-    all_patterns: Dict[str, List[str]] = {}
+    all_patterns: Dict[RepoType, List[str]] = {}
     all_blocked = []
     for pkg in get_buildqueue_with_status():
         repo_type = pkg.get_repo_type()
@@ -1191,7 +1200,7 @@ def fetch_assets(args: Any) -> None:
                         (pkg["name"], build_type, pkg.get_status_details(build_type)))
 
     all_assets = {}
-    assets_to_download: Dict[str, List[GitReleaseAsset]] = {}
+    assets_to_download: Dict[RepoType, List[GitReleaseAsset]] = {}
     for repo_type, patterns in all_patterns.items():
         if repo_type not in all_assets:
             release = get_release(repo, 'staging-' + repo_type)
