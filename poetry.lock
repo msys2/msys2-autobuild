@@ -30,7 +30,7 @@ unicode_backport = ["unicodedata2"]
 
 [[package]]
 name = "deprecated"
-version = "1.2.12"
+version = "1.2.13"
 description = "Python @deprecated decorator to deprecate old python classes, functions or methods."
 category = "main"
 optional = false
@@ -66,7 +66,7 @@ python-versions = ">=3.5"
 
 [[package]]
 name = "importlib-metadata"
-version = "4.6.3"
+version = "4.8.1"
 description = "Read metadata from Python packages"
 category = "dev"
 optional = false
@@ -249,7 +249,7 @@ python-versions = "*"
 
 [[package]]
 name = "types-tabulate"
-version = "0.1.1"
+version = "0.8.2"
 description = "Typing stubs for tabulate"
 category = "dev"
 optional = false
@@ -257,7 +257,7 @@ python-versions = "*"
 
 [[package]]
 name = "typing-extensions"
-version = "3.10.0.0"
+version = "3.10.0.2"
 description = "Backported and Experimental Type Hints for Python 3.5+"
 category = "dev"
 optional = false
@@ -299,7 +299,7 @@ testing = ["pytest (>=4.6)", "pytest-checkdocs (>=2.4)", "pytest-flake8", "pytes
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.6"
-content-hash = "949ba5583377753b9f73581d5d4e96a2351c5f2f305dfcf9701b8a3898a37d15"
+content-hash = "a8be1afbf9b1024e645cec17e0fed49c40c1ece29b9d9246e8cff1e31520f3c7"
 
 [metadata.files]
 certifi = [
@@ -358,8 +358,8 @@ charset-normalizer = [
     {file = "charset_normalizer-2.0.4-py3-none-any.whl", hash = "sha256:0c8911edd15d19223366a194a513099a302055a962bca2cec0f54b8b63175d8b"},
 ]
 deprecated = [
-    {file = "Deprecated-1.2.12-py2.py3-none-any.whl", hash = "sha256:08452d69b6b5bc66e8330adde0a4f8642e969b9e1702904d137eeb29c8ffc771"},
-    {file = "Deprecated-1.2.12.tar.gz", hash = "sha256:6d2de2de7931a968874481ef30208fd4e08da39177d61d3d4ebdf4366e7dbca1"},
+    {file = "Deprecated-1.2.13-py2.py3-none-any.whl", hash = "sha256:64756e3e14c8c5eea9795d93c524551432a0be75629f8f29e67ab8caf076c76d"},
+    {file = "Deprecated-1.2.13.tar.gz", hash = "sha256:43ac5335da90c31c24ba028af536a91d41d53f9e6901ddb021bcc572ce44e38d"},
 ]
 flake8 = [
     {file = "flake8-3.9.2-py2.py3-none-any.whl", hash = "sha256:bf8fd333346d844f616e8d47905ef3a3384edae6b4e9beb0c5101e25e3110907"},
@@ -370,8 +370,8 @@ idna = [
     {file = "idna-3.2.tar.gz", hash = "sha256:467fbad99067910785144ce333826c71fb0e63a425657295239737f7ecd125f3"},
 ]
 importlib-metadata = [
-    {file = "importlib_metadata-4.6.3-py3-none-any.whl", hash = "sha256:51c6635429c77cf1ae634c997ff9e53ca3438b495f10a55ba28594dd69764a8b"},
-    {file = "importlib_metadata-4.6.3.tar.gz", hash = "sha256:0645585859e9a6689c523927a5032f2ba5919f1f7d0e84bd4533312320de1ff9"},
+    {file = "importlib_metadata-4.8.1-py3-none-any.whl", hash = "sha256:b618b6d2d5ffa2f16add5697cf57a46c76a56229b0ed1c438322e4e95645bd15"},
+    {file = "importlib_metadata-4.8.1.tar.gz", hash = "sha256:f284b3e11256ad1e5d03ab86bb2ccd6f5339688ff17a4d797a0fe7df326f23b1"},
 ]
 mccabe = [
     {file = "mccabe-0.6.1-py2.py3-none-any.whl", hash = "sha256:ab8a6258860da4b6677da4bd2fe5dc2c659cff31b3ee4f7f5d64e79735b80d42"},
@@ -499,13 +499,13 @@ types-requests = [
     {file = "types_requests-2.25.6-py3-none-any.whl", hash = "sha256:a5a305b43ea57bf64d6731f89816946a405b591eff6de28d4c0fd58422cee779"},
 ]
 types-tabulate = [
-    {file = "types-tabulate-0.1.1.tar.gz", hash = "sha256:d1a415a8601391bc8450a669402ad57a1b620acf8d8d206fcbb3accc1440b106"},
-    {file = "types_tabulate-0.1.1-py2.py3-none-any.whl", hash = "sha256:34a4900c32a56db8c7e5a1c8857332e8d02fe45077ea0ed53a3a12a10cbdbd0c"},
+    {file = "types-tabulate-0.8.2.tar.gz", hash = "sha256:6dbad23ccb92562fcc420c4402799fbb14dfc1cb288bffa84f389d0b12120ba6"},
+    {file = "types_tabulate-0.8.2-py3-none-any.whl", hash = "sha256:456c8066f1ae8ae445a0484aaff9f30d6293e1cb84e8b15e3ad939047c8508bf"},
 ]
 typing-extensions = [
-    {file = "typing_extensions-3.10.0.0-py2-none-any.whl", hash = "sha256:0ac0f89795dd19de6b97debb0c6af1c70987fd80a2d62d1958f7e56fcc31b497"},
-    {file = "typing_extensions-3.10.0.0-py3-none-any.whl", hash = "sha256:779383f6086d90c99ae41cf0ff39aac8a7937a9283ce0a414e5dd782f4c94a84"},
-    {file = "typing_extensions-3.10.0.0.tar.gz", hash = "sha256:50b6f157849174217d0656f99dc82fe932884fb250826c18350e159ec6cdf342"},
+    {file = "typing_extensions-3.10.0.2-py2-none-any.whl", hash = "sha256:d8226d10bc02a29bcc81df19a26e56a9647f8b0a6d4a83924139f4a8b01f17b7"},
+    {file = "typing_extensions-3.10.0.2-py3-none-any.whl", hash = "sha256:f1d25edafde516b146ecd0613dabcc61409817af4766fbbcfb8d1ad4ec441a34"},
+    {file = "typing_extensions-3.10.0.2.tar.gz", hash = "sha256:49f75d16ff11f1cd258e1b988ccff82a3ca5570217d7ad8c5f48205dd99a677e"},
 ]
 urllib3 = [
     {file = "urllib3-1.26.6-py2.py3-none-any.whl", hash = "sha256:39fb8672126159acb139a7718dd10806104dec1e2f0f6c88aab05d17df10c8d4"},
