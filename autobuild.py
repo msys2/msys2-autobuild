@@ -427,8 +427,8 @@ SigLevel=Never
         with backup_pacman_conf(msys2_root):
             to_add: Dict[ArchType, List[GitReleaseAsset]] = {}
             for dep_type, deps in pkg.get_depends(build_type).items():
+                assets = cached_assets.get_assets(dep_type)
                 for dep in deps:
-                    assets = cached_assets.get_assets(dep_type)
                     for pattern in dep.get_build_patterns(dep_type):
                         for asset in assets:
                             if fnmatch.fnmatch(get_asset_filename(asset), pattern):
