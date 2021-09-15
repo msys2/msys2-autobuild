@@ -1280,7 +1280,7 @@ def get_assets_to_delete(repo: Repository) -> List[GitReleaseAsset]:
 
     print("Fetching assets...")
     assets: Dict[str, List[GitReleaseAsset]] = {}
-    all_build_types: List[BuildType] = ["msys", "msys-src", "mingw-src"]
+    all_build_types: List[BuildType] = ["msys", "msys-src", "mingw-src", "failed"]
     all_build_types.extend(Config.MINGW_ARCH_LIST)
     for build_type in all_build_types:
         release = get_release(repo, "staging-" + build_type)
