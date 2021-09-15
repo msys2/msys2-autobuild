@@ -1280,12 +1280,16 @@ def get_assets_to_delete(repo: Repository) -> List[GitReleaseAsset]:
 
     print("Fetching assets...")
     assets: Dict[str, List[GitReleaseAsset]] = {}
-    all_build_types: List[BuildType] = ["msys", "msys-src", "mingw-src", "failed"]
+    all_build_types: List[BuildType] = ["msys", "msys-src", "mingw-src"]
     all_build_types.extend(Config.MINGW_ARCH_LIST)
     for build_type in all_build_types:
         release = get_release(repo, "staging-" + build_type)
         for asset in get_release_assets(release, include_incomplete=True):
             assets.setdefault(get_asset_filename(asset), []).append(asset)
+
+    release = get_release(repo, "staging-failed")
+    for asset in get_release_assets(release, include_incomplete=True):
+        assets.setdefault(get_asset_filename(asset), []).append(asset)
 
     for pattern in patterns:
         for key in fnmatch.filter(assets.keys(), pattern):
