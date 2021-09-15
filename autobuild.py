@@ -153,16 +153,8 @@ class Package(dict):
             assert 0
         return patterns
 
-    def get_failed_names(self, build_type: BuildType) -> List[str]:
-        names = []
-        if build_type_is_src(build_type):
-            names.append(f"{self['name']}-{self['version']}.failed")
-        elif build_type in (Config.MINGW_ARCH_LIST + ["msys"]):
-            for item in self._get_build(build_type).get('packages', []):
-                names.append(f"{item}-{self['version']}.failed")
-        else:
-            assert 0
-        return names
+    def get_failed_name(self, build_type: BuildType) -> str:
+        return f"{build_type}-{self['name']}-{self['version']}.failed"
 
     def get_build_types(self) -> List[BuildType]:
         build_types = [
@@ -521,12 +513,11 @@ def build_package(build_type: BuildType, pkg: Package, msys2_root: _PathLike, bu
             wait_for_api_limit_reset()
             release = get_release(repo, "staging-failed")
             run_urls = get_current_run_urls()
-            for entry in pkg.get_failed_names(build_type):
-                failed_data = {}
-                if run_urls is not None:
-                    failed_data["urls"] = run_urls
-                content = json.dumps(failed_data).encode()
-                upload_asset(release, entry, text=True, content=content)
+            failed_data = {}
+            if run_urls is not None:
+                failed_data["urls"] = run_urls
+            content = json.dumps(failed_data).encode()
+            upload_asset(release, pkg.get_failed_name(build_type), text=True, content=content)
 
             raise BuildError(e)
         else:
@@ -713,17 +704,15 @@ def get_buildqueue_with_status(full_details: bool = False) -> List[Package]:
 
     def get_failed_urls(build_type: BuildType, pkg: Package) -> Optional[Dict[str, str]]:
         failed_names = [get_asset_filename(a) for a in assets_failed]
-        for name in pkg.get_failed_names(build_type):
-            if name in failed_names:
-                return failed_urls.get(name)
+        name = pkg.get_failed_name(build_type)
+        if name in failed_names:
+            return failed_urls.get(name)
         return None
 
     def pkg_has_failed(build_type: BuildType, pkg: Package) -> bool:
         failed_names = [get_asset_filename(a) for a in assets_failed]
-        for name in pkg.get_failed_names(build_type):
-            if name in failed_names:
-                return True
-        return False
+        name = pkg.get_failed_name(build_type)
+        return name in failed_names
 
     def pkg_is_manual(build_type: BuildType, pkg: Package) -> bool:
         if build_type_is_src(build_type):
@@ -1286,7 +1275,7 @@ def get_assets_to_delete(repo: Repository) -> List[GitReleaseAsset]:
     patterns = []
     for pkg in get_buildqueue():
         for build_type in pkg.get_build_types():
-            patterns.extend(pkg.get_failed_names(build_type))
+            patterns.append(pkg.get_failed_name(build_type))
             patterns.extend(pkg.get_build_patterns(build_type))
 
     print("Fetching assets...")
@@ -1331,13 +1320,13 @@ def clear_failed_state(args: Any) -> None:
     failed_map = dict((get_asset_filename(a), a) for a in assets_failed)
 
     for pkg in get_buildqueue_with_status():
-        for name in pkg.get_failed_names(build_type):
-            if name in failed_map:
-                asset = failed_map[name]
-                print(f"Deleting {get_asset_filename(asset)}...")
-                if not args.dry_run:
-                    with make_writable(asset):
-                        asset.delete_asset()
+        name = pkg.get_failed_name(build_type)
+        if name in failed_map:
+            asset = failed_map[name]
+            print(f"Deleting {get_asset_filename(asset)}...")
+            if not args.dry_run:
+                with make_writable(asset):
+                    asset.delete_asset()
 
 
 def get_credentials(readonly: bool = True) -> Dict[str, Any]:
