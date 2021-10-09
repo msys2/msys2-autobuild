@@ -124,7 +124,7 @@ class Package(dict):
 
     def get_status_details(self, build_type: BuildType) -> Dict[str, Any]:
         build = self._get_build(build_type)
-        return build.get("status_details", {})
+        return dict(build.get("status_details", {}))
 
     def set_status(self, build_type: BuildType, status: PackageStatus,
                    description: Optional[str] = None,
@@ -137,6 +137,24 @@ class Package(dict):
         if urls:
             meta["urls"] = urls
         build["status_details"] = meta
+
+    def set_blocked(
+            self, build_type: BuildType, status: PackageStatus,
+            dep: "Package", dep_type: BuildType):
+        dep_details = dep.get_status_details(dep_type)
+        dep_blocked = dep_details.get("blocked", {})
+        details = self.get_status_details(build_type)
+        blocked = details.get("blocked", {})
+        if dep_blocked:
+            blocked = dict(dep_blocked)
+        else:
+            blocked.setdefault(dep, set()).add(dep_type)
+        descs = []
+        for pkg, types in blocked.items():
+            descs.append("%s (%s)" % (pkg["name"], "/".join(types)))
+        self.set_status(build_type, status, "Blocked by: " + ", ".join(descs))
+        build = self._get_build(build_type)
+        build.setdefault("status_details", {})["blocked"] = blocked
 
     def is_new(self, build_type: BuildType) -> bool:
         build = self._get_build(build_type)
@@ -743,15 +761,13 @@ def get_buildqueue_with_status(full_details: bool = False) -> List[Package]:
         for build_type in pkg.get_build_types():
             status = pkg.get_status(build_type)
             if status == PackageStatus.WAITING_FOR_BUILD:
-                missing_deps = set()
+
                 for dep_type, deps in pkg.get_depends(build_type).items():
                     for dep in deps:
                         dep_status = dep.get_status(dep_type)
                         if dep_status != PackageStatus.FINISHED:
-                            missing_deps.add(dep)
-                if missing_deps:
-                    desc = f"Waiting for: {', '.join(sorted(d['name'] for d in missing_deps))}"
-                    pkg.set_status(build_type, PackageStatus.WAITING_FOR_DEPENDENCIES, desc)
+                            pkg.set_blocked(
+                                build_type, PackageStatus.WAITING_FOR_DEPENDENCIES, dep, dep_type)
 
     # Block packages where not all deps/rdeps/related are finished
     changed = True
@@ -765,14 +781,14 @@ def get_buildqueue_with_status(full_details: bool = False) -> List[Package]:
                     if build_type_is_src(build_type):
                         continue
 
-                    missing_deps = set()
                     for dep_type, deps in pkg.get_depends(build_type).items():
                         for dep in deps:
                             dep_status = dep.get_status(dep_type)
                             if dep_status != PackageStatus.FINISHED:
-                                missing_deps.add(dep)
+                                pkg.set_blocked(
+                                    build_type, PackageStatus.FINISHED_BUT_BLOCKED, dep, dep_type)
+                                changed = True
 
-                    missing_rdeps = set()
                     for dep_type, deps in pkg.get_rdepends(build_type).items():
                         for dep in deps:
                             if dep["name"] in Config.IGNORE_RDEP_PACKAGES or \
@@ -782,26 +798,13 @@ def get_buildqueue_with_status(full_details: bool = False) -> List[Package]:
                             dep_new = dep.is_new(dep_type)
                             # if the rdep isn't in the repo we can't break it by uploading
                             if dep_status != PackageStatus.FINISHED and not dep_new:
-                                missing_rdeps.add(dep)
-
-                    descs = []
-                    if missing_deps:
-                        desc = (f"Waiting on dependencies: "
-                                f"{ ', '.join(sorted(p['name'] for p in missing_deps)) }")
-                        descs.append(desc)
-                    if missing_rdeps:
-                        desc = (f"Waiting on reverse dependencies: "
-                                f"{ ', '.join(sorted(p['name'] for p in missing_rdeps)) }")
-                        descs.append(desc)
-
-                    if descs:
-                        changed = True
-                        pkg.set_status(
-                            build_type, PackageStatus.FINISHED_BUT_BLOCKED, ". ".join(descs))
+                                pkg.set_blocked(
+                                    build_type, PackageStatus.FINISHED_BUT_BLOCKED, dep, dep_type)
+                                changed = True
 
         # Block packages where not every build type is finished
         for pkg in pkgs:
-            unfinished: List[str] = []
+            unfinished = []
             blocked = []
             finished = []
             for build_type in pkg.get_build_types():
@@ -821,22 +824,25 @@ def get_buildqueue_with_status(full_details: bool = False) -> List[Package]:
             # packages will not change anything, so block them.
             if not blocked and not unfinished and finished and \
                     all(build_type_is_src(bt) for bt in finished):
-                unfinished.append("any")
-
-            if unfinished:
                 for build_type in pkg.get_build_types():
                     status = pkg.get_status(build_type)
                     if status in (PackageStatus.FINISHED, PackageStatus.FINISHED_BUT_BLOCKED):
-                        desc = f"Missing related builds: {', '.join(sorted(unfinished))}"
                         changed = True
-                        pkg.set_status(build_type, PackageStatus.FINISHED_BUT_INCOMPLETE, desc)
+                        pkg.set_status(build_type, PackageStatus.FINISHED_BUT_INCOMPLETE)
+            elif unfinished:
+                for build_type in pkg.get_build_types():
+                    status = pkg.get_status(build_type)
+                    if status in (PackageStatus.FINISHED, PackageStatus.FINISHED_BUT_BLOCKED):
+                        changed = True
+                        for bt in unfinished:
+                            pkg.set_blocked(build_type, PackageStatus.FINISHED_BUT_INCOMPLETE, pkg, bt)
             elif blocked:
                 for build_type in pkg.get_build_types():
                     status = pkg.get_status(build_type)
                     if status == PackageStatus.FINISHED:
-                        desc = f"Related build blocked: {', '.join(sorted(blocked))}"
                         changed = True
-                        pkg.set_status(build_type, PackageStatus.FINISHED_BUT_BLOCKED, desc)
+                        for bt in blocked:
+                            pkg.set_blocked(build_type, PackageStatus.FINISHED_BUT_BLOCKED, pkg, bt)
 
     return pkgs
 
@@ -1028,6 +1034,7 @@ def update_status(pkgs: List[Package]) -> None:
         pkg_result = {}
         for build_type in pkg.get_build_types():
             details = pkg.get_status_details(build_type)
+            details.pop("blocked", None)
             details["status"] = pkg.get_status(build_type).value
             details["version"] = pkg["version"]
             pkg_result[build_type] = details
@@ -1070,6 +1077,7 @@ def show_build(args: Any) -> None:
         for build_type in pkg.get_build_types():
             status = pkg.get_status(build_type)
             details = pkg.get_status_details(build_type)
+            details.pop("blocked", None)
             if status == PackageStatus.WAITING_FOR_BUILD:
                 todo.append((pkg, build_type, status, details))
             elif status in (PackageStatus.FINISHED, PackageStatus.FINISHED_BUT_BLOCKED,
