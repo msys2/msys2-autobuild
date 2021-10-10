@@ -65,7 +65,6 @@ class Config:
     MANUAL_BUILD: List[Tuple[str, List[BuildType]]] = [
         ('mingw-w64-firebird-git', []),
         ('mingw-w64-qt5-static', ['mingw32', 'mingw64', 'ucrt64']),
-        ('mingw-w64-qt6-static', []),
         ('mingw-w64-arm-none-eabi-gcc', []),
         ('*', ['clangarm64']),
     ]
