@@ -73,6 +73,8 @@ class Config:
 
     IGNORE_RDEP_PACKAGES: List[str] = [
         "mingw-w64-mlpack",
+        'mingw-w64-qt5-static',
+        'mingw-w64-qt6-static'
     ]
     """XXX: These would in theory block rdeps, but no one fixed them, so we ignore them"""
 
