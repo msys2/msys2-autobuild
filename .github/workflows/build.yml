@@ -142,7 +142,7 @@ jobs:
         GITHUB_RUN_NAME: ${{ matrix.name }}
       run: |
         $env:PACKAGER='CI (msys2-autobuild/' + $env:GITHUB_SHA.Substring(0, 8) + '/' + $env:GITHUB_RUN_ID + ')'
-        $BUILD_ROOT='C:\_'
+        $BUILD_ROOT='C:'
         $MSYS2_ROOT=(msys2 -c 'cygpath -w /')
         Get-PSDrive -PSProvider FileSystem
         python -u autobuild.py build ${{ matrix.build-args }} "$MSYS2_ROOT" "$BUILD_ROOT"
