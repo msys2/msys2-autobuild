@@ -107,6 +107,7 @@ jobs:
         msystem: MSYS
         update: true
         install: ${{ matrix.packages }}
+        location: 'D:\A'
 
     - name: Switch to the main mirror
       shell: msys2 {0}
