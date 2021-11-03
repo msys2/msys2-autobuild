@@ -1169,6 +1169,7 @@ def fetch_assets(args: Any) -> None:
     repo = get_repo()
     target_dir = os.path.abspath(args.targetdir)
     fetch_all = args.fetch_all
+    fetch_complete = args.fetch_complete
 
     all_patterns: Dict[BuildType, List[str]] = {}
     all_blocked = []
@@ -1180,7 +1181,7 @@ def fetch_assets(args: Any) -> None:
                 all_patterns.setdefault(build_type, []).extend(pkg_patterns)
             elif status in [PackageStatus.FINISHED_BUT_BLOCKED,
                             PackageStatus.FINISHED_BUT_INCOMPLETE]:
-                if fetch_all:
+                if fetch_all or (fetch_complete and status != PackageStatus.FINISHED_BUT_INCOMPLETE):
                     all_patterns.setdefault(build_type, []).extend(pkg_patterns)
                 else:
                     all_blocked.append(
@@ -1266,7 +1267,8 @@ def fetch_assets(args: Any) -> None:
           f"blocked: {len(all_blocked)} (related builds missing)")
 
     print("Pass --verbose to see the list of blocked packages.")
-    print("Pass --fetch-all to also fetch blocked packages.")
+    print("Pass --fetch-complete to also fetch blocked but complete packages")
+    print("Pass --fetch-all to fetch all packages.")
     print("Pass --delete to clear the target directory")
 
     def fetch_item(item):
@@ -1457,6 +1459,9 @@ def main(argv: List[str]) -> None:
         help="Don't actually download, just show what would be done")
     sub.add_argument(
         "--fetch-all", action="store_true", help="Fetch all packages, even blocked ones")
+    sub.add_argument(
+        "--fetch-complete", action="store_true",
+        help="Fetch all packages, even blocked ones, except incomplete ones")
     sub.set_defaults(func=fetch_assets)
 
     sub = subparser.add_parser(
