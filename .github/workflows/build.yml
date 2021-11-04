@@ -20,6 +20,11 @@ jobs:
 
     steps:
 
+    - name: Runner details
+      run: |
+        Get-PSDrive -PSProvider FileSystem
+        Get-CIMInstance -Class Win32_Processor | Select-Object -Property Name
+
     - uses: actions/checkout@v2
 
     - uses: actions/setup-python@v2
@@ -29,9 +34,9 @@ jobs:
     - uses: actions/cache@v2
       with:
         path: ~\AppData\Local\pip\Cache
-        key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+        key: ${{ runner.os }}-${{ runner.arch }}-pip-${{ hashFiles('**/requirements.txt') }}
         restore-keys: |
-          ${{ runner.os }}-pip-
+          ${{ runner.os }}-${{ runner.arch }}-pip-
 
     - name: Install deps
       env:
@@ -80,19 +85,24 @@ jobs:
 
     steps:
 
+    - name: Runner details
+      run: |
+        Get-PSDrive -PSProvider FileSystem
+        Get-CIMInstance -Class Win32_Processor | Select-Object -Property Name
+
     - uses: actions/checkout@v2
 
     - uses: actions/setup-python@v2
       with:
         python-version: '3.8'
-        architecture: ${{ startsWith(matrix.name, 'clangarm') && 'x86' || 'x64' }}
+        architecture: ${{ runner.arch == 'ARM64' && 'x86' || 'x64' }}
 
     - uses: actions/cache@v2
       with:
         path: ~\AppData\Local\pip\Cache
-        key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+        key: ${{ runner.os }}-${{ runner.arch }}-pip-${{ hashFiles('**/requirements.txt') }}
         restore-keys: |
-          ${{ runner.os }}-pip-
+          ${{ runner.os }}-${{ runner.arch }}-pip-
 
     - name: Install deps
       env:
@@ -101,7 +111,7 @@ jobs:
         python -m pip install --user 'wheel==0.36.2'
         python -m pip install --user -r requirements.txt
 
-    # Note that released ARM64 requires x86 msys, but this will install x64
+    # Note that ARM64 prior to Win11 requires x86 msys, but this will install x64
     - uses: msys2/setup-msys2@v2
       with:
         msystem: MSYS
@@ -145,5 +155,4 @@ jobs:
         $env:PACKAGER='CI (msys2-autobuild/' + $env:GITHUB_SHA.Substring(0, 8) + '/' + $env:GITHUB_RUN_ID + ')'
         $BUILD_ROOT='C:\'
         $MSYS2_ROOT=(msys2 -c 'cygpath -w /')
-        Get-PSDrive -PSProvider FileSystem
         python -u autobuild.py build ${{ matrix.build-args }} "$MSYS2_ROOT" "$BUILD_ROOT"
