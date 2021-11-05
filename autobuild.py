@@ -72,7 +72,6 @@ class Config:
     """Packages that take too long to build, or can't be build and should be handled manually"""
 
     IGNORE_RDEP_PACKAGES: List[str] = [
-        "mingw-w64-mlpack",
         'mingw-w64-qt5-static',
         'mingw-w64-qt6-static',
         'mingw-w64-zig',
