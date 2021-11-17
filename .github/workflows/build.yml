@@ -95,7 +95,8 @@ jobs:
     - uses: actions/setup-python@v2
       with:
         python-version: '3.8'
-        architecture: ${{ runner.arch == 'ARM64' && 'x86' || 'x64' }}
+        # Note that ARM64 prior to Win11 requires x86, but this will install x64
+        architecture: 'x64'
 
     - uses: actions/cache@v2
       with:
@@ -118,6 +119,7 @@ jobs:
         update: true
         install: ${{ matrix.packages }}
         location: 'D:\A'
+        release: ${{ runner.arch == 'ARM64' && 'false' || 'true' }}
 
     - name: Switch to the main mirror
       shell: msys2 {0}
