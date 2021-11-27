@@ -12,7 +12,7 @@ requests = "^2.25.1"
 
 [tool.poetry.dev-dependencies]
 mypy = "^0.910"
-flake8 = "^3.8.4"
+flake8 = "^4.0.1"
 types-tabulate = "^0.8.2"
 types-requests = "^2.25.0"
 
