@@ -891,6 +891,7 @@ def get_workflow() -> Workflow:
 
 
 def get_job_meta() -> List[Dict[str, Any]]:
+    hosted_runner = "windows-2022"
     job_meta: List[Dict[str, Any]] = [
         {
             "build-types": ["mingw64"],
@@ -898,7 +899,7 @@ def get_job_meta() -> List[Dict[str, Any]]:
                 "packages": "base-devel mingw-w64-x86_64-toolchain git",
                 "build-args": "--build-types mingw64",
                 "name": "mingw64",
-                "runner": "windows-latest"
+                "runner": hosted_runner
             }
         }, {
             "build-types": ["mingw32"],
@@ -906,7 +907,7 @@ def get_job_meta() -> List[Dict[str, Any]]:
                 "packages": "base-devel mingw-w64-i686-toolchain git",
                 "build-args": "--build-types mingw32",
                 "name": "mingw32",
-                "runner": "windows-latest"
+                "runner": hosted_runner
             }
         }, {
             "build-types": ["ucrt64"],
@@ -914,7 +915,7 @@ def get_job_meta() -> List[Dict[str, Any]]:
                 "packages": "base-devel mingw-w64-ucrt-x86_64-toolchain git",
                 "build-args": "--build-types ucrt64",
                 "name": "ucrt64",
-                "runner": "windows-latest"
+                "runner": hosted_runner
             }
         }, {
             "build-types": ["clang64"],
@@ -922,7 +923,7 @@ def get_job_meta() -> List[Dict[str, Any]]:
                 "packages": "base-devel mingw-w64-clang-x86_64-toolchain git",
                 "build-args": "--build-types clang64",
                 "name": "clang64",
-                "runner": "windows-latest"
+                "runner": hosted_runner
             }
         }, {
             "build-types": ["clang32"],
@@ -930,7 +931,7 @@ def get_job_meta() -> List[Dict[str, Any]]:
                 "packages": "base-devel git",
                 "build-args": "--build-types clang32",
                 "name": "clang32",
-                "runner": "windows-latest"
+                "runner": hosted_runner
             }
         }, {
             "build-types": ["clangarm64"],
@@ -946,7 +947,7 @@ def get_job_meta() -> List[Dict[str, Any]]:
                 "packages": "base-devel msys2-devel VCS",
                 "build-args": "--build-types msys,msys-src",
                 "name": "msys",
-                "runner": "windows-latest"
+                "runner": hosted_runner
             }
         }
     ]

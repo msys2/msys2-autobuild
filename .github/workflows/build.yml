@@ -13,7 +13,7 @@ concurrency: nope
 jobs:
 
   schedule:
-    runs-on: windows-latest
+    runs-on: windows-2022
 
     outputs:
       build-plan: ${{ steps.check.outputs.build-plan }}
