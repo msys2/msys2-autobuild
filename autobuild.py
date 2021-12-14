@@ -944,7 +944,7 @@ def get_job_meta() -> List[Dict[str, Any]]:
         }, {
             "build-types": ["msys", "msys-src"],
             "matrix": {
-                "packages": "base-devel msys2-devel VCS",
+                "packages": "base-devel VCS",
                 "build-args": "--build-types msys,msys-src",
                 "name": "msys",
                 "runner": hosted_runner
