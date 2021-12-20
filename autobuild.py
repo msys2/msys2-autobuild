@@ -1175,6 +1175,8 @@ def fetch_assets(args: Any) -> None:
     all_blocked = []
     for pkg in get_buildqueue_with_status():
         for build_type in pkg.get_build_types():
+            if args.build_type and build_type not in args.build_type:
+                continue
             status = pkg.get_status(build_type)
             pkg_patterns = pkg.get_build_patterns(build_type)
             if status == PackageStatus.FINISHED:
@@ -1462,6 +1464,9 @@ def main(argv: List[str]) -> None:
     sub.add_argument(
         "--fetch-complete", action="store_true",
         help="Fetch all packages, even blocked ones, except incomplete ones")
+    sub.add_argument(
+        "-t", "--build-type", action="append",
+        help="Only fetch packages for given build type(s) (may be used more than once)")
     sub.set_defaults(func=fetch_assets)
 
     sub = subparser.add_parser(
