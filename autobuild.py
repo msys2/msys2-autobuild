@@ -56,8 +56,13 @@ class Config:
     MINGW_SRC_ARCH: ArchType = "mingw64"
     """The arch that is used to build the source package (any mingw one should work)"""
 
-    REPO = "msys2/msys2-autobuild"
+    MAIN_REPO = "msys2/msys2-autobuild"
     """The path of this repo (used for accessing the assets)"""
+
+    ASSETS_REPO: Dict[BuildType, str] = {
+        "clangarm64": "msys2-arm/msys2-autobuild",
+    }
+    """Fetch certain build types from other repos if available"""
 
     SOFT_JOB_TIMEOUT = 60 * 60 * 4
     """Runtime after which we shouldn't start a new build"""
@@ -209,7 +214,7 @@ def get_current_run_urls() -> Optional[Dict[str, str]]:
     if "GITHUB_SHA" in os.environ and "GITHUB_RUN_NAME" in os.environ:
         sha = os.environ["GITHUB_SHA"]
         run_name = os.environ["GITHUB_RUN_NAME"]
-        commit = get_repo().get_commit(sha)
+        commit = get_main_repo().get_commit(sha)
         check_runs = commit.get_check_runs(
             check_name=run_name, status="in_progress", filter="latest")
         for run in check_runs:
@@ -320,7 +325,7 @@ def download_text_asset(asset: GitReleaseAsset) -> str:
 def make_writable(obj: GithubObject) -> Generator:
     # XXX: This switches the read-only token with a potentially writable one
     old_requester = obj._requester  # type: ignore
-    repo = get_repo(readonly=False)
+    repo = get_main_repo(readonly=False)
     try:
         obj._requester = repo._requester  # type: ignore
         yield
@@ -390,7 +395,6 @@ def backup_pacman_conf(msys2_root: _PathLike) -> Generator:
 def staging_dependencies(
         build_type: BuildType, pkg: Package, msys2_root: _PathLike,
         builddir: _PathLike) -> Generator:
-    repo = get_repo()
 
     def add_to_repo(repo_root: str, repo_name: str, assets: List[GitReleaseAsset]) -> None:
         repo_dir = Path(repo_root) / repo_name
@@ -432,7 +436,7 @@ SigLevel=Never
         args += [to_pure_posix_path(p) for p in package_paths]
         run_cmd(msys2_root, args, cwd=repo_dir)
 
-    cached_assets = CachedAssets(repo)
+    cached_assets = CachedAssets()
     repo_root = os.path.join(builddir, "_REPO")
     try:
         shutil.rmtree(repo_root, ignore_errors=True)
@@ -471,7 +475,7 @@ def build_package(build_type: BuildType, pkg: Package, msys2_root: _PathLike, bu
     repo_dir = os.path.join(builddir, repo_name)
     to_upload: List[str] = []
 
-    repo = get_repo()
+    repo = get_main_repo()
 
     with staging_dependencies(build_type, pkg, msys2_root, builddir), \
             fresh_git_repo(pkg['repo_url'], repo_dir):
@@ -683,28 +687,41 @@ def get_release(repo: Repository, name: str, create: bool = True) -> GitRelease:
 
 class CachedAssets:
 
-    def __init__(self, repo):
-        self._repo = repo
+    def __init__(self):
         self._assets = {}
-        self._failed = None
+        self._repos = {}
+        self._failed = {}
+
+    def _get_repo(self, build_type: BuildType) -> Repository:
+        repo_name = Config.ASSETS_REPO.get(build_type, Config.MAIN_REPO)
+        if repo_name not in self._repos:
+            self._repos[repo_name] = get_github().get_repo(repo_name, lazy=True)
+        return self._repos[repo_name]
 
     def get_assets(self, build_type: BuildType) -> List[GitReleaseAsset]:
         if build_type not in self._assets:
-            release = get_release(self._repo, 'staging-' + build_type)
+            repo = self._get_repo(build_type)
+            release = get_release(repo, 'staging-' + build_type)
             self._assets[build_type] = get_release_assets(release)
         return self._assets[build_type]
 
-    def get_failed_assets(self) -> List[GitReleaseAsset]:
-        if self._failed is None:
-            release = get_release(self._repo, 'staging-failed')
-            self._failed = get_release_assets(release)
-        return self._failed
+    def get_failed_assets(self, build_type: BuildType) -> List[GitReleaseAsset]:
+        repo = self._get_repo(build_type)
+        key = repo.full_name
+        if key not in self._failed:
+            release = get_release(repo, 'staging-failed')
+            self._failed[key] = get_release_assets(release)
+        assets = self._failed[key]
+        # XXX: This depends on the format of the filename
+        return [a for a in assets if get_asset_filename(a).startswith(build_type + "-")]
 
 
 def get_buildqueue_with_status(full_details: bool = False) -> List[Package]:
-    repo = get_repo()
-    cached_assets = CachedAssets(repo)
-    assets_failed = cached_assets.get_failed_assets()
+    cached_assets = CachedAssets()
+
+    assets_failed = []
+    for build_type in get_all_build_types():
+        assets_failed.extend(cached_assets.get_failed_assets(build_type))
 
     failed_urls = {}
     if full_details:
@@ -882,7 +899,7 @@ def get_workflow() -> Workflow:
     workflow_name = os.environ.get("GITHUB_WORKFLOW", None)
     if workflow_name is None:
         raise Exception("GITHUB_WORKFLOW not set")
-    repo = get_repo()
+    repo = get_main_repo()
     for workflow in repo.get_workflows():
         if workflow.name == workflow_name:
             return workflow
@@ -1030,7 +1047,7 @@ def queue_website_update() -> None:
 
 
 def update_status(pkgs: List[Package]) -> None:
-    repo = get_repo()
+    repo = get_main_repo()
     release = get_release(repo, "status")
 
     results = {}
@@ -1118,7 +1135,7 @@ def get_repo_subdir(build_type: BuildType) -> Path:
 
 
 def upload_assets(args: Any) -> None:
-    repo = get_repo()
+    repo = get_main_repo()
     package_name = args.package
     src_dir = args.path
     src_dir = os.path.abspath(src_dir)
@@ -1166,7 +1183,6 @@ def upload_assets(args: Any) -> None:
 
 
 def fetch_assets(args: Any) -> None:
-    repo = get_repo()
     target_dir = os.path.abspath(args.targetdir)
     fetch_all = args.fetch_all
     fetch_complete = args.fetch_complete
@@ -1190,7 +1206,7 @@ def fetch_assets(args: Any) -> None:
                         (pkg["name"], build_type, pkg.get_status_details(build_type)))
 
     all_assets = {}
-    cached_assets = CachedAssets(repo)
+    cached_assets = CachedAssets()
     assets_to_download: Dict[BuildType, List[GitReleaseAsset]] = {}
     for build_type, patterns in all_patterns.items():
         if build_type not in all_assets:
@@ -1286,6 +1302,12 @@ def fetch_assets(args: Any) -> None:
     print("done")
 
 
+def get_all_build_types() -> List[BuildType]:
+    all_build_types: List[BuildType] = ["msys", "msys-src", "mingw-src"]
+    all_build_types.extend(Config.MINGW_ARCH_LIST)
+    return all_build_types
+
+
 def get_assets_to_delete(repo: Repository) -> List[GitReleaseAsset]:
     print("Fetching packages to build...")
     patterns = []
@@ -1296,9 +1318,7 @@ def get_assets_to_delete(repo: Repository) -> List[GitReleaseAsset]:
 
     print("Fetching assets...")
     assets: Dict[str, List[GitReleaseAsset]] = {}
-    all_build_types: List[BuildType] = ["msys", "msys-src", "mingw-src"]
-    all_build_types.extend(Config.MINGW_ARCH_LIST)
-    for build_type in all_build_types:
+    for build_type in get_all_build_types():
         release = get_release(repo, "staging-" + build_type)
         for asset in get_release_assets(release, include_incomplete=True):
             assets.setdefault(get_asset_filename(asset), []).append(asset)
@@ -1319,7 +1339,7 @@ def get_assets_to_delete(repo: Repository) -> List[GitReleaseAsset]:
 
 
 def clean_gha_assets(args: Any) -> None:
-    repo = get_repo()
+    repo = get_main_repo()
     assets = get_assets_to_delete(repo)
 
     for asset in assets:
@@ -1334,7 +1354,7 @@ def clean_gha_assets(args: Any) -> None:
 
 def clear_failed_state(args: Any) -> None:
     build_type = args.build_type
-    repo = get_repo()
+    repo = get_main_repo()
     release = get_release(repo, 'staging-failed')
     assets_failed = get_release_assets(release)
     failed_map = dict((get_asset_filename(a), a) for a in assets_failed)
@@ -1375,9 +1395,9 @@ def get_github(readonly: bool = True) -> Github:
     return gh
 
 
-def get_repo(readonly: bool = True) -> Repository:
+def get_main_repo(readonly: bool = True) -> Repository:
     gh = get_github(readonly=readonly)
-    return gh.get_repo(Config.REPO, lazy=True)
+    return gh.get_repo(Config.MAIN_REPO, lazy=True)
 
 
 def wait_for_api_limit_reset(
@@ -1423,7 +1443,8 @@ def main(argv: List[str]) -> None:
     parser.set_defaults(func=lambda *x: parser.print_help())
     parser.add_argument(
            "-R", "--repo", action="store",
-           help=f"msys2-autobuild repository to target (default '{Config.REPO}')", default=Config.REPO)
+           help=f"msys2-autobuild repository to target (default '{Config.MAIN_REPO}')",
+           default=Config.MAIN_REPO)
     subparser = parser.add_subparsers(title="subcommands")
 
     sub = subparser.add_parser("build", help="Build all packages")
@@ -1491,7 +1512,7 @@ def main(argv: List[str]) -> None:
     sub.set_defaults(func=clear_failed_state)
 
     args = parser.parse_args(argv[1:])
-    Config.REPO = args.repo
+    Config.MAIN_REPO = args.repo
     args.func(args)
 
 
