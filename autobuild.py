@@ -60,6 +60,14 @@ class Config:
     """The path of this repo (used for accessing the assets)"""
 
     ASSETS_REPO: Dict[BuildType, str] = {
+        "msys-src": "msys2/msys2-autobuild",
+        "msys": "msys2/msys2-autobuild",
+        "mingw-src": "msys2/msys2-autobuild",
+        "mingw32": "msys2/msys2-autobuild",
+        "mingw64": "msys2/msys2-autobuild",
+        "ucrt64": "msys2/msys2-autobuild",
+        "clang64": "msys2/msys2-autobuild",
+        "clang32": "msys2/msys2-autobuild",
         "clangarm64": "msys2-arm/msys2-autobuild",
     }
     """Fetch certain build types from other repos if available"""
@@ -692,7 +700,7 @@ class CachedAssets:
         self._failed = {}
 
     def _get_repo(self, build_type: BuildType) -> Repository:
-        repo_name = Config.ASSETS_REPO.get(build_type, Config.MAIN_REPO)
+        repo_name = Config.ASSETS_REPO[build_type]
         if repo_name not in self._repos:
             self._repos[repo_name] = get_github().get_repo(repo_name, lazy=True)
         return self._repos[repo_name]
@@ -1018,9 +1026,15 @@ def write_build_plan(args: Any) -> None:
         write_out([])
         return
 
+    available_build_types = set()
+    for build_type, repo_name in Config.ASSETS_REPO.items():
+        if repo_name == Config.MAIN_REPO:
+            available_build_types.add(build_type)
+
     jobs = []
     for job_info in get_job_meta():
-        matching_build_types = set(queued_build_types) & set(job_info["build-types"])
+        matching_build_types = \
+            set(queued_build_types) & set(job_info["build-types"]) & available_build_types
         if matching_build_types:
             build_count = sum(queued_build_types[bt] for bt in matching_build_types)
             jobs.append(job_info["matrix"])
