@@ -920,7 +920,7 @@ def get_job_meta() -> List[Dict[str, Any]]:
         {
             "build-types": ["mingw64"],
             "matrix": {
-                "packages": "base-devel mingw-w64-x86_64-toolchain git",
+                "packages": "base-devel git",
                 "build-args": "--build-types mingw64",
                 "name": "mingw64",
                 "runner": hosted_runner
@@ -928,7 +928,7 @@ def get_job_meta() -> List[Dict[str, Any]]:
         }, {
             "build-types": ["mingw32"],
             "matrix": {
-                "packages": "base-devel mingw-w64-i686-toolchain git",
+                "packages": "base-devel git",
                 "build-args": "--build-types mingw32",
                 "name": "mingw32",
                 "runner": hosted_runner
@@ -936,7 +936,7 @@ def get_job_meta() -> List[Dict[str, Any]]:
         }, {
             "build-types": ["ucrt64"],
             "matrix": {
-                "packages": "base-devel mingw-w64-ucrt-x86_64-toolchain git",
+                "packages": "base-devel git",
                 "build-args": "--build-types ucrt64",
                 "name": "ucrt64",
                 "runner": hosted_runner
@@ -944,7 +944,7 @@ def get_job_meta() -> List[Dict[str, Any]]:
         }, {
             "build-types": ["clang64"],
             "matrix": {
-                "packages": "base-devel mingw-w64-clang-x86_64-toolchain git",
+                "packages": "base-devel git",
                 "build-args": "--build-types clang64",
                 "name": "clang64",
                 "runner": hosted_runner

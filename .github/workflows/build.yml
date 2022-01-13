@@ -136,11 +136,6 @@ jobs:
         msys2 -c 'pacman --noconfirm -Suu'
         msys2 -c 'pacman -Qkq'
 
-    - name: Install extra packages
-      if: ${{ startsWith(matrix.name, 'clang32') || startsWith(matrix.name, 'clangarm64') }}
-      run: |
-        msys2 -c 'pacman --noconfirm -S --needed mingw-w64-clang-${{ startsWith(matrix.name, 'clangarm64') && 'aarch64' || 'i686' }}-toolchain'
-
     - name: Init git
       shell: msys2 {0}
       run: |
