@@ -136,12 +136,6 @@ jobs:
         msys2 -c 'pacman --noconfirm -Suu'
         msys2 -c 'pacman -Qkq'
 
-    - name: Init git
-      shell: msys2 {0}
-      run: |
-        git config --global user.email 'ci@msys2.org'
-        git config --global user.name 'MSYS2 Continuous Integration'
-
     - name: Process build queue
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
