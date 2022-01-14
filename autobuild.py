@@ -4,7 +4,6 @@ import sys
 import os
 import argparse
 import glob
-from os import environ
 from github import Github
 from github.GithubObject import GithubObject
 from github.GithubException import GithubException, UnknownObjectException
@@ -494,7 +493,7 @@ def build_package(build_type: BuildType, pkg: Package, msys2_root: _PathLike, bu
             run_cmd(msys2_root, ['bash', validpgpkeys], cwd=pkg_dir)
 
             if build_type == "mingw-src":
-                env = environ.copy()
+                env = os.environ.copy()
                 env['MINGW_ARCH'] = Config.MINGW_SRC_ARCH
                 run_cmd(msys2_root, [
                     'makepkg-mingw',
@@ -510,7 +509,7 @@ def build_package(build_type: BuildType, pkg: Package, msys2_root: _PathLike, bu
                     '--allsource'
                 ], cwd=pkg_dir)
             elif build_type in Config.MINGW_ARCH_LIST:
-                env = environ.copy()
+                env = os.environ.copy()
                 env['MINGW_ARCH'] = build_type
                 run_cmd(msys2_root, [
                     'makepkg-mingw',
@@ -1383,10 +1382,10 @@ def clear_failed_state(args: Any) -> None:
 
 
 def get_credentials(readonly: bool = True) -> Dict[str, Any]:
-    if readonly and environ.get("GITHUB_TOKEN_READONLY", ""):
-        return {'login_or_token': environ["GITHUB_TOKEN_READONLY"]}
-    elif "GITHUB_TOKEN" in environ:
-        return {'login_or_token': environ["GITHUB_TOKEN"]}
+    if readonly and os.environ.get("GITHUB_TOKEN_READONLY", ""):
+        return {'login_or_token': os.environ["GITHUB_TOKEN_READONLY"]}
+    elif "GITHUB_TOKEN" in os.environ:
+        return {'login_or_token': os.environ["GITHUB_TOKEN"]}
     else:
         if readonly:
             print("[Warning] 'GITHUB_TOKEN' or 'GITHUB_TOKEN_READONLY' env vars "
