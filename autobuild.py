@@ -935,7 +935,7 @@ def get_job_meta() -> List[Dict[str, Any]]:
         {
             "build-types": ["mingw64"],
             "matrix": {
-                "packages": "base-devel git",
+                "packages": "base-devel",
                 "build-args": "--build-types mingw64",
                 "name": "mingw64",
                 "runner": hosted_runner
@@ -943,7 +943,7 @@ def get_job_meta() -> List[Dict[str, Any]]:
         }, {
             "build-types": ["mingw32"],
             "matrix": {
-                "packages": "base-devel git",
+                "packages": "base-devel",
                 "build-args": "--build-types mingw32",
                 "name": "mingw32",
                 "runner": hosted_runner
@@ -951,7 +951,7 @@ def get_job_meta() -> List[Dict[str, Any]]:
         }, {
             "build-types": ["ucrt64"],
             "matrix": {
-                "packages": "base-devel git",
+                "packages": "base-devel",
                 "build-args": "--build-types ucrt64",
                 "name": "ucrt64",
                 "runner": hosted_runner
@@ -959,7 +959,7 @@ def get_job_meta() -> List[Dict[str, Any]]:
         }, {
             "build-types": ["clang64"],
             "matrix": {
-                "packages": "base-devel git",
+                "packages": "base-devel",
                 "build-args": "--build-types clang64",
                 "name": "clang64",
                 "runner": hosted_runner
@@ -967,7 +967,7 @@ def get_job_meta() -> List[Dict[str, Any]]:
         }, {
             "build-types": ["clang32"],
             "matrix": {
-                "packages": "base-devel git",
+                "packages": "base-devel",
                 "build-args": "--build-types clang32",
                 "name": "clang32",
                 "runner": hosted_runner
@@ -975,7 +975,7 @@ def get_job_meta() -> List[Dict[str, Any]]:
         }, {
             "build-types": ["clangarm64"],
             "matrix": {
-                "packages": "base-devel git",
+                "packages": "base-devel",
                 "build-args": "--build-types clangarm64",
                 "name": "clangarm64",
                 "runner": ["Windows", "ARM64"]
