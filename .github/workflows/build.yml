@@ -42,7 +42,7 @@ jobs:
       env:
         PIP_DISABLE_PIP_VERSION_CHECK: 1
       run: |
-        python -m pip install --user 'wheel==0.36.2'
+        python -m pip install --user 'wheel==0.37.1'
         python -m pip install --user -r requirements.txt
 
     - name: Check what we should run
@@ -109,7 +109,7 @@ jobs:
       env:
         PIP_DISABLE_PIP_VERSION_CHECK: 1
       run: |
-        python -m pip install --user 'wheel==0.36.2'
+        python -m pip install --user 'wheel==0.37.1'
         python -m pip install --user -r requirements.txt
 
     # Note that ARM64 prior to Win11 requires x86 msys, but this will install x64
