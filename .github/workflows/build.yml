@@ -148,7 +148,6 @@ jobs:
         GITHUB_TOKEN_READONLY: ${{ secrets.GITHUBTOKENREADONLY }}
         GITHUB_RUN_NAME: ${{ matrix.name }}
       run: |
-        $env:PACKAGER='CI (msys2-autobuild/' + $env:GITHUB_SHA.Substring(0, 8) + '/' + $env:GITHUB_RUN_ID + ')'
         $BUILD_ROOT='C:\'
         $MSYS2_ROOT=(msys2 -c 'cygpath -w /')
         python -u autobuild.py build ${{ matrix.build-args }} "$MSYS2_ROOT" "$BUILD_ROOT"

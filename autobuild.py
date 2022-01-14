@@ -473,7 +473,15 @@ SigLevel=Never
 
 
 def get_build_environ() -> Dict[str, str]:
-    return os.environ.copy()
+    environ = os.environ.copy()
+
+    # Set PACKAGER for makepkg
+    packager_ref = Config.MAIN_REPO
+    if "GITHUB_SHA" in environ and "GITHUB_RUN_ID" in environ:
+        packager_ref += "/" + environ["GITHUB_SHA"][:8] + "/" + environ["GITHUB_RUN_ID"]
+    environ["PACKAGER"] = f"CI ({packager_ref})"
+
+    return environ
 
 
 def build_package(build_type: BuildType, pkg: Package, msys2_root: _PathLike, builddir: _PathLike) -> None:
