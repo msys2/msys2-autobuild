@@ -472,6 +472,10 @@ SigLevel=Never
         run_cmd(msys2_root, ["pacman", "--noconfirm", "-Suuy"])
 
 
+def get_build_environ() -> Dict[str, str]:
+    return os.environ.copy()
+
+
 def build_package(build_type: BuildType, pkg: Package, msys2_root: _PathLike, builddir: _PathLike) -> None:
     assert os.path.isabs(builddir)
     assert os.path.isabs(msys2_root)
@@ -492,8 +496,8 @@ def build_package(build_type: BuildType, pkg: Package, msys2_root: _PathLike, bu
             validpgpkeys = to_pure_posix_path(os.path.join(SCRIPT_DIR, 'fetch-validpgpkeys.sh'))
             run_cmd(msys2_root, ['bash', validpgpkeys], cwd=pkg_dir)
 
+            env = get_build_environ()
             if build_type == "mingw-src":
-                env = os.environ.copy()
                 env['MINGW_ARCH'] = Config.MINGW_SRC_ARCH
                 run_cmd(msys2_root, [
                     'makepkg-mingw',
@@ -507,9 +511,8 @@ def build_package(build_type: BuildType, pkg: Package, msys2_root: _PathLike, bu
                     '--noconfirm',
                     '--noprogressbar',
                     '--allsource'
-                ], cwd=pkg_dir)
+                ], env=env, cwd=pkg_dir)
             elif build_type in Config.MINGW_ARCH_LIST:
-                env = os.environ.copy()
                 env['MINGW_ARCH'] = build_type
                 run_cmd(msys2_root, [
                     'makepkg-mingw',
@@ -529,7 +532,7 @@ def build_package(build_type: BuildType, pkg: Package, msys2_root: _PathLike, bu
                     '--syncdeps',
                     '--rmdeps',
                     '--cleanbuild'
-                ], cwd=pkg_dir)
+                ], env=env, cwd=pkg_dir)
             else:
                 assert 0
 
