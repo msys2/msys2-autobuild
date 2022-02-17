@@ -37,7 +37,6 @@ The following graph shows what happens between a PKGBUILD getting changed in git
 and the built package being available in the pacman repo.
 
 ```mermaid
-%%{init: {'theme': 'forest' } }%%
 sequenceDiagram
     participant GIT as MSYS2/MINGW-packages
     participant API as packages.msys2.org
