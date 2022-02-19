@@ -465,11 +465,13 @@ SigLevel=Never
 
             # in case they are already installed we need to upgrade
             run_cmd(msys2_root, ["pacman", "--noconfirm", "-Suy"])
+            run_cmd(msys2_root, ["pacman", "--noconfirm", "-Su"])
             yield
     finally:
         shutil.rmtree(repo_root, ignore_errors=True)
         # downgrade again
         run_cmd(msys2_root, ["pacman", "--noconfirm", "-Suuy"])
+        run_cmd(msys2_root, ["pacman", "--noconfirm", "-Suu"])
 
 
 def get_build_environ() -> Dict[str, str]:
