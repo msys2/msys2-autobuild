@@ -483,11 +483,6 @@ def get_build_environ() -> Dict[str, str]:
         packager_ref += "/" + environ["GITHUB_SHA"][:8] + "/" + environ["GITHUB_RUN_ID"]
     environ["PACKAGER"] = f"CI ({packager_ref})"
 
-    # XXX: Some PKGBUILDs use "git am" which requires a committer to be
-    # configured, or it will fail. So do it here.
-    environ["GIT_COMMITTER_NAME"] = Config.MAIN_REPO
-    environ["GIT_COMMITTER_EMAIL"] = "ci@msys2.org"
-
     return environ
 
 
