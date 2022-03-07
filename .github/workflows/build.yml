@@ -25,9 +25,9 @@ jobs:
         Get-PSDrive -PSProvider FileSystem
         Get-CIMInstance -Class Win32_Processor | Select-Object -Property Name
 
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
 
-    - uses: actions/setup-python@v2
+    - uses: actions/setup-python@v3
       with:
         python-version: '3.8'
 
@@ -90,9 +90,9 @@ jobs:
         Get-PSDrive -PSProvider FileSystem
         Get-CIMInstance -Class Win32_Processor | Select-Object -Property Name
 
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
 
-    - uses: actions/setup-python@v2
+    - uses: actions/setup-python@v3
       with:
         python-version: '3.8'
         # Note that ARM64 prior to Win11 requires x86, but this will install x64
