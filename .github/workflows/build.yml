@@ -30,13 +30,8 @@ jobs:
     - uses: actions/setup-python@v3
       with:
         python-version: '3.8'
-
-    - uses: actions/cache@v2
-      with:
-        path: ~\AppData\Local\pip\Cache
-        key: ${{ runner.os }}-${{ runner.arch }}-pip-${{ hashFiles('**/requirements.txt') }}
-        restore-keys: |
-          ${{ runner.os }}-${{ runner.arch }}-pip-
+        cache: 'pip'
+        cache-dependency-path: 'requirements.txt'
 
     - name: Install deps
       env:
@@ -95,15 +90,10 @@ jobs:
     - uses: actions/setup-python@v3
       with:
         python-version: '3.8'
+        cache: 'pip'
+        cache-dependency-path: 'requirements.txt'
         # Note that ARM64 prior to Win11 requires x86, but this will install x64
         architecture: 'x64'
-
-    - uses: actions/cache@v2
-      with:
-        path: ~\AppData\Local\pip\Cache
-        key: ${{ runner.os }}-${{ runner.arch }}-pip-${{ hashFiles('**/requirements.txt') }}
-        restore-keys: |
-          ${{ runner.os }}-${{ runner.arch }}-pip-
 
     - name: Install deps
       env:
