@@ -90,7 +90,7 @@ class Config:
     """XXX: These would in theory block rdeps, but no one fixed them, so we ignore them"""
 
     OPTIONAL_DEPS: Dict[str, List[str]] = {
-        "mingw-w64-headers-git": ["mingw-w64-libwinpthread-git", "mingw-w64-tools-git"],
+        "mingw-w64-headers-git": ["mingw-w64-winpthreads-git", "mingw-w64-tools-git"],
     }
     """XXX: In case of cycles we mark these deps as optional"""
 
