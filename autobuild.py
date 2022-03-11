@@ -89,6 +89,11 @@ class Config:
     ]
     """XXX: These would in theory block rdeps, but no one fixed them, so we ignore them"""
 
+    OPTIONAL_DEPS: Dict[str, List[str]] = {
+        "mingw-w64-headers-git": ["mingw-w64-libwinpthread-git", "mingw-w64-tools-git"],
+    }
+    """XXX: In case of cycles we mark these deps as optional"""
+
     BUILD_TYPES_WIP: List[BuildType] = ["clangarm64"]
     """XXX: These build types don't block other things, even if they fail/don't get built"""
 
@@ -458,7 +463,11 @@ SigLevel=Never
                                 to_add.setdefault(dep_type, []).append(asset)
                                 break
                         else:
-                            raise SystemExit(f"asset for {pattern} in {dep_type} not found")
+                            if dep["name"] in Config.OPTIONAL_DEPS.get(pkg["name"], []):
+                                # If it's there, good, if not we ignore it since it's part of a cycle
+                                pass
+                            else:
+                                raise SystemExit(f"asset for {pattern} in {dep_type} not found")
 
             for dep_type, assets in to_add.items():
                 add_to_repo(repo_root, dep_type, assets)
@@ -805,6 +814,8 @@ def get_buildqueue_with_status(full_details: bool = False) -> List[Package]:
                     for dep in deps:
                         dep_status = dep.get_status(dep_type)
                         if dep_status != PackageStatus.FINISHED:
+                            if dep["name"] in Config.OPTIONAL_DEPS.get(pkg["name"], []):
+                                continue
                             pkg.set_blocked(
                                 build_type, PackageStatus.WAITING_FOR_DEPENDENCIES, dep, dep_type)
 
