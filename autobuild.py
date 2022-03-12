@@ -211,6 +211,12 @@ class Package(dict):
             build_type = "msys"
         return self._get_build(build_type)
 
+    def is_optional_dep(self, dep: "Package", dep_type: BuildType):
+        # Some deps are manually marked as optional to break cycles.
+        # This requires them to be in the main repo though, otherwise the cycle has to
+        # be fixed manually.
+        return dep["name"] in Config.OPTIONAL_DEPS.get(self["name"], []) and not dep.is_new(dep_type)
+
     def get_depends(self, build_type: BuildType) -> "Dict[ArchType, Set[Package]]":
         build = self._get_dep_build(build_type)
         return build.get('ext-depends', {})
@@ -464,7 +470,7 @@ SigLevel=Never
                                 to_add.setdefault(dep_type, []).append(asset)
                                 break
                         else:
-                            if dep["name"] in Config.OPTIONAL_DEPS.get(pkg["name"], []):
+                            if pkg.is_optional_dep(dep, dep_type):
                                 # If it's there, good, if not we ignore it since it's part of a cycle
                                 pass
                             else:
@@ -815,7 +821,7 @@ def get_buildqueue_with_status(full_details: bool = False) -> List[Package]:
                     for dep in deps:
                         dep_status = dep.get_status(dep_type)
                         if dep_status != PackageStatus.FINISHED:
-                            if dep["name"] in Config.OPTIONAL_DEPS.get(pkg["name"], []):
+                            if pkg.is_optional_dep(dep, dep_type):
                                 continue
                             pkg.set_blocked(
                                 build_type, PackageStatus.WAITING_FOR_DEPENDENCIES, dep, dep_type)
