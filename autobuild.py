@@ -92,6 +92,7 @@ class Config:
     OPTIONAL_DEPS: Dict[str, List[str]] = {
         "mingw-w64-headers-git": ["mingw-w64-winpthreads-git", "mingw-w64-tools-git"],
         "mingw-w64-crt-git": ["mingw-w64-winpthreads-git"],
+        "mingw-w64-librsvg": ["mingw-w64-gtk3"],
     }
     """XXX: In case of cycles we mark these deps as optional"""
 
