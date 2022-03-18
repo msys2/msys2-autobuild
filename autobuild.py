@@ -71,7 +71,7 @@ class Config:
     }
     """Fetch certain build types from other repos if available"""
 
-    SOFT_JOB_TIMEOUT = 60 * 60 * 4
+    SOFT_JOB_TIMEOUT = 60 * 60 * 3
     """Runtime after which we shouldn't start a new build"""
 
     MANUAL_BUILD: List[Tuple[str, List[BuildType]]] = [
