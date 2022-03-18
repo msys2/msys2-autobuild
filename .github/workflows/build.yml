@@ -13,17 +13,12 @@ concurrency: nope
 jobs:
 
   schedule:
-    runs-on: windows-2022
+    runs-on: ubuntu-latest
 
     outputs:
       build-plan: ${{ steps.check.outputs.build-plan }}
 
     steps:
-
-    - name: Runner details
-      run: |
-        Get-PSDrive -PSProvider FileSystem
-        Get-CIMInstance -Class Win32_Processor | Select-Object -Property Name
 
     - uses: actions/checkout@v3
 
@@ -47,7 +42,7 @@ jobs:
         GITHUB_TOKEN_READONLY: ${{ secrets.GITHUBTOKENREADONLY }}
       run: |
         python -u autobuild.py write-build-plan build_plan.json
-        $buildPlan = Get-Content build_plan.json -Raw
+        buildPlan="$(cat build_plan.json)"
         echo "::set-output name=build-plan::$buildPlan"
 
     - name: Clean up assets
