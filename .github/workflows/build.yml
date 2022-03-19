@@ -24,7 +24,7 @@ jobs:
 
     - uses: actions/setup-python@v3
       with:
-        python-version: '3.8'
+        python-version: '3.9'
         cache: 'pip'
         cache-dependency-path: 'requirements.txt'
 
@@ -84,7 +84,7 @@ jobs:
 
     - uses: actions/setup-python@v3
       with:
-        python-version: '3.8'
+        python-version: '3.9'
         cache: 'pip'
         cache-dependency-path: 'requirements.txt'
         # Note that ARM64 prior to Win11 requires x86, but this will install x64
