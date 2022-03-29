@@ -93,6 +93,7 @@ class Config:
         "mingw-w64-headers-git": ["mingw-w64-winpthreads-git", "mingw-w64-tools-git"],
         "mingw-w64-crt-git": ["mingw-w64-winpthreads-git"],
         "mingw-w64-librsvg": ["mingw-w64-gtk3"],
+        "mingw-w64-opencv": ["mingw-w64-ffmpeg"],
     }
     """XXX: In case of cycles we mark these deps as optional"""
 
