@@ -2,11 +2,12 @@ name: 'build'
 
 on:
   workflow_dispatch:
-    optional_deps:
-      description: 'depA:optional-depB,depA:optional-depC'
-      default: ''
-      required: false
-      type: string
+    inputs:
+      optional_deps:
+        description: 'depA:optional-depB,depA:optional-depC'
+        default: ''
+        required: false
+        type: string
   schedule:
     - cron: '0 0/3 * * *'
 
@@ -46,7 +47,7 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         GITHUB_TOKEN_READONLY: ${{ secrets.GITHUBTOKENREADONLY }}
       run: |
-        python -u autobuild.py write-build-plan build_plan.json
+        python -u autobuild.py write-build-plan --optional-deps '${{ github.event.inputs.optional_deps }}' build_plan.json
         buildPlan="$(cat build_plan.json)"
         echo "::set-output name=build-plan::$buildPlan"
 
