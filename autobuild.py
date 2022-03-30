@@ -1154,7 +1154,7 @@ def show_build(args: Any) -> None:
     done = []
     failed = []
 
-    pkgs = get_buildqueue_with_status(full_details=True)
+    pkgs = get_buildqueue_with_status(full_details=args.details)
 
     cycles = get_cycles(pkgs)
     if cycles:
@@ -1527,6 +1527,8 @@ def main(argv: List[str]) -> None:
 
     sub = subparser.add_parser(
         "show", help="Show all packages to be built", allow_abbrev=False)
+    sub.add_argument(
+        "--details", action="store_true", help="Show more details such as links to failed build logs (slow)")
     sub.set_defaults(func=show_build)
 
     sub = subparser.add_parser(
