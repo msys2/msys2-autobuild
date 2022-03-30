@@ -597,6 +597,9 @@ def run_build(args: Any) -> None:
     else:
         build_types = [p.strip() for p in args.build_types.split(",")]
 
+    for dep, ignored in parse_optional_deps(args.optional_deps or "").items():
+        Config.OPTIONAL_DEPS.setdefault(dep, []).extend(ignored)
+
     start_time = time.monotonic()
 
     if not sys.platform == "win32":
@@ -1036,8 +1039,21 @@ def get_job_meta() -> List[Dict[str, Any]]:
     return job_meta
 
 
+def parse_optional_deps(optional_deps: str) -> Dict[str, List[str]]:
+    res: Dict[str, List[str]] = {}
+    optional_deps = optional_deps.replace(" ", "")
+    if not optional_deps:
+        return res
+    for entry in optional_deps.split(","):
+        assert ":" in entry
+        first, second = entry.split(":", 2)
+        res.setdefault(first, []).append(second)
+    return res
+
+
 def write_build_plan(args: Any) -> None:
     target_file = args.target_file
+    optional_deps = args.optional_deps
 
     current_id = None
     if "GITHUB_RUN_ID" in os.environ:
@@ -1087,16 +1103,20 @@ def write_build_plan(args: Any) -> None:
             set(queued_build_types) & set(job_info["build-types"]) & available_build_types
         if matching_build_types:
             build_count = sum(queued_build_types[bt] for bt in matching_build_types)
-            jobs.append(job_info["matrix"])
+            job = job_info["matrix"]
+            # TODO: pin optional deps to their exact version somehow, in case something changes
+            # between this run and when the worker gets to it.
+            job["build-args"] = job["build-args"] + " --optional-deps " + shlex.quote(optional_deps or "")
+            jobs.append(job)
             # XXX: If there is more than three builds we start two jobs with the second
             # one having a reversed build order
             if build_count > 3:
-                matrix = dict(job_info["matrix"])
+                matrix = dict(job)
                 matrix["build-args"] = matrix["build-args"] + " --build-from end"
                 matrix["name"] = matrix["name"] + "-2"
                 jobs.append(matrix)
             if build_count > 9:
-                matrix = dict(job_info["matrix"])
+                matrix = dict(job)
                 matrix["build-args"] = matrix["build-args"] + " --build-from middle"
                 matrix["name"] = matrix["name"] + "-3"
                 jobs.append(matrix)
@@ -1526,6 +1546,7 @@ def main(argv: List[str]) -> None:
     sub.add_argument("-t", "--build-types", action="store")
     sub.add_argument(
         "--build-from", action="store", default="start", help="Start building from start|end|middle")
+    sub.add_argument("--optional-deps", action="store")
     sub.add_argument("msys2_root", help="The MSYS2 install used for building. e.g. C:\\msys64")
     sub.add_argument(
         "builddir",
@@ -1540,6 +1561,7 @@ def main(argv: List[str]) -> None:
 
     sub = subparser.add_parser(
         "write-build-plan", help="Write a GHA build matrix setup", allow_abbrev=False)
+    sub.add_argument("--optional-deps", action="store")
     sub.add_argument("target_file")
     sub.set_defaults(func=write_build_plan)
 

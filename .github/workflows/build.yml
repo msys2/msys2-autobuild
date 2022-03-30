@@ -2,6 +2,11 @@ name: 'build'
 
 on:
   workflow_dispatch:
+    optional_deps:
+      description: 'depA:optional-depB,depA:optional-depC'
+      default: ''
+      required: false
+      type: string
   schedule:
     - cron: '0 0/3 * * *'
 
