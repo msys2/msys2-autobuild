@@ -30,7 +30,7 @@ import io
 from datetime import datetime, timezone
 from enum import Enum
 from hashlib import sha256
-from typing import Generator, Union, AnyStr, List, Any, Dict, Tuple, Set, Optional, Sequence, Literal
+from typing import Generator, Union, AnyStr, List, Any, Dict, Tuple, Set, Optional, Sequence, Literal, cast
 
 
 ArchType = Literal["mingw32", "mingw64", "ucrt64", "clang64", "clang32", "clangarm64", "msys"]
@@ -906,6 +906,21 @@ def get_buildqueue_with_status(full_details: bool = False) -> List[Package]:
     return pkgs
 
 
+def get_cycles(pkgs: List[Package]) -> Set[Tuple[Package, Package]]:
+    cycles: Set[Tuple[Package, Package]] = set()
+    for pkg in pkgs:
+        for build_type in pkg.get_build_types():
+            if build_type_is_src(build_type):
+                continue
+            build_type = cast(ArchType, build_type)
+            for dep_type, deps in pkg.get_depends(build_type).items():
+                for dep in deps:
+                    dep_deps = dep.get_depends(dep_type)
+                    if pkg in dep_deps.get(build_type, set()):
+                        cycles.add(tuple(sorted([pkg, dep], key=lambda p: p["name"])))  # type: ignore
+    return cycles
+
+
 BuildFrom = Literal["start", "middle", "end"]
 
 
@@ -1139,7 +1154,15 @@ def show_build(args: Any) -> None:
     done = []
     failed = []
 
-    for pkg in get_buildqueue_with_status(full_details=True):
+    pkgs = get_buildqueue_with_status(full_details=True)
+
+    cycles = get_cycles(pkgs)
+    if cycles:
+        with gha_group(f"Dependency Cycles ({len(cycles)})"):
+            print(tabulate([(a["name"], b["name"]) for (a, b) in cycles],
+                           headers=["Package", "Package"]))
+
+    for pkg in pkgs:
         for build_type in pkg.get_build_types():
             status = pkg.get_status(build_type)
             details = pkg.get_status_details(build_type)
