@@ -597,8 +597,7 @@ def run_build(args: Any) -> None:
     else:
         build_types = [p.strip() for p in args.build_types.split(",")]
 
-    for dep, ignored in parse_optional_deps(args.optional_deps or "").items():
-        Config.OPTIONAL_DEPS.setdefault(dep, []).extend(ignored)
+    apply_optional_deps(args.optional_deps or "")
 
     start_time = time.monotonic()
 
@@ -1051,9 +1050,16 @@ def parse_optional_deps(optional_deps: str) -> Dict[str, List[str]]:
     return res
 
 
+def apply_optional_deps(optional_deps: str) -> None:
+    for dep, ignored in parse_optional_deps(optional_deps).items():
+        Config.OPTIONAL_DEPS.setdefault(dep, []).extend(ignored)
+
+
 def write_build_plan(args: Any) -> None:
     target_file = args.target_file
-    optional_deps = args.optional_deps
+    optional_deps = args.optional_deps or ""
+
+    apply_optional_deps(optional_deps)
 
     current_id = None
     if "GITHUB_RUN_ID" in os.environ:
@@ -1106,7 +1112,7 @@ def write_build_plan(args: Any) -> None:
             job = job_info["matrix"]
             # TODO: pin optional deps to their exact version somehow, in case something changes
             # between this run and when the worker gets to it.
-            job["build-args"] = job["build-args"] + " --optional-deps " + shlex.quote(optional_deps or "")
+            job["build-args"] = job["build-args"] + " --optional-deps " + shlex.quote(optional_deps)
             jobs.append(job)
             # XXX: If there is more than three builds we start two jobs with the second
             # one having a reversed build order
