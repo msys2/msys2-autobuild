@@ -65,7 +65,7 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         GITHUB_TOKEN_READONLY: ${{ secrets.GITHUBTOKENREADONLY }}
       run: |
-        python -u autobuild.py show
+        python -u autobuild.py show --optional-deps '${{ github.event.inputs.optional_deps }}'
 
   build:
     needs: schedule

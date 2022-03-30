@@ -1191,6 +1191,8 @@ def show_build(args: Any) -> None:
     done = []
     failed = []
 
+    apply_optional_deps(args.optional_deps or "")
+
     pkgs = get_buildqueue_with_status(full_details=args.details)
 
     show_cycles(pkgs)
@@ -1563,6 +1565,7 @@ def main(argv: List[str]) -> None:
         "show", help="Show all packages to be built", allow_abbrev=False)
     sub.add_argument(
         "--details", action="store_true", help="Show more details such as links to failed build logs (slow)")
+    sub.add_argument("--optional-deps", action="store")
     sub.set_defaults(func=show_build)
 
     sub = subparser.add_parser(
