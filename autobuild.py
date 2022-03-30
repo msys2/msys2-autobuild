@@ -1112,7 +1112,8 @@ def write_build_plan(args: Any) -> None:
             job = job_info["matrix"]
             # TODO: pin optional deps to their exact version somehow, in case something changes
             # between this run and when the worker gets to it.
-            job["build-args"] = job["build-args"] + " --optional-deps " + shlex.quote(optional_deps)
+            if optional_deps:
+                job["build-args"] = job["build-args"] + " --optional-deps " + shlex.quote(optional_deps)
             jobs.append(job)
             # XXX: If there is more than three builds we start two jobs with the second
             # one having a reversed build order
