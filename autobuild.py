@@ -1061,6 +1061,9 @@ def write_build_plan(args: Any) -> None:
     wait_for_api_limit_reset()
 
     pkgs = get_buildqueue_with_status(full_details=True)
+
+    show_cycles(pkgs)
+
     update_status(pkgs)
 
     queued_build_types: Dict[str, int] = {}
@@ -1148,6 +1151,14 @@ def run_update_status(args: Any) -> None:
     update_status(get_buildqueue_with_status(full_details=True))
 
 
+def show_cycles(pkgs: List[Package]) -> None:
+    cycles = get_cycles(pkgs)
+    if cycles:
+        with gha_group(f"Dependency Cycles ({len(cycles)})"):
+            print(tabulate([(a["name"], b["name"]) for (a, b) in cycles],
+                           headers=["Package", "Package"]))
+
+
 def show_build(args: Any) -> None:
     todo = []
     waiting = []
@@ -1156,11 +1167,7 @@ def show_build(args: Any) -> None:
 
     pkgs = get_buildqueue_with_status(full_details=args.details)
 
-    cycles = get_cycles(pkgs)
-    if cycles:
-        with gha_group(f"Dependency Cycles ({len(cycles)})"):
-            print(tabulate([(a["name"], b["name"]) for (a, b) in cycles],
-                           headers=["Package", "Package"]))
+    show_cycles(pkgs)
 
     for pkg in pkgs:
         for build_type in pkg.get_build_types():
