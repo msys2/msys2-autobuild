@@ -910,13 +910,26 @@ def get_buildqueue_with_status(full_details: bool = False) -> List[Package]:
 
 def get_cycles(pkgs: List[Package]) -> Set[Tuple[Package, Package]]:
     cycles: Set[Tuple[Package, Package]] = set()
+
+    # In case the package is already built it doesn't matter if it is part of a cycle
+    def pkg_is_finished(pkg: Package, build_type: BuildType) -> bool:
+        return pkg.get_status(build_type) in [
+            PackageStatus.FINISHED,
+            PackageStatus.FINISHED_BUT_BLOCKED,
+            PackageStatus.FINISHED_BUT_INCOMPLETE,
+        ]
+
     for pkg in pkgs:
         for build_type in pkg.get_build_types():
             if build_type_is_src(build_type):
                 continue
+            if pkg_is_finished(pkg, build_type):
+                continue
             build_type = cast(ArchType, build_type)
             for dep_type, deps in pkg.get_depends(build_type).items():
                 for dep in deps:
+                    if pkg_is_finished(dep, dep_type):
+                        continue
                     dep_deps = dep.get_depends(dep_type)
                     if pkg in dep_deps.get(build_type, set()):
                         cycles.add(tuple(sorted([pkg, dep], key=lambda p: p["name"])))  # type: ignore
