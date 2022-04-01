@@ -1181,9 +1181,13 @@ def run_update_status(args: Any) -> None:
 def show_cycles(pkgs: List[Package]) -> None:
     cycles = get_cycles(pkgs)
     if cycles:
+        def format_package(p: Package) -> str:
+            return f"{p['name']} [{p['version_repo']} -> {p['version']}]"
+
         with gha_group(f"Dependency Cycles ({len(cycles)})"):
-            print(tabulate([(a["name"], b["name"]) for (a, b) in cycles],
-                           headers=["Package", "Package"]))
+            print(tabulate([
+                (format_package(a), "<-->", format_package(b)) for (a, b) in cycles],
+                headers=["Package", "", "Package"]))
 
 
 def show_build(args: Any) -> None:
