@@ -4,17 +4,17 @@ on:
   workflow_dispatch:
     inputs:
       optional_deps:
-        description: 'depA:optional-depB,depA:optional-depC'
+        description: 'optional_deps=pkg-A:optional-dep-B,pkg-C:optional-dep-D'
         default: ''
         required: false
         type: string
       clear_failed_build_types:
-        description: 'mingw64,clang64'
+        description: 'clear_failed_build_types=mingw64,clang64'
         default: ''
         required: false
         type: string
       clear_failed_packages:
-        description: 'mingw-w64-foo,mingw-w64-bar'
+        description: 'clear_failed_packages=mingw-w64-foo,mingw-w64-bar'
         default: ''
         required: false
         type: string
