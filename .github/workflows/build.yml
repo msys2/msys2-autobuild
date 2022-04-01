@@ -8,13 +8,13 @@ on:
         default: ''
         required: false
         type: string
-      clear_failed_build_types:
-        description: 'clear_failed_build_types=mingw64,clang64'
+      clear_failed_packages:
+        description: 'clear_failed_packages=mingw-w64-foo,mingw-w64-bar'
         default: ''
         required: false
         type: string
-      clear_failed_packages:
-        description: 'clear_failed_packages=mingw-w64-foo,mingw-w64-bar'
+      clear_failed_build_types:
+        description: 'clear_failed_build_types=mingw64,clang64'
         default: ''
         required: false
         type: string
