@@ -1,0 +1,58 @@
+name: 'maint'
+
+on:
+  workflow_dispatch:
+    inputs:
+      clear_failed_packages:
+        description: 'clear_failed_packages=mingw-w64-foo,mingw-w64-bar'
+        default: ''
+        required: false
+        type: string
+      clear_failed_build_types:
+        description: 'clear_failed_build_types=mingw64,clang64'
+        default: ''
+        required: false
+        type: string
+
+permissions:
+  contents: write
+
+concurrency: maint-nope
+
+jobs:
+
+  schedule:
+    runs-on: ubuntu-latest
+
+    steps:
+
+    - uses: actions/checkout@v3
+
+    - uses: actions/setup-python@v3
+      with:
+        python-version: '3.9'
+        cache: 'pip'
+        cache-dependency-path: 'requirements.txt'
+
+    - name: Install deps
+      env:
+        PIP_DISABLE_PIP_VERSION_CHECK: 1
+      run: |
+        python -m pip install --user 'wheel==0.37.1'
+        python -m pip install --user -r requirements.txt
+
+    - name: Clear failed build types
+      if: ${{ github.event.inputs.clear_failed_build_types != '' }}
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GITHUB_TOKEN_READONLY: ${{ secrets.GITHUBTOKENREADONLY }}
+      run: |
+        python -u autobuild.py clear-failed --build-types '${{ github.event.inputs.clear_failed_build_types }}'
+
+    - name: Clear failed packages
+      if: ${{ github.event.inputs.clear_failed_packages != '' }}
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GITHUB_TOKEN_READONLY: ${{ secrets.GITHUBTOKENREADONLY }}
+      run: |
+        python -u autobuild.py clear-failed --packages '${{ github.event.inputs.clear_failed_packages }}'
