@@ -1024,7 +1024,7 @@ def get_job_meta() -> List[Dict[str, Any]]:
                 "packages": "base-devel",
                 "build-args": "--build-types clangarm64",
                 "name": "clangarm64",
-                "runner": ["Windows", "ARM64"]
+                "runner": ["Windows", "ARM64", "autobuild"]
             }
         }, {
             "build-types": ["msys", "msys-src"],
