@@ -28,6 +28,7 @@ import tempfile
 import shutil
 import json
 import io
+from functools import cache
 from datetime import datetime, timezone
 from enum import Enum
 from hashlib import sha256
@@ -109,15 +110,13 @@ REQUESTS_TIMEOUT = (15, 30)
 REQUESTS_RETRY = Retry(total=3, backoff_factor=1)
 
 
+@cache
 def get_requests_session() -> requests.Session:
     adapter = HTTPAdapter(max_retries=REQUESTS_RETRY)
     http = requests.Session()
     http.mount("https://", adapter)
     http.mount("http://", adapter)
     return http
-
-
-REQUESTS_SESSION = get_requests_session()
 
 
 class PackageStatus(Enum):
@@ -328,7 +327,8 @@ def get_asset_mtime_ns(asset: GitReleaseAsset) -> int:
 
 def download_asset(asset: GitReleaseAsset, target_path: str) -> None:
     assert asset_is_complete(asset)
-    with REQUESTS_SESSION.get(asset.browser_download_url, stream=True, timeout=REQUESTS_TIMEOUT) as r:
+    session = get_requests_session()
+    with session.get(asset.browser_download_url, stream=True, timeout=REQUESTS_TIMEOUT) as r:
         r.raise_for_status()
         fd, temppath = tempfile.mkstemp()
         try:
@@ -348,7 +348,8 @@ def download_asset(asset: GitReleaseAsset, target_path: str) -> None:
 
 def download_text_asset(asset: GitReleaseAsset) -> str:
     assert asset_is_complete(asset)
-    with REQUESTS_SESSION.get(asset.browser_download_url, timeout=REQUESTS_TIMEOUT) as r:
+    session = get_requests_session()
+    with session.get(asset.browser_download_url, timeout=REQUESTS_TIMEOUT) as r:
         r.raise_for_status()
         return r.text
 
@@ -654,7 +655,8 @@ def run_build(args: Any) -> None:
 
 def get_buildqueue() -> List[Package]:
     pkgs = []
-    r = REQUESTS_SESSION.get("https://packages.msys2.org/api/buildqueue2", timeout=REQUESTS_TIMEOUT)
+    session = get_requests_session()
+    r = session.get("https://packages.msys2.org/api/buildqueue2", timeout=REQUESTS_TIMEOUT)
     r.raise_for_status()
 
     for received in r.json():
@@ -1157,7 +1159,8 @@ def write_build_plan(args: Any) -> None:
 
 
 def queue_website_update() -> None:
-    r = REQUESTS_SESSION.post('https://packages.msys2.org/api/trigger_update', timeout=REQUESTS_TIMEOUT)
+    session = get_requests_session()
+    r = session.post('https://packages.msys2.org/api/trigger_update', timeout=REQUESTS_TIMEOUT)
     try:
         # it's not worth stopping the build if this fails, so just log it
         r.raise_for_status()
@@ -1535,6 +1538,7 @@ def get_credentials(readonly: bool = True) -> Dict[str, Any]:
             raise Exception("'GITHUB_TOKEN' env var not set")
 
 
+@cache
 def get_github(readonly: bool = True) -> Github:
     kwargs = get_credentials(readonly=readonly)
     has_creds = bool(kwargs)
@@ -1548,6 +1552,7 @@ def get_github(readonly: bool = True) -> Github:
     return gh
 
 
+@cache
 def get_main_repo(readonly: bool = True) -> Repository:
     gh = get_github(readonly=readonly)
     return gh.get_repo(Config.MAIN_REPO, lazy=True)
