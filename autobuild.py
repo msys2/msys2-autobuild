@@ -328,22 +328,23 @@ def get_asset_mtime_ns(asset: GitReleaseAsset) -> int:
 def download_asset(asset: GitReleaseAsset, target_path: str) -> None:
     assert asset_is_complete(asset)
     session = get_requests_session()
-    with session.get(asset.browser_download_url, stream=True, timeout=REQUESTS_TIMEOUT) as r:
-        r.raise_for_status()
-        fd, temppath = tempfile.mkstemp()
-        try:
-            os.chmod(temppath, 0o644)
-            with os.fdopen(fd, "wb") as h:
-                for chunk in r.iter_content(4096):
-                    h.write(chunk)
-            mtime_ns = get_asset_mtime_ns(asset)
-            os.utime(temppath, ns=(mtime_ns, mtime_ns))
-            shutil.move(temppath, target_path)
-        finally:
+    with requests_cache_disabled():
+        with session.get(asset.browser_download_url, stream=True, timeout=REQUESTS_TIMEOUT) as r:
+            r.raise_for_status()
+            fd, temppath = tempfile.mkstemp()
             try:
-                os.remove(temppath)
-            except OSError:
-                pass
+                os.chmod(temppath, 0o644)
+                with os.fdopen(fd, "wb") as h:
+                    for chunk in r.iter_content(4096):
+                        h.write(chunk)
+                mtime_ns = get_asset_mtime_ns(asset)
+                os.utime(temppath, ns=(mtime_ns, mtime_ns))
+                shutil.move(temppath, target_path)
+            finally:
+                try:
+                    os.remove(temppath)
+                except OSError:
+                    pass
 
 
 def download_text_asset(asset: GitReleaseAsset) -> str:
@@ -1596,7 +1597,39 @@ def clean_environ(environ: Dict[str, str]) -> Dict[str, str]:
     return new_env
 
 
+def install_requests_cache() -> None:
+    # This adds basic etag based caching, to avoid hitting API rate limiting
+
+    import requests_cache
+    from requests_cache.backends.sqlite import SQLiteCache
+
+    # Monkey patch globally, so pygithub uses it as well.
+    # Only do re-validation with etag/date etc and ignore the cache-control headers that
+    # github sends by default with 60 seconds. This is only possible with requests_cache 0.10+
+    cache_dir = os.path.join(SCRIPT_DIR, '.autobuild_cache')
+    os.makedirs(cache_dir, exist_ok=True)
+    requests_cache.install_cache(
+        cache_control=False,
+        expire_after=0,
+        backend=SQLiteCache(os.path.join(cache_dir, 'http_cache.sqlite')))
+
+    # How to limit the cache size is an open question, at least to me:
+    # https://github.com/reclosedev/requests-cache/issues/620
+    # so do it the simple/stupid way
+    cache = requests_cache.get_cache()
+    assert cache is not None
+    if cache.response_count() > 200:
+        cache.clear()
+
+
+def requests_cache_disabled() -> Any:
+    import requests_cache
+    return requests_cache.disabled()
+
+
 def main(argv: List[str]) -> None:
+    install_requests_cache()
+
     parser = argparse.ArgumentParser(description="Build packages", allow_abbrev=False)
     parser.set_defaults(func=lambda *x: parser.print_help())
     parser.add_argument(

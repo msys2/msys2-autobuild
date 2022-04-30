@@ -9,6 +9,7 @@ python = "^3.8"
 PyGithub = "^1.54.1"
 tabulate = "^0.8.7"
 requests = "^2.25.1"
+requests-cache = {version = "^0.10.0.dev4 "}
 
 [tool.poetry.dev-dependencies]
 mypy = "^0.931"
