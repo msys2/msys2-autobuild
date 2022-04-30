@@ -1158,7 +1158,11 @@ def write_build_plan(args: Any) -> None:
 
 def queue_website_update() -> None:
     r = REQUESTS_SESSION.post('https://packages.msys2.org/api/trigger_update', timeout=REQUESTS_TIMEOUT)
-    r.raise_for_status()
+    try:
+        # it's not worth stopping the build if this fails, so just log it
+        r.raise_for_status()
+    except requests.RequestException as e:
+        print(e)
 
 
 def update_status(pkgs: List[Package]) -> None:
