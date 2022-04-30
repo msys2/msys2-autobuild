@@ -21,6 +21,7 @@ from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
 from urllib3.util import Retry
 import requests
+from requests.adapters import HTTPAdapter
 import shlex
 import time
 import tempfile
@@ -105,6 +106,18 @@ _PathLike = Union[os.PathLike, AnyStr]
 SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
 
 REQUESTS_TIMEOUT = (15, 30)
+REQUESTS_RETRY = Retry(total=3, backoff_factor=1)
+
+
+def get_requests_session() -> requests.Session:
+    adapter = HTTPAdapter(max_retries=REQUESTS_RETRY)
+    http = requests.Session()
+    http.mount("https://", adapter)
+    http.mount("http://", adapter)
+    return http
+
+
+REQUESTS_SESSION = get_requests_session()
 
 
 class PackageStatus(Enum):
@@ -315,7 +328,7 @@ def get_asset_mtime_ns(asset: GitReleaseAsset) -> int:
 
 def download_asset(asset: GitReleaseAsset, target_path: str) -> None:
     assert asset_is_complete(asset)
-    with requests.get(asset.browser_download_url, stream=True, timeout=REQUESTS_TIMEOUT) as r:
+    with REQUESTS_SESSION.get(asset.browser_download_url, stream=True, timeout=REQUESTS_TIMEOUT) as r:
         r.raise_for_status()
         fd, temppath = tempfile.mkstemp()
         try:
@@ -335,7 +348,7 @@ def download_asset(asset: GitReleaseAsset, target_path: str) -> None:
 
 def download_text_asset(asset: GitReleaseAsset) -> str:
     assert asset_is_complete(asset)
-    with requests.get(asset.browser_download_url, timeout=REQUESTS_TIMEOUT) as r:
+    with REQUESTS_SESSION.get(asset.browser_download_url, timeout=REQUESTS_TIMEOUT) as r:
         r.raise_for_status()
         return r.text
 
@@ -641,7 +654,7 @@ def run_build(args: Any) -> None:
 
 def get_buildqueue() -> List[Package]:
     pkgs = []
-    r = requests.get("https://packages.msys2.org/api/buildqueue2", timeout=REQUESTS_TIMEOUT)
+    r = REQUESTS_SESSION.get("https://packages.msys2.org/api/buildqueue2", timeout=REQUESTS_TIMEOUT)
     r.raise_for_status()
 
     for received in r.json():
@@ -1144,7 +1157,7 @@ def write_build_plan(args: Any) -> None:
 
 
 def queue_website_update() -> None:
-    r = requests.post('https://packages.msys2.org/api/trigger_update', timeout=REQUESTS_TIMEOUT)
+    r = REQUESTS_SESSION.post('https://packages.msys2.org/api/trigger_update', timeout=REQUESTS_TIMEOUT)
     r.raise_for_status()
 
 
@@ -1523,7 +1536,8 @@ def get_github(readonly: bool = True) -> Github:
     has_creds = bool(kwargs)
     # 100 is the maximum allowed
     kwargs['per_page'] = 100
-    kwargs['retry'] = Retry(total=3, backoff_factor=1)
+    kwargs['retry'] = REQUESTS_RETRY
+    kwargs['timeout'] = sum(REQUESTS_TIMEOUT)
     gh = Github(**kwargs)
     if not has_creds and readonly:
         print(f"[Warning] Rate limit status: {gh.get_rate_limit().core}", file=sys.stderr)
