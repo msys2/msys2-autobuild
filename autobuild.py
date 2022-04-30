@@ -111,9 +111,13 @@ REQUESTS_RETRY = Retry(total=3, backoff_factor=1)
 
 
 @lru_cache(maxsize=None)
-def get_requests_session() -> requests.Session:
+def get_requests_session(nocache=False) -> requests.Session:
     adapter = HTTPAdapter(max_retries=REQUESTS_RETRY)
-    http = requests.Session()
+    if nocache:
+        with requests_cache_disabled():
+            http = requests.Session()
+    else:
+        http = requests.Session()
     http.mount("https://", adapter)
     http.mount("http://", adapter)
     return http
@@ -327,8 +331,7 @@ def get_asset_mtime_ns(asset: GitReleaseAsset) -> int:
 
 def download_asset(asset: GitReleaseAsset, target_path: str) -> None:
     assert asset_is_complete(asset)
-    session = get_requests_session()
-    assert requests_cache_is_disabled()
+    session = get_requests_session(nocache=True)
     with session.get(asset.browser_download_url, stream=True, timeout=REQUESTS_TIMEOUT) as r:
         r.raise_for_status()
         fd, temppath = tempfile.mkstemp()
@@ -445,12 +448,11 @@ def staging_dependencies(
             return item
 
         package_paths = []
-        with requests_cache_disabled():
-            with ThreadPoolExecutor(8) as executor:
-                for i, item in enumerate(executor.map(fetch_item, todo)):
-                    asset_path, asset = item
-                    print(f"[{i + 1}/{len(todo)}] {get_asset_filename(asset)}")
-                    package_paths.append(asset_path)
+        with ThreadPoolExecutor(8) as executor:
+            for i, item in enumerate(executor.map(fetch_item, todo)):
+                asset_path, asset = item
+                print(f"[{i + 1}/{len(todo)}] {get_asset_filename(asset)}")
+                package_paths.append(asset_path)
 
         repo_name = f"autobuild-{repo_name}"
         repo_db_path = os.path.join(repo_dir, f"{repo_name}.db.tar.gz")
@@ -1437,10 +1439,9 @@ def fetch_assets(args: Any) -> None:
             download_asset(asset, asset_path)
         return item
 
-    with requests_cache_disabled():
-        with ThreadPoolExecutor(8) as executor:
-            for i, item in enumerate(executor.map(fetch_item, todo.items())):
-                print(f"[{i + 1}/{len(todo)}] {get_asset_filename(item[1])}")
+    with ThreadPoolExecutor(8) as executor:
+        for i, item in enumerate(executor.map(fetch_item, todo.items())):
+            print(f"[{i + 1}/{len(todo)}] {get_asset_filename(item[1])}")
 
     print("done")
 
@@ -1615,6 +1616,9 @@ def install_requests_cache() -> None:
         expire_after=0,
         backend=SQLiteCache(os.path.join(cache_dir, 'http_cache.sqlite')))
 
+    # Call this once, so it gets cached from the main thread and can be used in a thread pool
+    get_requests_session(nocache=True)
+
     # How to limit the cache size is an open question, at least to me:
     # https://github.com/reclosedev/requests-cache/issues/620
     # so do it the simple/stupid way
@@ -1627,11 +1631,6 @@ def install_requests_cache() -> None:
 def requests_cache_disabled() -> Any:
     import requests_cache
     return requests_cache.disabled()
-
-
-def requests_cache_is_disabled() -> bool:
-    import requests_cache
-    return not requests_cache.is_installed()
 
 
 def main(argv: List[str]) -> None:
