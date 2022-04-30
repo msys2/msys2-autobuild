@@ -28,7 +28,7 @@ import tempfile
 import shutil
 import json
 import io
-from functools import cache
+from functools import lru_cache
 from datetime import datetime, timezone
 from enum import Enum
 from hashlib import sha256
@@ -110,7 +110,7 @@ REQUESTS_TIMEOUT = (15, 30)
 REQUESTS_RETRY = Retry(total=3, backoff_factor=1)
 
 
-@cache
+@lru_cache(maxsize=None)
 def get_requests_session() -> requests.Session:
     adapter = HTTPAdapter(max_retries=REQUESTS_RETRY)
     http = requests.Session()
@@ -1538,7 +1538,7 @@ def get_credentials(readonly: bool = True) -> Dict[str, Any]:
             raise Exception("'GITHUB_TOKEN' env var not set")
 
 
-@cache
+@lru_cache(maxsize=None)
 def get_github(readonly: bool = True) -> Github:
     kwargs = get_credentials(readonly=readonly)
     has_creds = bool(kwargs)
@@ -1552,7 +1552,7 @@ def get_github(readonly: bool = True) -> Github:
     return gh
 
 
-@cache
+@lru_cache(maxsize=None)
 def get_main_repo(readonly: bool = True) -> Repository:
     gh = get_github(readonly=readonly)
     return gh.get_repo(Config.MAIN_REPO, lazy=True)
