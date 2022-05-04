@@ -45,7 +45,7 @@ jobs:
       uses: actions/cache@v3
       with:
         path: ${{ github.workspace }}/.autobuild_cache
-        key: autobuild_cache-${{ github.run_id }}-${{ github.run_attempt }}
+        key: autobuild_cache-${{ github.job }}-${{ github.run_id }}-${{ github.run_attempt }}
         restore-keys: autobuild_cache-
 
     - name: Check what we should run
@@ -114,7 +114,7 @@ jobs:
       uses: actions/cache@v3
       with:
         path: ${{ github.workspace }}/.autobuild_cache
-        key: autobuild_cache-${{ github.run_id }}-${{ github.run_attempt }}
+        key: autobuild_cache-${{ github.job }}-${{ github.run_id }}-${{ github.run_attempt }}
         restore-keys: autobuild_cache-
 
     # Note that ARM64 prior to Win11 requires x86 msys, but this will install x64
