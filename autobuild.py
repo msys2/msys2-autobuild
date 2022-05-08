@@ -532,78 +532,78 @@ def build_package(build_type: BuildType, pkg: Package, msys2_root: _PathLike, bu
 
     repo = get_main_repo()
 
-    with staging_dependencies(build_type, pkg, msys2_root, builddir), \
-            fresh_git_repo(pkg['repo_url'], repo_dir):
+    with fresh_git_repo(pkg['repo_url'], repo_dir):
         pkg_dir = os.path.join(repo_dir, pkg['repo_path'])
 
-        try:
-            # Fetch all keys mentioned in the PKGBUILD
-            validpgpkeys = to_pure_posix_path(os.path.join(SCRIPT_DIR, 'fetch-validpgpkeys.sh'))
-            run_cmd(msys2_root, ['bash', validpgpkeys], cwd=pkg_dir)
+        # Fetch all keys mentioned in the PKGBUILD
+        validpgpkeys = to_pure_posix_path(os.path.join(SCRIPT_DIR, 'fetch-validpgpkeys.sh'))
+        run_cmd(msys2_root, ['bash', validpgpkeys], cwd=pkg_dir)
 
-            env = get_build_environ()
-            if build_type == "mingw-src":
-                env['MINGW_ARCH'] = Config.MINGW_SRC_ARCH
-                run_cmd(msys2_root, [
-                    'makepkg-mingw',
-                    '--noconfirm',
-                    '--noprogressbar',
-                    '--allsource'
-                ], env=env, cwd=pkg_dir)
-            elif build_type == "msys-src":
-                run_cmd(msys2_root, [
-                    'makepkg',
-                    '--noconfirm',
-                    '--noprogressbar',
-                    '--allsource'
-                ], env=env, cwd=pkg_dir)
-            elif build_type in Config.MINGW_ARCH_LIST:
-                env['MINGW_ARCH'] = build_type
-                run_cmd(msys2_root, [
-                    'makepkg-mingw',
-                    '--noconfirm',
-                    '--noprogressbar',
-                    '--nocheck',
-                    '--syncdeps',
-                    '--rmdeps',
-                    '--cleanbuild'
-                ], env=env, cwd=pkg_dir)
-            elif build_type == "msys":
-                run_cmd(msys2_root, [
-                    'makepkg',
-                    '--noconfirm',
-                    '--noprogressbar',
-                    '--nocheck',
-                    '--syncdeps',
-                    '--rmdeps',
-                    '--cleanbuild'
-                ], env=env, cwd=pkg_dir)
+        with staging_dependencies(build_type, pkg, msys2_root, builddir):
+            try:
+                env = get_build_environ()
+                if build_type == "mingw-src":
+                    env['MINGW_ARCH'] = Config.MINGW_SRC_ARCH
+                    run_cmd(msys2_root, [
+                        'makepkg-mingw',
+                        '--noconfirm',
+                        '--noprogressbar',
+                        '--allsource'
+                    ], env=env, cwd=pkg_dir)
+                elif build_type == "msys-src":
+                    run_cmd(msys2_root, [
+                        'makepkg',
+                        '--noconfirm',
+                        '--noprogressbar',
+                        '--allsource'
+                    ], env=env, cwd=pkg_dir)
+                elif build_type in Config.MINGW_ARCH_LIST:
+                    env['MINGW_ARCH'] = build_type
+                    run_cmd(msys2_root, [
+                        'makepkg-mingw',
+                        '--noconfirm',
+                        '--noprogressbar',
+                        '--nocheck',
+                        '--syncdeps',
+                        '--rmdeps',
+                        '--cleanbuild'
+                    ], env=env, cwd=pkg_dir)
+                elif build_type == "msys":
+                    run_cmd(msys2_root, [
+                        'makepkg',
+                        '--noconfirm',
+                        '--noprogressbar',
+                        '--nocheck',
+                        '--syncdeps',
+                        '--rmdeps',
+                        '--cleanbuild'
+                    ], env=env, cwd=pkg_dir)
+                else:
+                    assert 0
+
+                entries = os.listdir(pkg_dir)
+                for pattern in pkg.get_build_patterns(build_type):
+                    found = fnmatch.filter(entries, pattern)
+                    if not found:
+                        raise BuildError(f"{pattern} not found, likely wrong version built")
+                    to_upload.extend([os.path.join(pkg_dir, e) for e in found])
+
+            except (subprocess.CalledProcessError, BuildError) as e:
+                wait_for_api_limit_reset()
+                release = get_release(repo, "staging-failed")
+                run_urls = get_current_run_urls()
+                failed_data = {}
+                if run_urls is not None:
+                    failed_data["urls"] = run_urls
+                content = json.dumps(failed_data).encode()
+                upload_asset(release, pkg.get_failed_name(build_type), text=True, content=content)
+
+                raise BuildError(e)
             else:
-                assert 0
-
-            entries = os.listdir(pkg_dir)
-            for pattern in pkg.get_build_patterns(build_type):
-                found = fnmatch.filter(entries, pattern)
-                if not found:
-                    raise BuildError(f"{pattern} not found, likely wrong version built")
-                to_upload.extend([os.path.join(pkg_dir, e) for e in found])
-
-        except (subprocess.CalledProcessError, BuildError) as e:
-            wait_for_api_limit_reset()
-            release = get_release(repo, "staging-failed")
-            run_urls = get_current_run_urls()
-            failed_data = {}
-            if run_urls is not None:
-                failed_data["urls"] = run_urls
-            content = json.dumps(failed_data).encode()
-            upload_asset(release, pkg.get_failed_name(build_type), text=True, content=content)
-
-            raise BuildError(e)
-        else:
-            wait_for_api_limit_reset()
-            release = repo.get_release("staging-" + build_type)
-            for path in to_upload:
-                upload_asset(release, path)
+                wait_for_api_limit_reset()
+                release = repo.get_release("staging-" + build_type)
+                for path in to_upload:
+                    upload_asset(release, path)
 
 
 def run_build(args: Any) -> None:
