@@ -1612,12 +1612,16 @@ def install_requests_cache() -> None:
     cache_dir = os.path.join(SCRIPT_DIR, '.autobuild_cache')
     os.makedirs(cache_dir, exist_ok=True)
     requests_cache.install_cache(
+        always_revalidate=True,
         cache_control=False,
         expire_after=0,
         backend=SQLiteCache(os.path.join(cache_dir, 'http_cache.sqlite')))
 
     # Call this once, so it gets cached from the main thread and can be used in a thread pool
     get_requests_session(nocache=True)
+
+    # TODO: Use https://github.com/requests-cache/requests-cache/pull/624
+    # once it is released
 
     # How to limit the cache size is an open question, at least to me:
     # https://github.com/reclosedev/requests-cache/issues/620
