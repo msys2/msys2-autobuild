@@ -76,6 +76,9 @@ class Config:
     SOFT_JOB_TIMEOUT = 60 * 60 * 3
     """Runtime after which we shouldn't start a new build"""
 
+    MAXIMUM_JOB_COUNT = 12
+    """Maximum number of jobs to spawn"""
+
     MANUAL_BUILD: List[Tuple[str, List[BuildType]]] = [
         ('mingw-w64-firebird-git', []),
         ('mingw-w64-qt5-static', ['mingw32', 'mingw64', 'ucrt64']),
@@ -1159,7 +1162,7 @@ def write_build_plan(args: Any) -> None:
                 matrix["name"] = matrix["name"] + "-3"
                 jobs.append(matrix)
 
-    write_out(jobs)
+    write_out(jobs[:Config.MAXIMUM_JOB_COUNT])
 
 
 def queue_website_update() -> None:
