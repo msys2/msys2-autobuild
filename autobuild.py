@@ -32,7 +32,8 @@ from functools import lru_cache
 from datetime import datetime, timezone
 from enum import Enum
 from hashlib import sha256
-from typing import Generator, Union, AnyStr, List, Any, Dict, Tuple, Set, Optional, Sequence, Literal, cast
+from typing import Generator, Union, AnyStr, List, Any, Dict, Tuple, Set, Optional, Sequence, \
+    Literal, cast, TypeVar
 
 
 ArchType = Literal["mingw32", "mingw64", "ucrt64", "clang64", "clang32", "clangarm64", "msys"]
@@ -472,9 +473,17 @@ SigLevel=Never
 """)
                     h2.write(text)
 
-        args: List[_PathLike] = ["repo-add", to_pure_posix_path(repo_db_path)]
-        args += [to_pure_posix_path(p) for p in package_paths]
-        run_cmd(msys2_root, args, cwd=repo_dir)
+        ChunkItem = TypeVar("ChunkItem")
+
+        def chunks(lst: List[ChunkItem], n: int) -> Generator[List[ChunkItem], None, None]:
+            for i in range(0, len(lst), n):
+                yield lst[i:i + n]
+
+        base_args: List[_PathLike] = ["repo-add", to_pure_posix_path(repo_db_path)]
+        posix_paths: List[_PathLike] = [to_pure_posix_path(p) for p in package_paths]
+        for chunk in chunks(posix_paths, 15):
+            args = base_args + chunk
+            run_cmd(msys2_root, args, cwd=repo_dir)
 
     cached_assets = CachedAssets()
     repo_root = os.path.join(builddir, "_REPO")
