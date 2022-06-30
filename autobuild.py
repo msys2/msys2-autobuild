@@ -473,6 +473,7 @@ SigLevel=Never
 """)
                     h2.write(text)
 
+        # repo-add 15 packages at a time so we don't hit the size limit for CLI arguments
         ChunkItem = TypeVar("ChunkItem")
 
         def chunks(lst: List[ChunkItem], n: int) -> Generator[List[ChunkItem], None, None]:
