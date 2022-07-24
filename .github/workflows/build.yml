@@ -86,6 +86,10 @@ jobs:
     name: ${{ matrix.name }}
     runs-on: ${{ matrix.runner }}
 
+    env:
+      # XXX: https://github.com/msys2/MINGW-packages/issues/11864#issuecomment-1193289554
+      MSYS: winjitdebug
+
     steps:
 
     - name: Runner details
