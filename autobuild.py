@@ -650,12 +650,13 @@ def run_build(args: Any) -> None:
     while True:
         wait_for_api_limit_reset()
 
+        pkgs = get_buildqueue_with_status(full_details=True)
+        update_status(pkgs)
+
         if (time.monotonic() - start_time) >= Config.SOFT_JOB_TIMEOUT:
             print("timeout reached")
             break
 
-        pkgs = get_buildqueue_with_status(full_details=True)
-        update_status(pkgs)
         todo = get_package_to_build(pkgs, build_types, args.build_from)
         if not todo:
             break
