@@ -135,8 +135,7 @@ jobs:
       run: |
         echo 'Server = https://repo.msys2.org/mingw/$repo/' > /etc/pacman.d/mirrorlist.mingw
         echo 'Server = https://repo.msys2.org/msys/$arch/' > /etc/pacman.d/mirrorlist.msys
-        grep -qF '[clang32]' /etc/pacman.conf || sed -i '1s|^|[clang32]\nServer = http://repo.msys2.org/mingw/clang32/\n|' /etc/pacman.conf
-        grep -qF '[clangarm64]' /etc/pacman.conf || sed -i '1s|^|[clangarm64]\nServer = http://repo.msys2.org/mingw/clangarm64/\n|' /etc/pacman.conf
+        grep -qFx '[clangarm64]' /etc/pacman.conf || sed -i '/^# \[clangarm64\]/,/^$/ s|^# ||g' /etc/pacman.conf
         pacman-conf.exe
 
     - name: Update using the main mirror & Check install
