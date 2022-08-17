@@ -508,8 +508,14 @@ SigLevel=Never
                             else:
                                 raise SystemExit(f"asset for {pattern} in {dep_type} not found")
 
+            if not to_add:
+                yield
+
             for dep_type, assets in to_add.items():
                 add_to_repo(repo_root, dep_type, assets)
+
+            # that might have pulled in new dependencies from staging
+            staging_dependencies(build_type, pkg, msys2_root, builddir)
 
             # in case they are already installed we need to upgrade
             run_cmd(msys2_root, ["pacman", "--noconfirm", "-Suy"])
