@@ -53,8 +53,9 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         GITHUB_TOKEN_READONLY: ${{ secrets.GITHUBTOKENREADONLY }}
+        OPTIONAL_DEPS: ${{ github.event.inputs.optional_deps }}
       run: |
-        python -u autobuild.py write-build-plan --optional-deps '${{ github.event.inputs.optional_deps }}' build_plan.json
+        python -u autobuild.py write-build-plan --optional-deps "$env:OPTIONAL_DEPS" build_plan.json
         buildPlan="$(cat build_plan.json)"
         echo "::set-output name=build-plan::$buildPlan"
 
@@ -71,8 +72,9 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         GITHUB_TOKEN_READONLY: ${{ secrets.GITHUBTOKENREADONLY }}
+        OPTIONAL_DEPS: ${{ github.event.inputs.optional_deps }}
       run: |
-        python -u autobuild.py show --optional-deps '${{ github.event.inputs.optional_deps }}'
+        python -u autobuild.py show --optional-deps "$env:OPTIONAL_DEPS"
 
   build:
     needs: schedule
