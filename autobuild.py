@@ -422,22 +422,59 @@ def to_pure_posix_path(path: _PathLike) -> PurePath:
 
 
 @contextmanager
-def backup_pacman_conf(msys2_root: _PathLike) -> Generator:
-    conf = get_python_path(msys2_root, "/etc/pacman.conf")
-    backup = get_python_path(msys2_root, "/etc/pacman.conf.backup")
-    shutil.copyfile(conf, backup)
+def temp_pacman_conf(msys2_root: _PathLike) -> Generator[Path, None, None]:
+    """Gives a unix path to a temporary copy of pacman.conf"""
+
+    fd, filename = tempfile.mkstemp("pacman.conf")
+    os.close(fd)
     try:
-        yield
+        conf = get_python_path(msys2_root, "/etc/pacman.conf")
+        with open(conf, "rb") as src:
+            with open(filename, "wb") as dest:
+                shutil.copyfileobj(src, dest)
+
+        yield Path(filename)
     finally:
-        os.replace(backup, conf)
+        try:
+            os.unlink(filename)
+        except OSError:
+            pass
+
+
+@contextmanager
+def temp_pacman_script(pacman_config: _PathLike) -> Generator[_PathLike, None, None]:
+    """Gives a temporary pacman script which uses the passed in pacman config
+    without having to pass --config to it. Required because makepkg doesn't allow
+    setting the pacman conf path, but it allows setting the pacman executable path
+    via the 'PACMAN' env var.
+    """
+
+    fd, filename = tempfile.mkstemp("pacman")
+    os.close(fd)
+
+    try:
+        with open(filename, "w", encoding="utf-8") as h:
+            cli = shlex.join(['/usr/bin/pacman', '--config', str(to_pure_posix_path(pacman_config))])
+            h.write(f"""\
+#!/bin/bash
+set -e
+{cli} "$@"
+""")
+        yield filename
+    finally:
+        try:
+            os.unlink(filename)
+        except OSError:
+            pass
 
 
 @contextmanager
 def staging_dependencies(
         build_type: BuildType, pkg: Package, msys2_root: _PathLike,
-        builddir: _PathLike) -> Generator:
+        builddir: _PathLike) -> Generator[_PathLike, None, None]:
 
-    def add_to_repo(repo_root: str, repo_name: str, assets: List[GitReleaseAsset]) -> None:
+    def add_to_repo(repo_root: _PathLike, pacman_config: _PathLike, repo_name: str,
+                    assets: List[GitReleaseAsset]) -> None:
         repo_dir = Path(repo_root) / repo_name
         os.makedirs(repo_dir, exist_ok=True)
 
@@ -461,12 +498,11 @@ def staging_dependencies(
         repo_name = f"autobuild-{repo_name}"
         repo_db_path = os.path.join(repo_dir, f"{repo_name}.db.tar.gz")
 
-        conf = get_python_path(msys2_root, "/etc/pacman.conf")
-        with open(conf, "r", encoding="utf-8") as h:
+        with open(pacman_config, "r", encoding="utf-8") as h:
             text = h.read()
             uri = to_pure_posix_path(repo_dir).as_uri()
             if uri not in text:
-                with open(conf, "w", encoding="utf-8") as h2:
+                with open(pacman_config, "w", encoding="utf-8") as h2:
                     h2.write(f"""[{repo_name}]
 Server={uri}
 SigLevel=Never
@@ -491,7 +527,7 @@ SigLevel=Never
     try:
         shutil.rmtree(repo_root, ignore_errors=True)
         os.makedirs(repo_root, exist_ok=True)
-        with backup_pacman_conf(msys2_root):
+        with temp_pacman_conf(msys2_root) as pacman_config:
             to_add: Dict[ArchType, List[GitReleaseAsset]] = {}
             for dep_type, deps in pkg.get_depends(build_type).items():
                 assets = cached_assets.get_assets(dep_type)
@@ -509,12 +545,13 @@ SigLevel=Never
                                 raise SystemExit(f"asset for {pattern} in {dep_type} not found")
 
             for dep_type, assets in to_add.items():
-                add_to_repo(repo_root, dep_type, assets)
+                add_to_repo(repo_root, pacman_config, dep_type, assets)
 
-            # in case they are already installed we need to upgrade
-            run_cmd(msys2_root, ["pacman", "--noconfirm", "-Suy"])
-            run_cmd(msys2_root, ["pacman", "--noconfirm", "-Su"])
-            yield
+            with temp_pacman_script(pacman_config) as temp_pacman:
+                # in case they are already installed we need to upgrade
+                run_cmd(msys2_root, [to_pure_posix_path(temp_pacman), "--noconfirm", "-Suy"])
+                run_cmd(msys2_root, [to_pure_posix_path(temp_pacman), "--noconfirm", "-Su"])
+                yield temp_pacman
     finally:
         shutil.rmtree(repo_root, ignore_errors=True)
         # downgrade again
@@ -552,9 +589,11 @@ def build_package(build_type: BuildType, pkg: Package, msys2_root: _PathLike, bu
         validpgpkeys = to_pure_posix_path(os.path.join(SCRIPT_DIR, 'fetch-validpgpkeys.sh'))
         run_cmd(msys2_root, ['bash', validpgpkeys], cwd=pkg_dir)
 
-        with staging_dependencies(build_type, pkg, msys2_root, builddir):
+        with staging_dependencies(build_type, pkg, msys2_root, builddir) as temp_pacman:
             try:
                 env = get_build_environ()
+                # this makes makepkg use our custom pacman script
+                env['PACMAN'] = str(to_pure_posix_path(temp_pacman))
                 if build_type == "mingw-src":
                     env['MINGW_ARCH'] = Config.MINGW_SRC_ARCH
                     run_cmd(msys2_root, [
