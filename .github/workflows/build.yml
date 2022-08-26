@@ -132,6 +132,17 @@ jobs:
         location: 'D:\A'
         release: ${{ runner.arch == 'ARM64' && 'false' || 'true' }}
 
+    # https://github.com/msys2/msys2-autobuild/issues/62
+    - name: Disable texinfo hooks for ARM64
+      if: runner.arch == 'ARM64'
+      shell: msys2 {0}
+      run: |
+        # by creating empty hooks there that are named the same
+        # we disable the hooks from the package
+        mkdir -p /etc/pacman.d/hooks
+        touch /etc/pacman.d/hooks/texinfo-install.hook
+        touch /etc/pacman.d/hooks/texinfo-remove.hook
+
     - name: Switch to the main mirror
       shell: msys2 {0}
       run: |
