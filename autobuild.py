@@ -111,7 +111,7 @@ _PathLike = Union[os.PathLike, AnyStr]
 SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
 
 REQUESTS_TIMEOUT = (15, 30)
-REQUESTS_RETRY = Retry(total=3, backoff_factor=1)
+REQUESTS_RETRY = Retry(total=3, backoff_factor=1, status_forcelist=[500])
 
 
 @lru_cache(maxsize=None)
