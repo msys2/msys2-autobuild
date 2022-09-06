@@ -458,7 +458,7 @@ def temp_pacman_script(pacman_config: _PathLike) -> Generator[_PathLike, None, N
             h.write(f"""\
 #!/bin/bash
 set -e
-{cli} "$@"
+exec {cli} "$@"
 """)
         yield filename
     finally:
