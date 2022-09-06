@@ -13,6 +13,11 @@ on:
         default: ''
         required: false
         type: string
+      context:
+        description: 'Extra information from invoker'
+        default: ''
+        required: false
+        type: string
 
 permissions:
   contents: write
