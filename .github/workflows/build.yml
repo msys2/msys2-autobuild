@@ -8,6 +8,11 @@ on:
         default: ''
         required: false
         type: string
+      context:
+        description: 'Extra information from invoker'
+        default: ''
+        required: false
+        type: string
   schedule:
     - cron: '0 0/3 * * *'
 
