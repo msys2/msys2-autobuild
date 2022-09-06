@@ -26,6 +26,13 @@ jobs:
 
     steps:
 
+    - name: Dump inputs
+      if: ${{ github.event_name == 'workflow_dispatch' }}
+      env:
+        CONTEXT: '${{ toJSON(github.event.inputs) }}'
+      run: |
+        echo "$CONTEXT"
+
     - uses: actions/checkout@v3
 
     - uses: actions/setup-python@v4
