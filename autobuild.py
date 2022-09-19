@@ -102,9 +102,6 @@ class Config:
     }
     """XXX: In case of cycles we mark these deps as optional"""
 
-    BUILD_TYPES_WIP: List[BuildType] = ["clangarm64"]
-    """XXX: These build types don't block other things, even if they fail/don't get built"""
-
 
 _PathLike = Union[os.PathLike, AnyStr]
 
@@ -923,8 +920,7 @@ def get_buildqueue_with_status(full_details: bool = False) -> List[Package]:
 
                     for dep_type, deps in pkg.get_rdepends(build_type).items():
                         for dep in deps:
-                            if dep["name"] in Config.IGNORE_RDEP_PACKAGES or \
-                                    (build_type != dep_type and dep_type in Config.BUILD_TYPES_WIP):
+                            if dep["name"] in Config.IGNORE_RDEP_PACKAGES:
                                 continue
                             dep_status = dep.get_status(dep_type)
                             dep_new = dep.is_new(dep_type)
@@ -946,8 +942,7 @@ def get_buildqueue_with_status(full_details: bool = False) -> List[Package]:
                         blocked.append(build_type)
                     # if the package isn't in the repo better not block on it
                     elif not pkg.is_new(build_type):
-                        if build_type not in Config.BUILD_TYPES_WIP:
-                            unfinished.append(build_type)
+                        unfinished.append(build_type)
                 else:
                     finished.append(build_type)
 
