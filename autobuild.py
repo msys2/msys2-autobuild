@@ -55,7 +55,7 @@ class Config:
     MINGW_ARCH_LIST: List[ArchType] = ["mingw32", "mingw64", "ucrt64", "clang64", "clang32", "clangarm64"]
     """Arches we try to build"""
 
-    MINGW_SRC_ARCH: ArchType = "mingw64"
+    MINGW_SRC_ARCH: ArchType = "ucrt64"
     """The arch that is used to build the source package (any mingw one should work)"""
 
     MAIN_REPO = "msys2/msys2-autobuild"
