@@ -69,7 +69,7 @@ jobs:
       run: |
         python -u autobuild.py write-build-plan --optional-deps "$OPTIONAL_DEPS" build_plan.json
         buildPlan="$(cat build_plan.json)"
-        echo "::set-output name=build-plan::$buildPlan"
+        echo "build-plan=$buildPlan" >> $GITHUB_OUTPUT
 
     - name: Clean up assets
       if: steps.check.outputs.build-plan != '[]'
