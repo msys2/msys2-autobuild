@@ -106,6 +106,14 @@ jobs:
 
     steps:
 
+    - name: Configure Pagefile
+      if: ${{ runner.arch != 'ARM64' }}
+      uses: al-cheb/configure-pagefile-action@86589fd789a4de3e62ba628dda2cb10027b66d67
+      with:
+        minimum-size: 4GB
+        maximum-size: 16GB
+        disk-root: "C:"
+
     - name: Runner details
       run: |
         Get-PSDrive -PSProvider FileSystem
