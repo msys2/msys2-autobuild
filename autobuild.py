@@ -372,7 +372,7 @@ def make_writable(obj: GithubObject) -> Generator:
 
 
 def upload_asset(release: GitRelease, path: _PathLike, replace: bool = False,
-                 text: bool = False, content: bytes = None) -> None:
+                 text: bool = False, content: Optional[bytes] = None) -> None:
     path = Path(path)
     basename = os.path.basename(str(path))
     asset_name = get_gh_asset_name(basename, text)
