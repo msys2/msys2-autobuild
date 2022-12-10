@@ -24,7 +24,7 @@ concurrency: nope
 jobs:
 
   schedule:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
 
     outputs:
       build-plan: ${{ steps.check.outputs.build-plan }}
