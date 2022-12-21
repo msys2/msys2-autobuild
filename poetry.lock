@@ -1,16 +1,18 @@
 [[package]]
 name = "attrs"
-version = "22.1.0"
+version = "22.2.0"
 description = "Classes Without Boilerplate"
 category = "main"
 optional = false
-python-versions = ">=3.5"
+python-versions = ">=3.6"
 
 [package.extras]
-dev = ["cloudpickle", "coverage[toml] (>=5.0.2)", "furo", "hypothesis", "mypy (>=0.900,!=0.940)", "pre-commit", "pympler", "pytest (>=4.3.0)", "pytest-mypy-plugins", "sphinx", "sphinx-notfound-page", "zope.interface"]
-docs = ["furo", "sphinx", "sphinx-notfound-page", "zope.interface"]
-tests = ["cloudpickle", "coverage[toml] (>=5.0.2)", "hypothesis", "mypy (>=0.900,!=0.940)", "pympler", "pytest (>=4.3.0)", "pytest-mypy-plugins", "zope.interface"]
-tests-no-zope = ["cloudpickle", "coverage[toml] (>=5.0.2)", "hypothesis", "mypy (>=0.900,!=0.940)", "pympler", "pytest (>=4.3.0)", "pytest-mypy-plugins"]
+cov = ["attrs", "coverage-enable-subprocess", "coverage[toml] (>=5.3)"]
+dev = ["attrs"]
+docs = ["furo", "sphinx", "myst-parser", "zope.interface", "sphinx-notfound-page", "sphinxcontrib-towncrier", "towncrier"]
+tests = ["attrs", "zope.interface"]
+tests-no-zope = ["hypothesis", "pympler", "pytest (>=4.3.0)", "pytest-xdist", "cloudpickle", "mypy (>=0.971,<0.990)", "pytest-mypy-plugins"]
+tests_no_zope = ["hypothesis", "pympler", "pytest (>=4.3.0)", "pytest-xdist", "cloudpickle", "mypy (>=0.971,<0.990)", "pytest-mypy-plugins"]
 
 [[package]]
 name = "cattrs"
@@ -52,7 +54,7 @@ optional = false
 python-versions = ">=3.6.0"
 
 [package.extras]
-unicode-backport = ["unicodedata2"]
+unicode_backport = ["unicodedata2"]
 
 [[package]]
 name = "deprecated"
@@ -66,7 +68,7 @@ python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*"
 wrapt = ">=1.10,<2"
 
 [package.extras]
-dev = ["PyTest", "PyTest (<5)", "PyTest-Cov", "PyTest-Cov (<2.6)", "bump2version (<1)", "configparser (<5)", "importlib-metadata (<3)", "importlib-resources (<4)", "sphinx (<2)", "sphinxcontrib-websupport (<2)", "tox", "zipp (<2)"]
+dev = ["tox", "bump2version (<1)", "sphinx (<2)", "importlib-metadata (<3)", "importlib-resources (<4)", "configparser (<5)", "sphinxcontrib-websupport (<2)", "zipp (<2)", "PyTest (<5)", "PyTest-Cov (<2.6)", "pytest", "pytest-cov"]
 
 [[package]]
 name = "exceptiongroup"
@@ -144,8 +146,8 @@ optional = false
 python-versions = ">=3.7"
 
 [package.extras]
-docs = ["furo (>=2022.9.29)", "proselint (>=0.13)", "sphinx (>=5.3)", "sphinx-autodoc-typehints (>=1.19.4)"]
-test = ["appdirs (==1.4.4)", "pytest (>=7.2)", "pytest-cov (>=4)", "pytest-mock (>=3.10)"]
+docs = ["furo (>=2022.9.29)", "proselint (>=0.13)", "sphinx-autodoc-typehints (>=1.19.4)", "sphinx (>=5.3)"]
+test = ["appdirs (==1.4.4)", "pytest-cov (>=4)", "pytest-mock (>=3.10)", "pytest (>=7.2)"]
 
 [[package]]
 name = "pycodestyle"
@@ -198,9 +200,9 @@ python-versions = ">=3.7"
 
 [package.extras]
 crypto = ["cryptography (>=3.4.0)"]
-dev = ["coverage[toml] (==5.0.4)", "cryptography (>=3.4.0)", "pre-commit", "pytest (>=6.0.0,<7.0.0)", "sphinx (>=4.5.0,<5.0.0)", "sphinx-rtd-theme", "zope.interface"]
+dev = ["sphinx (>=4.5.0,<5.0.0)", "sphinx-rtd-theme", "zope.interface", "cryptography (>=3.4.0)", "pytest (>=6.0.0,<7.0.0)", "coverage[toml] (==5.0.4)", "pre-commit"]
 docs = ["sphinx (>=4.5.0,<5.0.0)", "sphinx-rtd-theme", "zope.interface"]
-tests = ["coverage[toml] (==5.0.4)", "pytest (>=6.0.0,<7.0.0)"]
+tests = ["pytest (>=6.0.0,<7.0.0)", "coverage[toml] (==5.0.4)"]
 
 [[package]]
 name = "pynacl"
@@ -214,8 +216,8 @@ python-versions = ">=3.6"
 cffi = ">=1.4.1"
 
 [package.extras]
-docs = ["sphinx (>=1.6.5)", "sphinx_rtd_theme"]
-tests = ["hypothesis (>=3.27.0)", "pytest (>=3.2.1,!=3.3.0)"]
+docs = ["sphinx (>=1.6.5)", "sphinx-rtd-theme"]
+tests = ["pytest (>=3.2.1,!=3.3.0)", "hypothesis (>=3.27.0)"]
 
 [[package]]
 name = "requests"
@@ -233,7 +235,7 @@ urllib3 = ">=1.21.1,<1.27"
 
 [package.extras]
 socks = ["PySocks (>=1.5.6,!=1.5.7)"]
-use-chardet-on-py3 = ["chardet (>=3.0.2,<6)"]
+use_chardet_on_py3 = ["chardet (>=3.0.2,<6)"]
 
 [[package]]
 name = "requests-cache"
@@ -253,15 +255,15 @@ url-normalize = ">=1.4"
 urllib3 = ">=1.25.5"
 
 [package.extras]
-all = ["boto3 (>=1.15)", "botocore (>=1.18)", "itsdangerous (>=2.0)", "pymongo (>=3)", "pyyaml (>=5.4)", "redis (>=3)", "ujson (>=5.4)"]
-bson = ["bson (>=0.5)"]
-docs = ["furo (>=2022.6,<2023.0)", "linkify-it-py (>=2.0)", "myst-parser (>=0.17)", "sphinx (>=5.0.2,<6.0.0)", "sphinx-autodoc-typehints (>=1.19)", "sphinx-automodapi (>=0.14)", "sphinx-copybutton (>=0.5)", "sphinx-design (>=0.2)", "sphinx-notfound-page (>=0.8)", "sphinxcontrib-apidoc (>=0.3)", "sphinxext-opengraph (>=0.6)"]
 dynamodb = ["boto3 (>=1.15)", "botocore (>=1.18)"]
-json = ["ujson (>=5.4)"]
+all = ["boto3 (>=1.15)", "botocore (>=1.18)", "pymongo (>=3)", "redis (>=3)", "itsdangerous (>=2.0)", "pyyaml (>=5.4)", "ujson (>=5.4)"]
 mongodb = ["pymongo (>=3)"]
 redis = ["redis (>=3)"]
+bson = ["bson (>=0.5)"]
 security = ["itsdangerous (>=2.0)"]
 yaml = ["pyyaml (>=5.4)"]
+json = ["ujson (>=5.4)"]
+docs = ["furo (>=2022.6,<2023.0)", "linkify-it-py (>=2.0)", "myst-parser (>=0.17)", "sphinx (>=5.0.2,<6.0.0)", "sphinx-autodoc-typehints (>=1.19)", "sphinx-automodapi (>=0.14)", "sphinx-copybutton (>=0.5)", "sphinx-design (>=0.2)", "sphinx-notfound-page (>=0.8)", "sphinxcontrib-apidoc (>=0.3)", "sphinxext-opengraph (>=0.6)"]
 
 [[package]]
 name = "six"
@@ -292,7 +294,7 @@ python-versions = ">=3.7"
 
 [[package]]
 name = "types-requests"
-version = "2.28.11.5"
+version = "2.28.11.6"
 description = "Typing stubs for requests"
 category = "dev"
 optional = false
@@ -345,8 +347,8 @@ optional = false
 python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*, !=3.4.*, !=3.5.*"
 
 [package.extras]
-brotli = ["brotli (>=1.0.9)", "brotlicffi (>=0.8.0)", "brotlipy (>=0.6.0)"]
-secure = ["certifi", "cryptography (>=1.3.4)", "idna (>=2.0.0)", "ipaddress", "pyOpenSSL (>=0.14)", "urllib3-secure-extra"]
+brotli = ["brotlicffi (>=0.8.0)", "brotli (>=1.0.9)", "brotlipy (>=0.6.0)"]
+secure = ["pyOpenSSL (>=0.14)", "cryptography (>=1.3.4)", "idna (>=2.0.0)", "certifi", "urllib3-secure-extra", "ipaddress"]
 socks = ["PySocks (>=1.5.6,!=1.5.7,<2.0)"]
 
 [[package]]
@@ -364,8 +366,8 @@ content-hash = "a9ae0eb8d89bb2258514cf0391165c55a2484e7b4de313fb3be084b688fdb1ef
 
 [metadata.files]
 attrs = [
-    {file = "attrs-22.1.0-py2.py3-none-any.whl", hash = "sha256:86efa402f67bf2df34f51a335487cf46b1ec130d02b8d39fd248abfd30da551c"},
-    {file = "attrs-22.1.0.tar.gz", hash = "sha256:29adc2665447e5191d0e7c568fde78b21f9672d344281d0c6e1ab085429b22b6"},
+    {file = "attrs-22.2.0-py3-none-any.whl", hash = "sha256:29e95c7f6778868dbd49170f98f8818f78f3dc5e0e37c0b1f474e3561b240836"},
+    {file = "attrs-22.2.0.tar.gz", hash = "sha256:c9227bfc2f01993c03f68db37d1d15c9690188323c067c641f1a35ca58185f99"},
 ]
 cattrs = [
     {file = "cattrs-22.2.0-py3-none-any.whl", hash = "sha256:bc12b1f0d000b9f9bee83335887d532a1d3e99a833d1bf0882151c97d3e68c21"},
@@ -441,10 +443,7 @@ cffi = [
     {file = "cffi-1.15.1-cp39-cp39-win_amd64.whl", hash = "sha256:70df4e3b545a17496c9b3f41f5115e69a4f2e77e94e1d2a8e1070bc0c38c8a3c"},
     {file = "cffi-1.15.1.tar.gz", hash = "sha256:d400bfb9a37b1351253cb402671cea7e89bdecc294e8016a707f6d1d8ac934f9"},
 ]
-charset-normalizer = [
-    {file = "charset-normalizer-2.1.1.tar.gz", hash = "sha256:5a3d016c7c547f69d6f81fb0db9449ce888b418b5b9952cc5e6e66843e9dd845"},
-    {file = "charset_normalizer-2.1.1-py3-none-any.whl", hash = "sha256:83e9a75d1911279afd89352c68b45348559d1fc0506b054b346651b5e7fee29f"},
-]
+charset-normalizer = []
 deprecated = [
     {file = "Deprecated-1.2.13-py2.py3-none-any.whl", hash = "sha256:64756e3e14c8c5eea9795d93c524551432a0be75629f8f29e67ab8caf076c76d"},
     {file = "Deprecated-1.2.13.tar.gz", hash = "sha256:43ac5335da90c31c24ba028af536a91d41d53f9e6901ddb021bcc572ce44e38d"},
@@ -457,14 +456,8 @@ flake8 = [
     {file = "flake8-6.0.0-py2.py3-none-any.whl", hash = "sha256:3833794e27ff64ea4e9cf5d410082a8b97ff1a06c16aa3d2027339cd0f1195c7"},
     {file = "flake8-6.0.0.tar.gz", hash = "sha256:c61007e76655af75e6785a931f452915b371dc48f56efd765247c8fe68f2b181"},
 ]
-idna = [
-    {file = "idna-3.4-py3-none-any.whl", hash = "sha256:90b77e79eaa3eba6de819a0c442c0b4ceefc341a7a2ab77d7562bf49f425c5c2"},
-    {file = "idna-3.4.tar.gz", hash = "sha256:814f528e8dead7d329833b91c5faa87d60bf71824cd12a7530b5526063d02cb4"},
-]
-mccabe = [
-    {file = "mccabe-0.7.0-py2.py3-none-any.whl", hash = "sha256:6c2d30ab6be0e4a46919781807b4f0d834ebdd6c6e3dca0bda5a15f863427b6e"},
-    {file = "mccabe-0.7.0.tar.gz", hash = "sha256:348e0240c33b60bbdf4e523192ef919f28cb2c3d7d5c7794f74009290f236325"},
-]
+idna = []
+mccabe = []
 mypy = [
     {file = "mypy-0.991-cp310-cp310-macosx_10_9_universal2.whl", hash = "sha256:7d17e0a9707d0772f4a7b878f04b4fd11f6f5bcb9b3813975a9b13c9332153ab"},
     {file = "mypy-0.991-cp310-cp310-macosx_10_9_x86_64.whl", hash = "sha256:0714258640194d75677e86c786e80ccf294972cc76885d3ebbb560f11db0003d"},
@@ -558,8 +551,8 @@ tomli = [
     {file = "tomli-2.0.1.tar.gz", hash = "sha256:de526c12914f0c550d15924c62d72abc48d6fe7364aa87328337a31007fe8a4f"},
 ]
 types-requests = [
-    {file = "types-requests-2.28.11.5.tar.gz", hash = "sha256:a7df37cc6fb6187a84097da951f8e21d335448aa2501a6b0a39cbd1d7ca9ee2a"},
-    {file = "types_requests-2.28.11.5-py3-none-any.whl", hash = "sha256:091d4a5a33c1b4f20d8b1b952aa8fa27a6e767c44c3cf65e56580df0b05fd8a9"},
+    {file = "types-requests-2.28.11.6.tar.gz", hash = "sha256:8c1b1e6a0b19522b4738063e772dcee82cee1c3646536ccc4eb96f655af2b6c6"},
+    {file = "types_requests-2.28.11.6-py3-none-any.whl", hash = "sha256:48b7c06e3dffc1b6359e1888084a2b97f41b6b63f208c571ddb02ddbc6a892e4"},
 ]
 types-tabulate = [
     {file = "types-tabulate-0.9.0.0.tar.gz", hash = "sha256:4a79474714cea156bcd2185bb9bddd8fb9d3d5227c8d0a7f21bf21caf5f60e67"},
