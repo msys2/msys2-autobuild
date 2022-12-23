@@ -1094,25 +1094,23 @@ def get_job_meta() -> List[Dict[str, Any]]:
                 "runner": ["Windows", "ARM64", "autobuild"]
             }
         }, {
-            "build-types": ["msys", "msys-src"],
+            "build-types": ["msys"],
             "matrix": {
-                "packages": "base-devel VCS",
+                "packages": "base-devel",
                 "build-args": "--build-types msys,msys-src",
                 "name": "msys",
                 "runner": hosted_runner
             }
+        }, {
+            "build-types": ["msys-src", "mingw-src"],
+            "matrix": {
+                "packages": "base-devel VCS",
+                "build-args": "--build-types msys-src,mingw-src",
+                "name": "src",
+                "runner": hosted_runner
+            }
         }
     ]
-
-    # The job matching MINGW_SRC_ARCH should also build mingw-src
-    for meta in job_meta:
-        if Config.MINGW_SRC_ARCH in meta["build-types"]:
-            meta["build-types"].append("mingw-src")
-            meta["matrix"]["build-args"] = meta["matrix"]["build-args"] + ",mingw-src"
-            meta["matrix"]["packages"] = meta["matrix"]["packages"] + " VCS"
-            break
-    else:
-        raise Exception("Didn't find arch for building mingw-src")
 
     return job_meta
 
