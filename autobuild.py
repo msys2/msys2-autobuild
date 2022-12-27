@@ -996,6 +996,9 @@ def get_cycles(pkgs: List[Package]) -> Set[Tuple[Package, Package]]:
                 for dep in deps:
                     if pkg_is_finished(dep, dep_type):
                         continue
+                    # manually broken cycle
+                    if pkg.is_optional_dep(dep, dep_type) or dep.is_optional_dep(pkg, build_type):
+                        continue
                     dep_deps = dep.get_depends(dep_type)
                     if pkg in dep_deps.get(build_type, set()):
                         cycles.add(tuple(sorted([pkg, dep], key=lambda p: p["name"])))  # type: ignore
