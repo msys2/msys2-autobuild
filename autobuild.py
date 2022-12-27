@@ -170,10 +170,10 @@ class Package(dict):
         build = self["builds"].setdefault(build_type, {})
         build["status"] = status
         meta: Dict[str, Any] = {}
-        if description:
-            meta["desc"] = description
-        if urls:
-            meta["urls"] = urls
+        meta["desc"] = description
+        if urls is None:
+            urls = {}
+        meta["urls"] = urls
         build["status_details"] = meta
 
     def set_blocked(
@@ -1225,18 +1225,29 @@ def update_status(pkgs: List[Package]) -> None:
     repo = get_main_repo()
     release = get_release(repo, "status")
 
-    results = {}
+    status_object: Dict[str, Any] = {}
+
+    packages = []
     for pkg in pkgs:
         pkg_result = {}
+        pkg_result["name"] = pkg["name"]
+        pkg_result["version"] = pkg["version"]
+        builds = {}
         for build_type in pkg.get_build_types():
             details = pkg.get_status_details(build_type)
             details.pop("blocked", None)
             details["status"] = pkg.get_status(build_type).value
-            details["version"] = pkg["version"]
-            pkg_result[build_type] = details
-        results[pkg["name"]] = pkg_result
+            builds[build_type] = details
+        pkg_result["builds"] = builds
+        packages.append(pkg_result)
+    status_object["packages"] = packages
 
-    content = json.dumps(results, indent=2).encode()
+    cycles = []
+    for a, b in get_cycles(pkgs):
+        cycles.append([a["name"], b["name"]])
+    status_object["cycles"] = sorted(cycles)
+
+    content = json.dumps(status_object, indent=2).encode()
 
     # If multiple jobs update this at the same time things can fail
     try:
@@ -1254,7 +1265,7 @@ def update_status(pkgs: List[Package]) -> None:
         print(e)
         return
 
-    print(f"Uploaded status file for {len(results)} packages: {new_asset.browser_download_url}")
+    print(f"Uploaded status file for {len(packages)} packages: {new_asset.browser_download_url}")
 
     queue_website_update()
 
