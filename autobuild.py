@@ -1546,14 +1546,15 @@ def clean_gha_assets(args: Any) -> None:
     repo = get_main_repo()
     assets = get_assets_to_delete(repo)
 
-    for asset in assets:
+    def delete_asset(asset: GitReleaseAsset) -> None:
         print(f"Deleting {get_asset_filename(asset)}...")
         if not args.dry_run:
             with make_writable(asset):
                 asset.delete_asset()
 
-    if not assets:
-        print("Nothing to delete")
+    with ThreadPoolExecutor(4) as executor:
+        for item in executor.map(delete_asset, assets):
+            pass
 
 
 def clear_failed_state(args: Any) -> None:
