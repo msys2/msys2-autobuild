@@ -269,6 +269,10 @@ def run_cmd(msys2_root: _PathLike, args: Sequence[_PathLike], **kwargs: Any) -> 
     env["MSYSTEM"] = "MSYS"
     env["MSYS2_PATH_TYPE"] = "minimal"
 
+    # GH actions have started to set MSYS globally, make sure we ignore it
+    # https://github.com/actions/toolkit/issues/1311#issuecomment-1382339390
+    env.pop("MSYS", None)
+
     def shlex_join(split_command: Sequence[str]) -> str:
         # shlex.join got added in 3.8 while we support 3.6
         return ' '.join(shlex.quote(arg) for arg in split_command)
