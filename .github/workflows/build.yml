@@ -100,10 +100,6 @@ jobs:
     name: ${{ matrix.name }}
     runs-on: ${{ matrix.runner }}
 
-    env:
-      # XXX: https://github.com/msys2/MINGW-packages/issues/11864#issuecomment-1193289554
-      MSYS: winjitdebug
-
     steps:
 
     - name: Configure Pagefile
@@ -172,6 +168,8 @@ jobs:
         GITHUB_TOKEN_READONLY: ${{ secrets.GITHUBTOKENREADONLY }}
         GITHUB_RUN_NAME: ${{ matrix.name }}
       run: |
+        # XXX: https://github.com/msys2/MINGW-packages/issues/11864#issuecomment-1193289554
+        $env:MSYS='winjitdebug'
         $env:VCPKG_ROOT=''
         $BUILD_ROOT='C:\'
         $MSYS2_ROOT=(msys2 -c 'cygpath -w /')
