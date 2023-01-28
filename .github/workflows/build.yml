@@ -153,7 +153,6 @@ jobs:
       run: |
         echo 'Server = https://repo.msys2.org/mingw/$repo/' > /etc/pacman.d/mirrorlist.mingw
         echo 'Server = https://repo.msys2.org/msys/$arch/' > /etc/pacman.d/mirrorlist.msys
-        grep -qFx '[clangarm64]' /etc/pacman.conf || sed -i '/^# \[clangarm64\]/,/^$/ s|^# ||g' /etc/pacman.conf
         pacman-conf.exe
 
     - name: Update using the main mirror & Check install
