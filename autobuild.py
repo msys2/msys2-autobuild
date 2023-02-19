@@ -765,7 +765,7 @@ def get_asset_filename(asset: GitReleaseAsset) -> str:
 
 def get_release_assets(release: GitRelease, include_incomplete: bool = False) -> List[GitReleaseAsset]:
     assets = []
-    for asset in release.get_assets():
+    for asset in release.assets:
         # skip in case not fully uploaded yet (or uploading failed)
         if not asset_is_complete(asset) and not include_incomplete:
             continue
@@ -1252,7 +1252,7 @@ def update_status(pkgs: List[Package]) -> None:
     # If multiple jobs update this at the same time things can fail
     try:
         asset_name = "status.json"
-        for asset in release.get_assets():
+        for asset in release.assets:
             if asset.name == asset_name:
                 with make_writable(asset):
                     asset.delete_asset()
