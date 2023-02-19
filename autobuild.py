@@ -29,7 +29,7 @@ import shutil
 import json
 import io
 from functools import lru_cache
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from enum import Enum
 from hashlib import sha256
 from typing import Generator, Union, AnyStr, List, Any, Dict, Tuple, Set, Optional, Sequence, \
@@ -1669,28 +1669,22 @@ def install_requests_cache() -> None:
 
     # Monkey patch globally, so pygithub uses it as well.
     # Only do re-validation with etag/date etc and ignore the cache-control headers that
-    # github sends by default with 60 seconds. This is only possible with requests_cache 0.10+
+    # github sends by default with 60 seconds.
     cache_dir = os.path.join(SCRIPT_DIR, '.autobuild_cache')
     os.makedirs(cache_dir, exist_ok=True)
     requests_cache.install_cache(
         always_revalidate=True,
         cache_control=False,
-        expire_after=0,
+        expire_after=requests_cache.EXPIRE_IMMEDIATELY,
         backend=SQLiteCache(os.path.join(cache_dir, 'http_cache.sqlite')))
 
     # Call this once, so it gets cached from the main thread and can be used in a thread pool
     get_requests_session(nocache=True)
 
-    # TODO: Use https://github.com/requests-cache/requests-cache/pull/624
-    # once it is released
-
-    # How to limit the cache size is an open question, at least to me:
-    # https://github.com/reclosedev/requests-cache/issues/620
-    # so do it the simple/stupid way
+    # Delete old cache entries, so this doesn't grow indefinitely
     cache = requests_cache.get_cache()
     assert cache is not None
-    if cache.response_count() > 200:
-        cache.clear()
+    cache.delete(older_than=timedelta(days=7))
 
 
 def requests_cache_disabled() -> Any:
