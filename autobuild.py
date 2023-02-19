@@ -1661,7 +1661,8 @@ def clean_environ(environ: Dict[str, str]) -> Dict[str, str]:
     return new_env
 
 
-def install_requests_cache() -> None:
+@contextmanager
+def install_requests_cache() -> Generator:
     # This adds basic etag based caching, to avoid hitting API rate limiting
 
     import requests_cache
@@ -1681,10 +1682,16 @@ def install_requests_cache() -> None:
     # Call this once, so it gets cached from the main thread and can be used in a thread pool
     get_requests_session(nocache=True)
 
-    # Delete old cache entries, so this doesn't grow indefinitely
-    cache = requests_cache.get_cache()
-    assert cache is not None
-    cache.delete(older_than=timedelta(days=7))
+    try:
+        yield
+    finally:
+        # Delete old cache entries, so this doesn't grow indefinitely
+        cache = requests_cache.get_cache()
+        assert cache is not None
+        cache.delete(older_than=timedelta(hours=3))
+
+        # un-monkey-patch again
+        requests_cache.uninstall_cache()
 
 
 def requests_cache_disabled() -> Any:
@@ -1693,8 +1700,6 @@ def requests_cache_disabled() -> Any:
 
 
 def main(argv: List[str]) -> None:
-    install_requests_cache()
-
     parser = argparse.ArgumentParser(description="Build packages", allow_abbrev=False)
     parser.set_defaults(func=lambda *x: parser.print_help())
     parser.add_argument(
@@ -1777,7 +1782,8 @@ def main(argv: List[str]) -> None:
 
     args = parser.parse_args(argv[1:])
     Config.MAIN_REPO = args.repo
-    args.func(args)
+    with install_requests_cache():
+        args.func(args)
 
 
 if __name__ == "__main__":
