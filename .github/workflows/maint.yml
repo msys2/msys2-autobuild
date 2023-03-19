@@ -59,8 +59,8 @@ jobs:
         GITHUB_TOKEN_READONLY: ${{ secrets.GITHUBTOKENREADONLY }}
         CLEAR_FAILED_BUILD_TYPES: ${{ github.event.inputs.clear_failed_build_types }}
       run: |
-        python -u autobuild.py clear-failed --build-types "$CLEAR_FAILED_BUILD_TYPES"
-        python -u autobuild.py update-status
+        python -m msys2_autobuild clear-failed --build-types "$CLEAR_FAILED_BUILD_TYPES"
+        python -m msys2_autobuild update-status
 
     - name: Clear failed packages
       if: ${{ github.event.inputs.clear_failed_packages != '' }}
@@ -69,5 +69,5 @@ jobs:
         GITHUB_TOKEN_READONLY: ${{ secrets.GITHUBTOKENREADONLY }}
         CLEAR_FAILED_PACKAGES: ${{ github.event.inputs.clear_failed_packages }}
       run: |
-        python -u autobuild.py clear-failed --packages "$CLEAR_FAILED_PACKAGES"
-        python -u autobuild.py update-status
+        python -m msys2_autobuild clear-failed --packages "$CLEAR_FAILED_PACKAGES"
+        python -m msys2_autobuild update-status

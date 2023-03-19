@@ -16,6 +16,9 @@ on:
   schedule:
     - cron: '0 0/3 * * *'
 
+env:
+  PYTHONUNBUFFERED: 1
+
 permissions:
   contents: write
 
@@ -66,7 +69,7 @@ jobs:
         GITHUB_TOKEN_READONLY: ${{ secrets.GITHUBTOKENREADONLY }}
         OPTIONAL_DEPS: ${{ github.event.inputs.optional_deps }}
       run: |
-        python -u autobuild.py write-build-plan --optional-deps "$OPTIONAL_DEPS" build_plan.json
+        python -m msys2_autobuild write-build-plan --optional-deps "$OPTIONAL_DEPS" build_plan.json
         buildPlan="$(cat build_plan.json)"
         echo "build-plan=$buildPlan" >> $GITHUB_OUTPUT
 
@@ -76,7 +79,7 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         GITHUB_TOKEN_READONLY: ${{ secrets.GITHUBTOKENREADONLY }}
       run: |
-        python -u autobuild.py clean-assets
+        python -m msys2_autobuild clean-assets
 
     - name: Show build queue
       if: steps.check.outputs.build-plan != '[]'
@@ -85,7 +88,7 @@ jobs:
         GITHUB_TOKEN_READONLY: ${{ secrets.GITHUBTOKENREADONLY }}
         OPTIONAL_DEPS: ${{ github.event.inputs.optional_deps }}
       run: |
-        python -u autobuild.py show --optional-deps "$OPTIONAL_DEPS"
+        python -m msys2_autobuild show --optional-deps "$OPTIONAL_DEPS"
 
   build:
     needs: schedule
@@ -171,4 +174,4 @@ jobs:
         $env:VCPKG_ROOT=''
         $BUILD_ROOT='C:\'
         $MSYS2_ROOT=(msys2 -c 'cygpath -w /')
-        python -u autobuild.py build ${{ matrix.build-args }} "$MSYS2_ROOT" "$BUILD_ROOT"
+        python -m msys2_autobuild build ${{ matrix.build-args }} "$MSYS2_ROOT" "$BUILD_ROOT"

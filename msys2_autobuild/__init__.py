@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-
 import sys
 import os
 import argparse
@@ -1671,7 +1669,7 @@ def install_requests_cache() -> Generator:
     # Monkey patch globally, so pygithub uses it as well.
     # Only do re-validation with etag/date etc and ignore the cache-control headers that
     # github sends by default with 60 seconds.
-    cache_dir = os.path.join(SCRIPT_DIR, '.autobuild_cache')
+    cache_dir = os.path.join(os.getcwd(), '.autobuild_cache')
     os.makedirs(cache_dir, exist_ok=True)
     requests_cache.install_cache(
         always_revalidate=True,
@@ -1786,5 +1784,5 @@ def main(argv: List[str]) -> None:
         args.func(args)
 
 
-if __name__ == "__main__":
-    main(sys.argv)
+def run() -> None:
+    return main(sys.argv)

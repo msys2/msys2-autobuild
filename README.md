@@ -1,6 +1,6 @@
 # msys2-autobuild
 
-## autobuild.py
+## CLI
 
 ```console
 $ pacman -S mingw-w64-x86_64-python-tabulate mingw-w64-x86_64-python-pygithub mingw-w64-x86_64-python-requests
@@ -11,7 +11,7 @@ $ python -m pip install --user -r requirements.txt
 ```
 
 ```console
-$ ./autobuild.py --help
+$ python -m msys2_autobuild --help
 usage: autobuild.py [-h]
                     {build,show,should-run,update-status,fetch-assets,upload-assets,clean-assets}
                     ...
