@@ -23,7 +23,7 @@ $ pipx install git+https://github.com/msys2/msys2-autobuild
 ```console
 $ msys2-autobuild --help
 usage: msys2-autobuild [-h] [-R REPO]
-                       {build,show,write-build-plan,update-status,fetch-assets,upload-assets,clear-failed}
+                       {build,show,write-build-plan,update-status,fetch-assets,upload-assets,clear-failed,clean-assets}
                        ...
 
 Build packages
@@ -33,7 +33,7 @@ options:
   -R REPO, --repo REPO  msys2-autobuild repository to target (default 'msys2/msys2-autobuild')
 
 subcommands:
-  {build,show,write-build-plan,update-status,fetch-assets,upload-assets,clear-failed}
+  {build,show,write-build-plan,update-status,fetch-assets,upload-assets,clear-failed,clean-assets}
     build               Build all packages
     show                Show all packages to be built
     write-build-plan    Write a GHA build matrix setup
@@ -41,4 +41,5 @@ subcommands:
     fetch-assets        Download all staging packages
     upload-assets       Upload packages
     clear-failed        Clear the failed state for packages
+    clean-assets        Clean up GHA assets
 ```

@@ -2,8 +2,9 @@ import argparse
 import sys
 from typing import List
 
-from . import (cmd_build, cmd_clear_failed, cmd_fetch_assets, cmd_show_build,
-               cmd_update_status, cmd_upload_assets, cmd_write_build_plan)
+from . import (cmd_build, cmd_clean_assets, cmd_clear_failed, cmd_fetch_assets,
+               cmd_show_build, cmd_update_status, cmd_upload_assets,
+               cmd_write_build_plan)
 from .config import Config
 from .utils import install_requests_cache
 
@@ -24,6 +25,7 @@ def main(argv: List[str]) -> None:
     cmd_fetch_assets.add_parser(subparsers)
     cmd_upload_assets.add_parser(subparsers)
     cmd_clear_failed.add_parser(subparsers)
+    cmd_clean_assets.add_parser(subparsers)
 
     args = parser.parse_args(argv[1:])
     Config.MAIN_REPO = args.repo
