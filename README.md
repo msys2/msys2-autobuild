@@ -11,24 +11,26 @@ $ python -m pip install --user -r requirements.txt
 ```
 
 ```console
-$ python -m msys2_autobuild --help
-usage: autobuild.py [-h]
-                    {build,show,should-run,update-status,fetch-assets,upload-assets,clean-assets}
-                    ...
+$ msys2-autobuild --help
+usage: msys2-autobuild [-h] [-R REPO]
+                       {build,show,write-build-plan,update-status,fetch-assets,upload-assets,clear-failed}
+                       ...
 
 Build packages
 
-optional arguments:
+options:
   -h, --help            show this help message and exit
+  -R REPO, --repo REPO  msys2-autobuild repository to target (default 'msys2/msys2-autobuild')
 
 subcommands:
-  {build,show,should-run,update-status,fetch-assets,upload-assets,clean-assets}
+  {build,show,write-build-plan,update-status,fetch-assets,upload-assets,clear-failed}
     build               Build all packages
     show                Show all packages to be built
+    write-build-plan    Write a GHA build matrix setup
     update-status       Update the status file
     fetch-assets        Download all staging packages
     upload-assets       Upload packages
-    clean-assets        Clean up GHA assets
+    clear-failed        Clear the failed state for packages
 ```
 
 ## Automated Build Process
