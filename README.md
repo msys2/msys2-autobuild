@@ -42,3 +42,9 @@ subcommands:
     clear-failed        Clear the failed state for packages
     clean-assets        Clean up GHA assets
 ```
+
+## Configuration
+
+* `GITHUB_TOKEN` (required) - a GitHub token with write access to the current repo.
+* `GITHUB_TOKEN_READONLY` (optional) - a GitHub token with read access to the current repo. This is used for read operations to not get limited by the API access limits.
+* `GITHUB_REPOSITORY` (optional) - the path to the GitHub repo this is uploading to. Used for deciding which things can be built and where to upload them to. Defaults to `msys2/msys2-autobuild`.
