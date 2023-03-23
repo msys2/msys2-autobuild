@@ -24,13 +24,13 @@ from .config import REQUESTS_RETRY, REQUESTS_TIMEOUT, BuildType, Config
 from .utils import PathLike, get_requests_session
 
 
-def get_credentials(readonly: bool = True) -> Dict[str, Any]:
-    if readonly and os.environ.get("GITHUB_TOKEN_READONLY", ""):
+def get_credentials(write: bool = False) -> Dict[str, Any]:
+    if not write and os.environ.get("GITHUB_TOKEN_READONLY", ""):
         return {'login_or_token': os.environ["GITHUB_TOKEN_READONLY"]}
     elif "GITHUB_TOKEN" in os.environ:
         return {'login_or_token': os.environ["GITHUB_TOKEN"]}
     else:
-        if readonly:
+        if not write:
             print("[Warning] 'GITHUB_TOKEN' or 'GITHUB_TOKEN_READONLY' env vars "
                   "not set which might lead to API rate limiting", file=sys.stderr)
             return {}
@@ -42,7 +42,7 @@ def get_credentials(readonly: bool = True) -> Dict[str, Any]:
 def make_writable(obj: GithubObject) -> Generator:
     # XXX: This switches the read-only token with a potentially writable one
     old_requester = obj._requester  # type: ignore
-    repo = get_current_repo(readonly=False)
+    repo = get_current_repo(write=True)
     try:
         obj._requester = repo._requester  # type: ignore
         yield
@@ -51,28 +51,28 @@ def make_writable(obj: GithubObject) -> Generator:
 
 
 @lru_cache(maxsize=None)
-def get_current_repo(readonly: bool = True) -> Repository:
-    gh = get_github(readonly=readonly)
+def get_current_repo(write: bool = False) -> Repository:
+    gh = get_github(write=write)
     repo_full_name = os.environ.get("GITHUB_REPOSITORY", "msys2/msys2-autobuild")
     return gh.get_repo(repo_full_name, lazy=True)
 
 
 @lru_cache(maxsize=None)
-def get_repo(build_type: BuildType, readonly: bool = True) -> Repository:
-    gh = get_github(readonly=readonly)
+def get_repo(build_type: BuildType, write: bool = False) -> Repository:
+    gh = get_github(write=write)
     return gh.get_repo(Config.ASSETS_REPO[build_type], lazy=True)
 
 
 @lru_cache(maxsize=None)
-def get_github(readonly: bool = True) -> Github:
-    kwargs = get_credentials(readonly=readonly)
+def get_github(write: bool = False) -> Github:
+    kwargs = get_credentials(write=write)
     has_creds = bool(kwargs)
     # 100 is the maximum allowed
     kwargs['per_page'] = 100
     kwargs['retry'] = REQUESTS_RETRY
     kwargs['timeout'] = sum(REQUESTS_TIMEOUT)
     gh = Github(**kwargs)
-    if not has_creds and readonly:
+    if not has_creds and not write:
         print(f"[Warning] Rate limit status: {gh.get_rate_limit().core}", file=sys.stderr)
     return gh
 
@@ -111,19 +111,19 @@ def get_current_run_urls() -> Optional[Dict[str, str]]:
 
 
 def wait_for_api_limit_reset(
-        min_remaining: int = 50, min_remaining_readonly: int = 250, min_sleep: float = 60,
+        min_remaining_write: int = 50, min_remaining: int = 250, min_sleep: float = 60,
         max_sleep: float = 300) -> None:
 
-    for readonly in [True, False]:
-        gh = get_github(readonly=readonly)
+    for write in [False, True]:
+        gh = get_github(write=write)
         while True:
             core = gh.get_rate_limit().core
             reset = fixup_datetime(core.reset)
             now = datetime.now(timezone.utc)
             diff = (reset - now).total_seconds()
-            print(f"{core.remaining} API calls left (readonly={readonly}), "
+            print(f"{core.remaining} API calls left (write={write}), "
                   f"{diff} seconds until the next reset")
-            if core.remaining > (min_remaining_readonly if readonly else min_remaining):
+            if core.remaining > (min_remaining_write if write else min_remaining):
                 break
             wait = diff
             if wait < min_sleep:
