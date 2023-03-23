@@ -13,11 +13,11 @@ from .queue import PackageStatus, get_buildqueue_with_status
 
 
 def get_repo_subdir(build_type: BuildType) -> Path:
-    if build_type == "msys":
+    if build_type in Config.MSYS_ARCH_LIST:
         return Path("msys") / "x86_64"
-    elif build_type == "msys-src":
+    elif build_type == Config.MSYS_SRC_BUILD_TYPE:
         return Path("msys") / "sources"
-    elif build_type == "mingw-src":
+    elif build_type == Config.MINGW_SRC_BUILD_TYPE:
         return Path("mingw") / "sources"
     elif build_type in Config.MINGW_ARCH_LIST:
         return Path("mingw") / build_type

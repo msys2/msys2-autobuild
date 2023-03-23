@@ -9,7 +9,7 @@ import requests
 from github.GithubException import GithubException
 
 from .config import (REQUESTS_TIMEOUT, ArchType, BuildType, Config,
-                     get_all_build_types)
+                     get_all_build_types, build_type_is_src)
 from .gh import (CachedAssets, download_text_asset, get_asset_filename,
                  get_main_repo, get_release, make_writable)
 from .utils import get_requests_session, queue_website_update
@@ -27,10 +27,6 @@ class PackageStatus(Enum):
 
     def __str__(self) -> str:
         return self.value
-
-
-def build_type_is_src(build_type: BuildType) -> bool:
-    return build_type in ["mingw-src", "msys-src"]
 
 
 class Package(dict):
@@ -93,7 +89,7 @@ class Package(dict):
         patterns = []
         if build_type_is_src(build_type):
             patterns.append(f"{self['name']}-{self['version']}.src.tar.[!s]*")
-        elif build_type in (Config.MINGW_ARCH_LIST + ["msys"]):
+        elif build_type in (Config.MINGW_ARCH_LIST + Config.MSYS_ARCH_LIST):
             for item in self._get_build(build_type).get('packages', []):
                 patterns.append(f"{item}-{self['version']}-*.pkg.tar.zst")
         else:
@@ -105,19 +101,19 @@ class Package(dict):
 
     def get_build_types(self) -> List[BuildType]:
         build_types = [
-            t for t in self["builds"] if t in (Config.MINGW_ARCH_LIST + ["msys"])]
+            t for t in self["builds"] if t in (Config.MINGW_ARCH_LIST + Config.MSYS_ARCH_LIST)]
         if self["source"]:
-            if any((k != 'msys') for k in build_types):
-                build_types.append("mingw-src")
-            if "msys" in build_types:
-                build_types.append("msys-src")
+            if any((k in Config.MINGW_ARCH_LIST) for k in build_types):
+                build_types.append(Config.MINGW_SRC_BUILD_TYPE)
+            if any((k in Config.MSYS_ARCH_LIST) for k in build_types):
+                build_types.append(Config.MSYS_SRC_BUILD_TYPE)
         return build_types
 
     def _get_dep_build(self, build_type: BuildType) -> Dict:
-        if build_type == "mingw-src":
+        if build_type == Config.MINGW_SRC_BUILD_TYPE:
             build_type = Config.MINGW_SRC_ARCH
-        elif build_type == "msys-src":
-            build_type = "msys"
+        elif build_type == Config.MSYS_SRC_BUILD_TYPE:
+            build_type = Config.MSYS_SRC_ARCH
         return self._get_build(build_type)
 
     def is_optional_dep(self, dep: "Package", dep_type: BuildType):

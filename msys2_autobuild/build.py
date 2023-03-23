@@ -254,7 +254,7 @@ def build_package(build_type: BuildType, pkg: Package, msys2_root: _PathLike, bu
                 env = get_build_environ()
                 # this makes makepkg use our custom pacman script
                 env['PACMAN'] = str(to_pure_posix_path(temp_pacman))
-                if build_type == "mingw-src":
+                if build_type == Config.MINGW_SRC_BUILD_TYPE:
                     env['MINGW_ARCH'] = Config.MINGW_SRC_ARCH
                     run_cmd(msys2_root, [
                         'makepkg-mingw',
@@ -262,7 +262,7 @@ def build_package(build_type: BuildType, pkg: Package, msys2_root: _PathLike, bu
                         '--noprogressbar',
                         '--allsource'
                     ], env=env, cwd=pkg_dir)
-                elif build_type == "msys-src":
+                elif build_type == Config.MSYS_SRC_BUILD_TYPE:
                     run_cmd(msys2_root, [
                         'makepkg',
                         '--noconfirm',
@@ -280,7 +280,7 @@ def build_package(build_type: BuildType, pkg: Package, msys2_root: _PathLike, bu
                         '--rmdeps',
                         '--cleanbuild'
                     ], env=env, cwd=pkg_dir)
-                elif build_type == "msys":
+                elif build_type in Config.MSYS_SRC_ARCH:
                     run_cmd(msys2_root, [
                         'makepkg',
                         '--noconfirm',
