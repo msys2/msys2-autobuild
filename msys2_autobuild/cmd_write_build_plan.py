@@ -1,13 +1,11 @@
 import json
-import os
 import shlex
 from typing import Any, Dict, List
 
 from tabulate import tabulate
 
-from .config import Config, BuildType
-from .gh import (get_current_repo, get_current_workflow,
-                 wait_for_api_limit_reset)
+from .config import BuildType, Config
+from .gh import get_current_repo, wait_for_api_limit_reset
 from .queue import (Package, PackageStatus, get_buildqueue_with_status,
                     get_cycles, update_status)
 from .utils import apply_optional_deps, gha_group
@@ -104,24 +102,9 @@ def write_build_plan(args: Any) -> None:
 
     apply_optional_deps(optional_deps)
 
-    current_id = None
-    if "GITHUB_RUN_ID" in os.environ:
-        current_id = int(os.environ["GITHUB_RUN_ID"])
-
     def write_out(result: List[Dict[str, str]]) -> None:
         with open(target_file, "wb") as h:
             h.write(json.dumps(result, indent=2).encode())
-
-    workflow = get_current_workflow()
-    runs = list(workflow.get_runs(status="in_progress"))
-    runs += list(workflow.get_runs(status="queued"))
-    for run in runs:
-        if current_id is not None and current_id == run.id:
-            # Ignore this run itself
-            continue
-        print(f"Another workflow is currently running or has something queued: {run.html_url}")
-        write_out([])
-        return
 
     wait_for_api_limit_reset()
 

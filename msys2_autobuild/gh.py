@@ -18,7 +18,6 @@ from github.GithubObject import GithubObject
 from github.GitRelease import GitRelease
 from github.GitReleaseAsset import GitReleaseAsset
 from github.Repository import Repository
-from github.Workflow import Workflow
 
 from .config import REQUESTS_RETRY, REQUESTS_TIMEOUT, BuildType, Config
 from .utils import PathLike, get_requests_session
@@ -274,15 +273,3 @@ class CachedAssets:
         assets = self._failed[key]
         # XXX: This depends on the format of the filename
         return [a for a in assets if get_asset_filename(a).startswith(build_type + "-")]
-
-
-def get_current_workflow() -> Workflow:
-    workflow_name = os.environ.get("GITHUB_WORKFLOW", None)
-    if workflow_name is None:
-        raise Exception("GITHUB_WORKFLOW not set")
-    repo = get_current_repo()
-    for workflow in repo.get_workflows():
-        if workflow.name == workflow_name:
-            return workflow
-    else:
-        raise Exception("workflow not found:", workflow_name)
