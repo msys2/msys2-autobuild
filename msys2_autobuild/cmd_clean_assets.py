@@ -5,12 +5,14 @@ from typing import Any, Dict, List
 from github.GitReleaseAsset import GitReleaseAsset
 
 from .config import get_all_build_types
-from .gh import (get_asset_filename, get_release, get_release_assets, get_repo,
-                 make_writable)
+from .gh import (get_asset_filename, get_current_repo, get_release,
+                 get_release_assets, make_writable)
 from .queue import get_buildqueue
 
 
 def get_assets_to_delete() -> List[GitReleaseAsset]:
+    repo = get_current_repo()
+
     print("Fetching packages to build...")
     patterns = []
     for pkg in get_buildqueue():
@@ -21,7 +23,6 @@ def get_assets_to_delete() -> List[GitReleaseAsset]:
     print("Fetching assets...")
     assets: Dict[str, List[GitReleaseAsset]] = {}
     for build_type in get_all_build_types():
-        repo = get_repo(build_type)
         release = get_release(repo, "staging-" + build_type)
         for asset in get_release_assets(release, include_incomplete=True):
             assets.setdefault(get_asset_filename(asset), []).append(asset)
