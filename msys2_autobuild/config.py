@@ -68,6 +68,13 @@ class Config:
     MAXIMUM_JOB_COUNT = 15
     """Maximum number of jobs to spawn"""
 
+    MAXIMUM_BUILD_TYPE_JOB_COUNT: Dict[BuildType, int] = {
+        "msys-src": 1,
+        "mingw-src": 1,
+        "clangarm64": 1,
+    }
+    """Maximum jobs for each build type. Default is no limit."""
+
     MANUAL_BUILD: List[Tuple[str, List[BuildType]]] = [
         ('mingw-w64-firebird-git', []),
         ('mingw-w64-qt5-static', ['mingw32', 'mingw64', 'ucrt64', 'clang32', 'clang64']),

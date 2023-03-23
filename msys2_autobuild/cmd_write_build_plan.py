@@ -5,7 +5,7 @@ from typing import Any, Dict, List
 
 from tabulate import tabulate
 
-from .config import Config
+from .config import Config, BuildType
 from .gh import (get_current_repo, get_current_workflow,
                  wait_for_api_limit_reset)
 from .queue import (Package, PackageStatus, get_buildqueue_with_status,
@@ -110,7 +110,7 @@ def write_build_plan(args: Any) -> None:
 
     def write_out(result: List[Dict[str, str]]) -> None:
         with open(target_file, "wb") as h:
-            h.write(json.dumps(result).encode())
+            h.write(json.dumps(result, indent=2).encode())
 
     workflow = get_current_workflow()
     runs = list(workflow.get_runs(status="in_progress"))
@@ -131,7 +131,7 @@ def write_build_plan(args: Any) -> None:
 
     update_status(pkgs)
 
-    queued_build_types: Dict[str, int] = {}
+    queued_build_types: Dict[BuildType, int] = {}
     for pkg in pkgs:
         for build_type in pkg.get_build_types():
             if pkg.get_status(build_type) == PackageStatus.WAITING_FOR_BUILD:
@@ -150,6 +150,14 @@ def write_build_plan(args: Any) -> None:
     for job_info in get_job_meta():
         matching_build_types = \
             set(queued_build_types) & set(job_info["build-types"]) & available_build_types
+
+        # limit to the build type included with the lowest limit
+        job_limit = Config.MAXIMUM_JOB_COUNT
+        for build_type in matching_build_types:
+            type_limit = Config.MAXIMUM_BUILD_TYPE_JOB_COUNT.get(build_type, Config.MAXIMUM_JOB_COUNT)
+            if type_limit < job_limit:
+                job_limit = type_limit
+
         if matching_build_types:
             build_count = sum(queued_build_types[bt] for bt in matching_build_types)
             job = job_info["matrix"]
@@ -160,12 +168,12 @@ def write_build_plan(args: Any) -> None:
             jobs.append(job)
             # XXX: If there is more than three builds we start two jobs with the second
             # one having a reversed build order
-            if build_count > 3:
+            if build_count > 3 and job_limit >= 2:
                 matrix = dict(job)
                 matrix["build-args"] = matrix["build-args"] + " --build-from end"
                 matrix["name"] = matrix["name"] + "-2"
                 jobs.append(matrix)
-            if build_count > 9:
+            if build_count > 9 and job_limit >= 3:
                 matrix = dict(job)
                 matrix["build-args"] = matrix["build-args"] + " --build-from middle"
                 matrix["name"] = matrix["name"] + "-3"
