@@ -18,18 +18,18 @@ from .gh import (CachedAssets, download_asset, get_asset_filename,
                  get_current_run_urls, get_main_repo, get_release,
                  upload_asset, wait_for_api_limit_reset)
 from .queue import Package
-from .utils import SCRIPT_DIR, _PathLike
+from .utils import SCRIPT_DIR, PathLike
 
 
 class BuildError(Exception):
     pass
 
 
-def get_python_path(msys2_root: _PathLike, msys2_path: _PathLike) -> Path:
+def get_python_path(msys2_root: PathLike, msys2_path: PathLike) -> Path:
     return Path(os.path.normpath(str(msys2_root) + str(msys2_path)))
 
 
-def to_pure_posix_path(path: _PathLike) -> PurePath:
+def to_pure_posix_path(path: PathLike) -> PurePath:
     return PurePosixPath("/" + str(path).replace(":", "", 1).replace("\\", "/"))
 
 
@@ -46,7 +46,7 @@ def get_build_environ() -> Dict[str, str]:
 
 
 @contextmanager
-def temp_pacman_script(pacman_config: _PathLike) -> Generator[_PathLike, None, None]:
+def temp_pacman_script(pacman_config: PathLike) -> Generator[PathLike, None, None]:
     """Gives a temporary pacman script which uses the passed in pacman config
     without having to pass --config to it. Required because makepkg doesn't allow
     setting the pacman conf path, but it allows setting the pacman executable path
@@ -73,7 +73,7 @@ exec {cli} "$@"
 
 
 @contextmanager
-def temp_pacman_conf(msys2_root: _PathLike) -> Generator[Path, None, None]:
+def temp_pacman_conf(msys2_root: PathLike) -> Generator[Path, None, None]:
     """Gives a unix path to a temporary copy of pacman.conf"""
 
     fd, filename = tempfile.mkstemp("pacman.conf")
@@ -106,7 +106,7 @@ def clean_environ(environ: Dict[str, str]) -> Dict[str, str]:
     return new_env
 
 
-def run_cmd(msys2_root: _PathLike, args: Sequence[_PathLike], **kwargs: Any) -> None:
+def run_cmd(msys2_root: PathLike, args: Sequence[PathLike], **kwargs: Any) -> None:
     executable = os.path.join(msys2_root, 'usr', 'bin', 'bash.exe')
     env = clean_environ(kwargs.pop("env", os.environ.copy()))
     env["CHERE_INVOKING"] = "1"
@@ -121,7 +121,7 @@ def run_cmd(msys2_root: _PathLike, args: Sequence[_PathLike], **kwargs: Any) -> 
 
 
 @contextmanager
-def fresh_git_repo(url: str, path: _PathLike) -> Generator:
+def fresh_git_repo(url: str, path: PathLike) -> Generator:
     if not os.path.exists(path):
         check_call(["git", "clone", url, path])
     else:
@@ -142,10 +142,10 @@ def fresh_git_repo(url: str, path: _PathLike) -> Generator:
 
 @contextmanager
 def staging_dependencies(
-        build_type: BuildType, pkg: Package, msys2_root: _PathLike,
-        builddir: _PathLike) -> Generator[_PathLike, None, None]:
+        build_type: BuildType, pkg: Package, msys2_root: PathLike,
+        builddir: PathLike) -> Generator[PathLike, None, None]:
 
-    def add_to_repo(repo_root: _PathLike, pacman_config: _PathLike, repo_name: str,
+    def add_to_repo(repo_root: PathLike, pacman_config: PathLike, repo_name: str,
                     assets: List[GitReleaseAsset]) -> None:
         repo_dir = Path(repo_root) / repo_name
         os.makedirs(repo_dir, exist_ok=True)
@@ -188,8 +188,8 @@ SigLevel=Never
             for i in range(0, len(lst), n):
                 yield lst[i:i + n]
 
-        base_args: List[_PathLike] = ["repo-add", to_pure_posix_path(repo_db_path)]
-        posix_paths: List[_PathLike] = [to_pure_posix_path(p) for p in package_paths]
+        base_args: List[PathLike] = ["repo-add", to_pure_posix_path(repo_db_path)]
+        posix_paths: List[PathLike] = [to_pure_posix_path(p) for p in package_paths]
         for chunk in chunks(posix_paths, 15):
             args = base_args + chunk
             run_cmd(msys2_root, args, cwd=repo_dir)
@@ -231,7 +231,7 @@ SigLevel=Never
         run_cmd(msys2_root, ["pacman", "--noconfirm", "-Suu"])
 
 
-def build_package(build_type: BuildType, pkg: Package, msys2_root: _PathLike, builddir: _PathLike) -> None:
+def build_package(build_type: BuildType, pkg: Package, msys2_root: PathLike, builddir: PathLike) -> None:
     assert os.path.isabs(builddir)
     assert os.path.isabs(msys2_root)
     os.makedirs(builddir, exist_ok=True)

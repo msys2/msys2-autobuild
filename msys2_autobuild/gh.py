@@ -21,7 +21,7 @@ from github.Repository import Repository
 from github.Workflow import Workflow
 
 from .config import REQUESTS_RETRY, REQUESTS_TIMEOUT, BuildType, Config
-from .utils import _PathLike, get_requests_session
+from .utils import PathLike, get_requests_session
 
 
 def get_credentials(readonly: bool = True) -> Dict[str, Any]:
@@ -162,7 +162,7 @@ def download_asset(asset: GitReleaseAsset, target_path: str) -> None:
                 pass
 
 
-def get_gh_asset_name(basename: _PathLike, text: bool = False) -> str:
+def get_gh_asset_name(basename: PathLike, text: bool = False) -> str:
     # GitHub will throw out charaters like '~' or '='. It also doesn't like
     # when there is no file extension and will try to add one
     return sha256(str(basename).encode("utf-8")).hexdigest() + (".bin" if not text else ".txt")
@@ -194,7 +194,7 @@ def get_release_assets(release: GitRelease, include_incomplete: bool = False) ->
     return assets
 
 
-def upload_asset(release: GitRelease, path: _PathLike, replace: bool = False,
+def upload_asset(release: GitRelease, path: PathLike, replace: bool = False,
                  text: bool = False, content: Optional[bytes] = None) -> None:
     path = Path(path)
     basename = os.path.basename(str(path))

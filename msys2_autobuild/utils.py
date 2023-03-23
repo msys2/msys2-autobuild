@@ -9,7 +9,7 @@ from requests.adapters import HTTPAdapter
 
 from .config import REQUESTS_RETRY, REQUESTS_TIMEOUT, Config
 
-_PathLike = Union[os.PathLike, AnyStr]
+PathLike = Union[os.PathLike, AnyStr]
 SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
 
 
