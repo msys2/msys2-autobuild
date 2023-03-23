@@ -104,7 +104,7 @@ def write_build_plan(args: Any) -> None:
 
     def write_out(result: List[Dict[str, str]]) -> None:
         with open(target_file, "wb") as h:
-            h.write(json.dumps(result, indent=2).encode())
+            h.write(json.dumps(result).encode())
 
     wait_for_api_limit_reset()
 
