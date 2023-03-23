@@ -5,17 +5,12 @@ from typing import List
 from . import (cmd_build, cmd_clean_assets, cmd_clear_failed, cmd_fetch_assets,
                cmd_show_build, cmd_update_status, cmd_upload_assets,
                cmd_write_build_plan)
-from .config import Config
 from .utils import install_requests_cache
 
 
 def main(argv: List[str]) -> None:
     parser = argparse.ArgumentParser(description="Build packages", allow_abbrev=False)
     parser.set_defaults(func=lambda *x: parser.print_help())
-    parser.add_argument(
-           "-R", "--repo", action="store",
-           help=f"msys2-autobuild repository to target (default '{Config.MAIN_REPO}')",
-           default=Config.MAIN_REPO)
     subparsers = parser.add_subparsers(title="subcommands")
 
     cmd_build.add_parser(subparsers)
@@ -28,7 +23,6 @@ def main(argv: List[str]) -> None:
     cmd_clean_assets.add_parser(subparsers)
 
     args = parser.parse_args(argv[1:])
-    Config.MAIN_REPO = args.repo
     with install_requests_cache():
         args.func(args)
 

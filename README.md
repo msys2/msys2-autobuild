@@ -22,7 +22,7 @@ $ pipx install git+https://github.com/msys2/msys2-autobuild
 
 ```console
 $ msys2-autobuild --help
-usage: msys2-autobuild [-h] [-R REPO]
+usage: msys2-autobuild [-h]
                        {build,show,write-build-plan,update-status,fetch-assets,upload-assets,clear-failed,clean-assets}
                        ...
 
@@ -30,7 +30,6 @@ Build packages
 
 options:
   -h, --help            show this help message and exit
-  -R REPO, --repo REPO  msys2-autobuild repository to target (default 'msys2/msys2-autobuild')
 
 subcommands:
   {build,show,write-build-plan,update-status,fetch-assets,upload-assets,clear-failed,clean-assets}
