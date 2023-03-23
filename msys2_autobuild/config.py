@@ -49,9 +49,6 @@ class Config:
 
     MSYS_SRC_BUILD_TYPE: BuildType = "msys-src"
 
-    MAIN_REPO = "msys2/msys2-autobuild"
-    """The path of this repo (used for accessing the assets)"""
-
     ASSETS_REPO: Dict[BuildType, str] = {
         "msys-src": "msys2/msys2-autobuild",
         "msys": "msys2/msys2-autobuild",

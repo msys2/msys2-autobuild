@@ -42,7 +42,7 @@ def get_credentials(readonly: bool = True) -> Dict[str, Any]:
 def make_writable(obj: GithubObject) -> Generator:
     # XXX: This switches the read-only token with a potentially writable one
     old_requester = obj._requester  # type: ignore
-    repo = get_main_repo(readonly=False)
+    repo = get_current_repo(readonly=False)
     try:
         obj._requester = repo._requester  # type: ignore
         yield
@@ -51,9 +51,16 @@ def make_writable(obj: GithubObject) -> Generator:
 
 
 @lru_cache(maxsize=None)
-def get_main_repo(readonly: bool = True) -> Repository:
+def get_current_repo(readonly: bool = True) -> Repository:
     gh = get_github(readonly=readonly)
-    return gh.get_repo(Config.MAIN_REPO, lazy=True)
+    repo_full_name = os.environ.get("GITHUB_REPOSITORY", "msys2/msys2-autobuild")
+    return gh.get_repo(repo_full_name, lazy=True)
+
+
+@lru_cache(maxsize=None)
+def get_repo(build_type: BuildType, readonly: bool = True) -> Repository:
+    gh = get_github(readonly=readonly)
+    return gh.get_repo(Config.ASSETS_REPO[build_type], lazy=True)
 
 
 @lru_cache(maxsize=None)
@@ -91,7 +98,7 @@ def get_current_run_urls() -> Optional[Dict[str, str]]:
     if "GITHUB_SHA" in os.environ and "GITHUB_RUN_NAME" in os.environ:
         sha = os.environ["GITHUB_SHA"]
         run_name = os.environ["GITHUB_RUN_NAME"]
-        commit = get_main_repo().get_commit(sha)
+        commit = get_current_repo().get_commit(sha)
         check_runs = commit.get_check_runs(
             check_name=run_name, status="in_progress", filter="latest")
         for run in check_runs:
@@ -249,24 +256,17 @@ class CachedAssets:
 
     def __init__(self):
         self._assets = {}
-        self._repos = {}
         self._failed = {}
-
-    def _get_repo(self, build_type: BuildType) -> Repository:
-        repo_name = Config.ASSETS_REPO[build_type]
-        if repo_name not in self._repos:
-            self._repos[repo_name] = get_github().get_repo(repo_name, lazy=True)
-        return self._repos[repo_name]
 
     def get_assets(self, build_type: BuildType) -> List[GitReleaseAsset]:
         if build_type not in self._assets:
-            repo = self._get_repo(build_type)
+            repo = get_repo(build_type)
             release = get_release(repo, 'staging-' + build_type)
             self._assets[build_type] = get_release_assets(release)
         return self._assets[build_type]
 
     def get_failed_assets(self, build_type: BuildType) -> List[GitReleaseAsset]:
-        repo = self._get_repo(build_type)
+        repo = get_repo(build_type)
         key = repo.full_name
         if key not in self._failed:
             release = get_release(repo, 'staging-failed')
@@ -276,11 +276,11 @@ class CachedAssets:
         return [a for a in assets if get_asset_filename(a).startswith(build_type + "-")]
 
 
-def get_workflow() -> Workflow:
+def get_current_workflow() -> Workflow:
     workflow_name = os.environ.get("GITHUB_WORKFLOW", None)
     if workflow_name is None:
         raise Exception("GITHUB_WORKFLOW not set")
-    repo = get_main_repo()
+    repo = get_current_repo()
     for workflow in repo.get_workflows():
         if workflow.name == workflow_name:
             return workflow

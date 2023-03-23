@@ -15,8 +15,8 @@ from github.GitReleaseAsset import GitReleaseAsset
 
 from .config import ArchType, BuildType, Config
 from .gh import (CachedAssets, download_asset, get_asset_filename,
-                 get_current_run_urls, get_main_repo, get_release,
-                 upload_asset, wait_for_api_limit_reset)
+                 get_current_run_urls, get_release, get_repo, upload_asset,
+                 wait_for_api_limit_reset)
 from .queue import Package
 from .utils import SCRIPT_DIR, PathLike
 
@@ -33,11 +33,11 @@ def to_pure_posix_path(path: PathLike) -> PurePath:
     return PurePosixPath("/" + str(path).replace(":", "", 1).replace("\\", "/"))
 
 
-def get_build_environ() -> Dict[str, str]:
+def get_build_environ(build_type: BuildType) -> Dict[str, str]:
     environ = os.environ.copy()
 
     # Set PACKAGER for makepkg
-    packager_ref = Config.MAIN_REPO
+    packager_ref = Config.ASSETS_REPO[build_type]
     if "GITHUB_SHA" in environ and "GITHUB_RUN_ID" in environ:
         packager_ref += "/" + environ["GITHUB_SHA"][:8] + "/" + environ["GITHUB_RUN_ID"]
     environ["PACKAGER"] = f"CI ({packager_ref})"
@@ -240,7 +240,7 @@ def build_package(build_type: BuildType, pkg: Package, msys2_root: PathLike, bui
     repo_dir = os.path.join(builddir, repo_name)
     to_upload: List[str] = []
 
-    repo = get_main_repo()
+    repo = get_repo(build_type)
 
     with fresh_git_repo(pkg['repo_url'], repo_dir):
         pkg_dir = os.path.join(repo_dir, pkg['repo_path'])
@@ -251,7 +251,7 @@ def build_package(build_type: BuildType, pkg: Package, msys2_root: PathLike, bui
 
         with staging_dependencies(build_type, pkg, msys2_root, builddir) as temp_pacman:
             try:
-                env = get_build_environ()
+                env = get_build_environ(build_type)
                 # this makes makepkg use our custom pacman script
                 env['PACMAN'] = str(to_pure_posix_path(temp_pacman))
                 if build_type == Config.MINGW_SRC_BUILD_TYPE:

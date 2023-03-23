@@ -9,9 +9,9 @@ import requests
 from github.GithubException import GithubException
 
 from .config import (REQUESTS_TIMEOUT, ArchType, BuildType, Config,
-                     get_all_build_types, build_type_is_src)
+                     build_type_is_src, get_all_build_types)
 from .gh import (CachedAssets, download_text_asset, get_asset_filename,
-                 get_main_repo, get_release, make_writable)
+                 get_current_repo, get_release, make_writable)
 from .utils import get_requests_session, queue_website_update
 
 
@@ -355,7 +355,7 @@ def get_buildqueue_with_status(full_details: bool = False) -> List[Package]:
 
 
 def update_status(pkgs: List[Package]) -> None:
-    repo = get_main_repo()
+    repo = get_current_repo()
     release = get_release(repo, "status")
 
     status_object: Dict[str, Any] = {}

@@ -1,6 +1,6 @@
 from typing import Any
 
-from .gh import (get_asset_filename, get_main_repo, get_release,
+from .gh import (get_asset_filename, get_current_repo, get_release,
                  get_release_assets, make_writable)
 from .queue import get_buildqueue_with_status
 
@@ -14,7 +14,7 @@ def clear_failed_state(args: Any) -> None:
     if build_type_filter is None and package_filter is None:
         raise SystemExit("clear-failed: At least one of --build-types or --packages needs to be passed")
 
-    repo = get_main_repo()
+    repo = get_current_repo()
     release = get_release(repo, 'staging-failed')
     assets_failed = get_release_assets(release)
     failed_map = dict((get_asset_filename(a), a) for a in assets_failed)

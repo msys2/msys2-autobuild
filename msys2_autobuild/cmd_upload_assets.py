@@ -2,12 +2,11 @@ import glob
 import os
 from typing import Any
 
-from .gh import get_main_repo, get_release, upload_asset
+from .gh import get_release, get_repo, upload_asset
 from .queue import PackageStatus, get_buildqueue_with_status
 
 
 def upload_assets(args: Any) -> None:
-    repo = get_main_repo()
     package_name = args.package
     src_dir = args.path
     src_dir = os.path.abspath(src_dir)
@@ -47,6 +46,7 @@ def upload_assets(args: Any) -> None:
     print(f"Found {len(matches)} files..")
 
     for build_type, match in matches:
+        repo = get_repo(build_type)
         release = get_release(repo, 'staging-' + build_type)
         print(f"Uploading {match}")
         if not args.dry_run:

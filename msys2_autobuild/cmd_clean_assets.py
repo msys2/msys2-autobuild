@@ -3,15 +3,14 @@ from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Dict, List
 
 from github.GitReleaseAsset import GitReleaseAsset
-from github.Repository import Repository
 
 from .config import get_all_build_types
-from .gh import (get_asset_filename, get_main_repo, get_release,
-                 get_release_assets, make_writable)
+from .gh import (get_asset_filename, get_release, get_release_assets, get_repo,
+                 make_writable)
 from .queue import get_buildqueue
 
 
-def get_assets_to_delete(repo: Repository) -> List[GitReleaseAsset]:
+def get_assets_to_delete() -> List[GitReleaseAsset]:
     print("Fetching packages to build...")
     patterns = []
     for pkg in get_buildqueue():
@@ -22,6 +21,7 @@ def get_assets_to_delete(repo: Repository) -> List[GitReleaseAsset]:
     print("Fetching assets...")
     assets: Dict[str, List[GitReleaseAsset]] = {}
     for build_type in get_all_build_types():
+        repo = get_repo(build_type)
         release = get_release(repo, "staging-" + build_type)
         for asset in get_release_assets(release, include_incomplete=True):
             assets.setdefault(get_asset_filename(asset), []).append(asset)
@@ -42,8 +42,7 @@ def get_assets_to_delete(repo: Repository) -> List[GitReleaseAsset]:
 
 
 def clean_gha_assets(args: Any) -> None:
-    repo = get_main_repo()
-    assets = get_assets_to_delete(repo)
+    assets = get_assets_to_delete()
 
     def delete_asset(asset: GitReleaseAsset) -> None:
         print(f"Deleting {get_asset_filename(asset)}...")

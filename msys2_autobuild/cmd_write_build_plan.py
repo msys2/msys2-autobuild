@@ -6,7 +6,8 @@ from typing import Any, Dict, List
 from tabulate import tabulate
 
 from .config import Config
-from .gh import get_workflow, wait_for_api_limit_reset
+from .gh import (get_current_repo, get_current_workflow,
+                 wait_for_api_limit_reset)
 from .queue import (Package, PackageStatus, get_buildqueue_with_status,
                     get_cycles, update_status)
 from .utils import apply_optional_deps, gha_group
@@ -111,7 +112,7 @@ def write_build_plan(args: Any) -> None:
         with open(target_file, "wb") as h:
             h.write(json.dumps(result).encode())
 
-    workflow = get_workflow()
+    workflow = get_current_workflow()
     runs = list(workflow.get_runs(status="in_progress"))
     runs += list(workflow.get_runs(status="queued"))
     for run in runs:
@@ -142,7 +143,7 @@ def write_build_plan(args: Any) -> None:
 
     available_build_types = set()
     for build_type, repo_name in Config.ASSETS_REPO.items():
-        if repo_name == Config.MAIN_REPO:
+        if repo_name == get_current_repo().full_name:
             available_build_types.add(build_type)
 
     jobs = []
