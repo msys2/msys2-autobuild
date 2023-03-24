@@ -62,7 +62,7 @@ class Config:
     }
     """Fetch certain build types from other repos if available"""
 
-    SOFT_JOB_TIMEOUT = 60 * 60 * 3
+    SOFT_JOB_TIMEOUT = 60 * 60 * 2
     """Runtime after which we shouldn't start a new build"""
 
     MAXIMUM_JOB_COUNT = 15
