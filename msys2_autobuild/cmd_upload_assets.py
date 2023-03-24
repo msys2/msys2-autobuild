@@ -54,7 +54,7 @@ def upload_assets(args: Any) -> None:
     print("Done")
 
 
-def add_parser(subparsers) -> None:
+def add_parser(subparsers: Any) -> None:
     sub = subparsers.add_parser(
         "upload-assets", help="Upload packages", allow_abbrev=False)
     sub.add_argument("path", help="Directory to look for packages in")

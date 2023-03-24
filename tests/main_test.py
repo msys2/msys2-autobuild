@@ -1,3 +1,5 @@
+# type: ignore
+
 from msys2_autobuild.utils import parse_optional_deps
 
 

@@ -37,7 +37,7 @@ def clear_failed_state(args: Any) -> None:
                         asset.delete_asset()
 
 
-def add_parser(subparsers) -> None:
+def add_parser(subparsers: Any) -> None:
     sub = subparsers.add_parser(
         "clear-failed", help="Clear the failed state for packages", allow_abbrev=False)
     sub.add_argument(

@@ -19,7 +19,7 @@ def requests_cache_disabled() -> Any:
 
 
 @lru_cache(maxsize=None)
-def get_requests_session(nocache=False) -> requests.Session:
+def get_requests_session(nocache: bool = False) -> requests.Session:
     adapter = HTTPAdapter(max_retries=REQUESTS_RETRY)
     if nocache:
         with requests_cache_disabled():

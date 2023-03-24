@@ -9,7 +9,7 @@ from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
 from pathlib import Path, PurePath, PurePosixPath
 from subprocess import check_call
-from typing import Any, Dict, Generator, List, Sequence, TypeVar
+from typing import Any, Dict, Generator, List, Sequence, TypeVar, Tuple
 
 from github.GitReleaseAsset import GitReleaseAsset
 
@@ -155,7 +155,7 @@ def staging_dependencies(
             asset_path = os.path.join(repo_dir, get_asset_filename(asset))
             todo.append((asset_path, asset))
 
-        def fetch_item(item):
+        def fetch_item(item: Tuple[str, GitReleaseAsset]) -> Tuple[str, GitReleaseAsset]:
             asset_path, asset = item
             download_asset(asset, asset_path)
             return item

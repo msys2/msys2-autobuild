@@ -253,9 +253,9 @@ def get_release(repo: Repository, name: str, create: bool = True) -> GitRelease:
 
 class CachedAssets:
 
-    def __init__(self):
-        self._assets = {}
-        self._failed = {}
+    def __init__(self) -> None:
+        self._assets: Dict[BuildType, List[GitReleaseAsset]] = {}
+        self._failed: Dict[str, List[GitReleaseAsset]] = {}
 
     def get_assets(self, build_type: BuildType) -> List[GitReleaseAsset]:
         if build_type not in self._assets:

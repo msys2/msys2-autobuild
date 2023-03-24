@@ -1,6 +1,6 @@
 import json
 import shlex
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Iterator
 import itertools
 
 from .config import BuildType, Config, build_type_is_src
@@ -10,7 +10,7 @@ from .queue import (Package, PackageStatus, get_buildqueue_with_status,
 from .utils import apply_optional_deps
 
 
-def generate_jobs_for(build_type: BuildType, optional_deps: str, count: int):
+def generate_jobs_for(build_type: BuildType, optional_deps: str, count: int) -> Iterator[Dict[str, Any]]:
     name = build_type
     packages = " ".join(["base-devel"])
     runner = ["windows-2022"] if build_type != "clangarm64" else ["Windows", "ARM64", "autobuild"]
@@ -28,7 +28,7 @@ def generate_jobs_for(build_type: BuildType, optional_deps: str, count: int):
         }
 
 
-def generate_src_jobs(optional_deps: str, count: int):
+def generate_src_jobs(optional_deps: str, count: int) -> Iterator[Dict[str, Any]]:
     name = "src"
     packages = " ".join(["base-devel", "VCS"])
     runner = ["windows-2022"]
@@ -48,7 +48,7 @@ def generate_src_jobs(optional_deps: str, count: int):
 
 
 # from https://docs.python.org/3/library/itertools.html
-def roundrobin(*iterables):
+def roundrobin(*iterables):  # type: ignore
     "roundrobin('ABC', 'D', 'EF') --> A D E B F C"
     # Recipe credited to George Sakkis
     num_active = len(iterables)
@@ -124,7 +124,7 @@ def write_build_plan(args: Any) -> None:
     write_out(jobs)
 
 
-def add_parser(subparsers) -> None:
+def add_parser(subparsers: Any) -> None:
     sub = subparsers.add_parser(
         "write-build-plan", help="Write a GHA build matrix setup", allow_abbrev=False)
     sub.add_argument("--optional-deps", action="store")

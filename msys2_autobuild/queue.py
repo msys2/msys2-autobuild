@@ -65,7 +65,7 @@ class Package(dict):
 
     def set_blocked(
             self, build_type: BuildType, status: PackageStatus,
-            dep: "Package", dep_type: BuildType):
+            dep: "Package", dep_type: BuildType) -> None:
         dep_details = dep.get_status_details(dep_type)
         dep_blocked = dep_details.get("blocked", {})
         details = self.get_status_details(build_type)
@@ -116,7 +116,7 @@ class Package(dict):
             build_type = Config.MSYS_SRC_ARCH
         return self._get_build(build_type)
 
-    def is_optional_dep(self, dep: "Package", dep_type: BuildType):
+    def is_optional_dep(self, dep: "Package", dep_type: BuildType) -> bool:
         # Some deps are manually marked as optional to break cycles.
         # This requires them to be in the main repo though, otherwise the cycle has to
         # be fixed manually.

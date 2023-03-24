@@ -2,7 +2,7 @@ import fnmatch
 import os
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Tuple
 
 from github.GitReleaseAsset import GitReleaseAsset
 
@@ -73,7 +73,7 @@ def fetch_assets(args: Any) -> None:
             asset_path = asset_dir / get_asset_filename(asset)
             to_fetch[str(asset_path)] = asset
 
-    def file_is_uptodate(path, asset):
+    def file_is_uptodate(path: str, asset: GitReleaseAsset) -> bool:
         asset_path = Path(path)
         if not asset_path.exists():
             return False
@@ -132,7 +132,7 @@ def fetch_assets(args: Any) -> None:
     print("Pass --fetch-all to fetch all packages.")
     print("Pass --delete to clear the target directory")
 
-    def fetch_item(item):
+    def fetch_item(item: Tuple[str, GitReleaseAsset]) -> Tuple[str, GitReleaseAsset]:
         asset_path, asset = item
         if not args.pretend:
             download_asset(asset, asset_path)
@@ -145,7 +145,7 @@ def fetch_assets(args: Any) -> None:
     print("done")
 
 
-def add_parser(subparsers) -> None:
+def add_parser(subparsers: Any) -> None:
     sub = subparsers.add_parser(
         "fetch-assets", help="Download all staging packages", allow_abbrev=False)
     sub.add_argument("targetdir")

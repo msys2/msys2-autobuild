@@ -57,7 +57,7 @@ def show_build(args: Any) -> None:
     show_table("DONE", done)
 
 
-def add_parser(subparsers) -> None:
+def add_parser(subparsers: Any) -> None:
     sub = subparsers.add_parser(
         "show", help="Show all packages to be built", allow_abbrev=False)
     sub.add_argument(

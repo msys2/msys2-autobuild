@@ -92,7 +92,7 @@ def run_build(args: Any) -> None:
             continue
 
 
-def add_parser(subparsers) -> None:
+def add_parser(subparsers: Any) -> None:
     sub = subparsers.add_parser("build", help="Build all packages")
     sub.add_argument("-t", "--build-types", action="store")
     sub.add_argument(
