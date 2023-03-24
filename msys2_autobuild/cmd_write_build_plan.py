@@ -1,99 +1,111 @@
 import json
 import shlex
 from typing import Any, Dict, List
+import itertools
 
-from tabulate import tabulate
-
-from .config import BuildType, Config
+from .config import BuildType, Config, build_type_is_src
 from .gh import get_current_repo, wait_for_api_limit_reset
 from .queue import (Package, PackageStatus, get_buildqueue_with_status,
-                    get_cycles, update_status)
-from .utils import apply_optional_deps, gha_group
+                    update_status)
+from .utils import apply_optional_deps
 
 
-def show_cycles(pkgs: List[Package]) -> None:
-    cycles = get_cycles(pkgs)
-    if cycles:
-        def format_package(p: Package) -> str:
-            return f"{p['name']} [{p['version_repo']} -> {p['version']}]"
-
-        with gha_group(f"Dependency Cycles ({len(cycles)})"):
-            print(tabulate([
-                (format_package(a), "<-->", format_package(b)) for (a, b) in cycles],
-                headers=["Package", "", "Package"]))
+SCHEDULE_JOB_NAME = "schedule"
 
 
-def get_job_meta() -> List[Dict[str, Any]]:
-    hosted_runner = "windows-2022"
-    job_meta: List[Dict[str, Any]] = [
-        {
-            "build-types": ["mingw64"],
-            "matrix": {
-                "packages": "base-devel",
-                "build-args": "--build-types mingw64",
-                "name": "mingw64",
-                "runner": hosted_runner
-            }
-        }, {
-            "build-types": ["mingw32"],
-            "matrix": {
-                "packages": "base-devel",
-                "build-args": "--build-types mingw32",
-                "name": "mingw32",
-                "runner": hosted_runner
-            }
-        }, {
-            "build-types": ["ucrt64"],
-            "matrix": {
-                "packages": "base-devel",
-                "build-args": "--build-types ucrt64",
-                "name": "ucrt64",
-                "runner": hosted_runner
-            }
-        }, {
-            "build-types": ["clang64"],
-            "matrix": {
-                "packages": "base-devel",
-                "build-args": "--build-types clang64",
-                "name": "clang64",
-                "runner": hosted_runner
-            }
-        }, {
-            "build-types": ["clang32"],
-            "matrix": {
-                "packages": "base-devel",
-                "build-args": "--build-types clang32",
-                "name": "clang32",
-                "runner": hosted_runner
-            }
-        }, {
-            "build-types": ["clangarm64"],
-            "matrix": {
-                "packages": "base-devel",
-                "build-args": "--build-types clangarm64",
-                "name": "clangarm64",
-                "runner": ["Windows", "ARM64", "autobuild"]
-            }
-        }, {
-            "build-types": ["msys"],
-            "matrix": {
-                "packages": "base-devel",
-                "build-args": "--build-types msys",
-                "name": "msys",
-                "runner": hosted_runner
-            }
-        }, {
-            "build-types": ["msys-src", "mingw-src"],
-            "matrix": {
-                "packages": "base-devel VCS",
-                "build-args": "--build-types msys-src,mingw-src",
-                "name": "src",
-                "runner": hosted_runner
-            }
+def generate_jobs_for(build_type: BuildType, optional_deps: str, count: int):
+    name = build_type
+    packages = " ".join(["base-devel"])
+    runner = ["windows-2022"] if build_type != "clangarm64" else ["Windows", "ARM64", "autobuild"]
+    build_from = itertools.cycle(["start", "end", "middle"])
+    for i in range(count):
+        real_name = name if i == 0 else name + "-" + str(i + 1)
+        build_args = ["--build-types", build_type, "--build-from", next(build_from)]
+        if optional_deps:
+            build_args += ["--optional-deps", optional_deps]
+        yield {
+            "name": real_name,
+            "packages": packages,
+            "runner": runner,
+            "build-args": shlex.join(build_args),
+            "needs": [SCHEDULE_JOB_NAME],
         }
-    ]
 
-    return job_meta
+
+def generate_src_jobs(needs: List[str], optional_deps: str, count: int):
+    name = "src"
+    packages = " ".join(["base-devel", "VCS"])
+    runner = ["windows-2022"]
+    build_types = [Config.MINGW_SRC_BUILD_TYPE, Config.MSYS_SRC_BUILD_TYPE]
+    build_from = itertools.cycle(["start", "end", "middle"])
+    for i in range(count):
+        real_name = name if i == 0 else name + "-" + str(i + 1)
+        build_args = ["--build-types", ",".join(build_types), "--build-from", next(build_from)]
+        if optional_deps:
+            build_args += ["--optional-deps", optional_deps]
+        yield {
+            "name": real_name,
+            "packages": packages,
+            "runner": runner,
+            "build-args": shlex.join(build_args),
+            "needs": needs + [SCHEDULE_JOB_NAME],
+        }
+
+
+# from https://docs.python.org/3/library/itertools.html
+def roundrobin(*iterables):
+    "roundrobin('ABC', 'D', 'EF') --> A D E B F C"
+    # Recipe credited to George Sakkis
+    num_active = len(iterables)
+    nexts = itertools.cycle(iter(it).__next__ for it in iterables)
+    while num_active:
+        try:
+            for next in nexts:
+                yield next()
+        except StopIteration:
+            # Remove the iterator we just exhausted from the cycle.
+            num_active -= 1
+            nexts = itertools.cycle(itertools.islice(nexts, num_active))
+
+
+def create_build_plan(pkgs: List[Package], optional_deps: str) -> List[Dict[str, Any]]:
+    queued_build_types: Dict[BuildType, int] = {}
+    for pkg in pkgs:
+        for build_type in pkg.get_build_types():
+            # skip if we can't build it
+            if Config.ASSETS_REPO[build_type] != get_current_repo().full_name:
+                continue
+            if pkg.get_status(build_type) == PackageStatus.WAITING_FOR_BUILD:
+                queued_build_types[build_type] = queued_build_types.get(build_type, 0) + 1
+
+    def get_job_count(build_type: BuildType) -> int:
+        queued = queued_build_types[build_type]
+        if queued > 9:
+            count = 3
+        elif queued > 3:
+            count = 2
+        else:
+            count = 1
+        return min(Config.MAXIMUM_BUILD_TYPE_JOB_COUNT.get(build_type, count), count)
+
+    # generate the build jobs
+    job_lists = []
+    for build_type, count in queued_build_types.items():
+        if build_type_is_src(build_type):
+            continue
+        count = get_job_count(build_type)
+        job_lists.append(list(generate_jobs_for(build_type, optional_deps, count)))
+    jobs = list(roundrobin(*job_lists))[:Config.MAXIMUM_JOB_COUNT]
+
+    # generate src build jobs depending on the build jobs above
+    src_build_types = [
+        b for b in [Config.MINGW_SRC_BUILD_TYPE, Config.MSYS_SRC_BUILD_TYPE]
+        if b in queued_build_types]
+    if src_build_types:
+        src_count = min(get_job_count(b) for b in src_build_types)
+        jobs.extend(list(generate_src_jobs([job["name"] for job in jobs], optional_deps, src_count)))
+
+    return jobs
 
 
 def write_build_plan(args: Any) -> None:
@@ -102,7 +114,7 @@ def write_build_plan(args: Any) -> None:
 
     apply_optional_deps(optional_deps)
 
-    def write_out(result: List[Dict[str, str]]) -> None:
+    def write_out(result: List[Dict[str, Any]]) -> None:
         with open(target_file, "wb") as h:
             h.write(json.dumps(result).encode())
 
@@ -110,59 +122,11 @@ def write_build_plan(args: Any) -> None:
 
     pkgs = get_buildqueue_with_status(full_details=True)
 
-    show_cycles(pkgs)
-
     update_status(pkgs)
 
-    queued_build_types: Dict[BuildType, int] = {}
-    for pkg in pkgs:
-        for build_type in pkg.get_build_types():
-            if pkg.get_status(build_type) == PackageStatus.WAITING_FOR_BUILD:
-                queued_build_types[build_type] = queued_build_types.get(build_type, 0) + 1
+    jobs = create_build_plan(pkgs, optional_deps)
 
-    if not queued_build_types:
-        write_out([])
-        return
-
-    available_build_types = set()
-    for build_type, repo_name in Config.ASSETS_REPO.items():
-        if repo_name == get_current_repo().full_name:
-            available_build_types.add(build_type)
-
-    jobs = []
-    for job_info in get_job_meta():
-        matching_build_types = \
-            set(queued_build_types) & set(job_info["build-types"]) & available_build_types
-
-        # limit to the build type included with the lowest limit
-        job_limit = Config.MAXIMUM_JOB_COUNT
-        for build_type in matching_build_types:
-            type_limit = Config.MAXIMUM_BUILD_TYPE_JOB_COUNT.get(build_type, Config.MAXIMUM_JOB_COUNT)
-            if type_limit < job_limit:
-                job_limit = type_limit
-
-        if matching_build_types:
-            build_count = sum(queued_build_types[bt] for bt in matching_build_types)
-            job = job_info["matrix"]
-            # TODO: pin optional deps to their exact version somehow, in case something changes
-            # between this run and when the worker gets to it.
-            if optional_deps:
-                job["build-args"] = job["build-args"] + " --optional-deps " + shlex.quote(optional_deps)
-            jobs.append(job)
-            # XXX: If there is more than three builds we start two jobs with the second
-            # one having a reversed build order
-            if build_count > 3 and job_limit >= 2:
-                matrix = dict(job)
-                matrix["build-args"] = matrix["build-args"] + " --build-from end"
-                matrix["name"] = matrix["name"] + "-2"
-                jobs.append(matrix)
-            if build_count > 9 and job_limit >= 3:
-                matrix = dict(job)
-                matrix["build-args"] = matrix["build-args"] + " --build-from middle"
-                matrix["name"] = matrix["name"] + "-3"
-                jobs.append(matrix)
-
-    write_out(jobs[:Config.MAXIMUM_JOB_COUNT])
+    write_out(jobs)
 
 
 def add_parser(subparsers) -> None:

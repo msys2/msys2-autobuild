@@ -91,7 +91,6 @@ jobs:
         python -m msys2_autobuild show --optional-deps "$OPTIONAL_DEPS"
 
   build:
-    needs: schedule
     timeout-minutes: 4320
 
     if: ${{ needs.schedule.outputs.build-plan != '[]' }}
@@ -101,6 +100,7 @@ jobs:
         include: ${{ fromJson(needs.schedule.outputs.build-plan) }}
     name: ${{ matrix.name }}
     runs-on: ${{ matrix.runner }}
+    needs: ${{ matrix.needs }}
 
     steps:
 
