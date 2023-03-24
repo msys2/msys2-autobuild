@@ -10,9 +10,6 @@ from .queue import (Package, PackageStatus, get_buildqueue_with_status,
 from .utils import apply_optional_deps
 
 
-SCHEDULE_JOB_NAME = "schedule"
-
-
 def generate_jobs_for(build_type: BuildType, optional_deps: str, count: int):
     name = build_type
     packages = " ".join(["base-devel"])
@@ -28,11 +25,10 @@ def generate_jobs_for(build_type: BuildType, optional_deps: str, count: int):
             "packages": packages,
             "runner": runner,
             "build-args": shlex.join(build_args),
-            "needs": [SCHEDULE_JOB_NAME],
         }
 
 
-def generate_src_jobs(needs: List[str], optional_deps: str, count: int):
+def generate_src_jobs(optional_deps: str, count: int):
     name = "src"
     packages = " ".join(["base-devel", "VCS"])
     runner = ["windows-2022"]
@@ -48,7 +44,6 @@ def generate_src_jobs(needs: List[str], optional_deps: str, count: int):
             "packages": packages,
             "runner": runner,
             "build-args": shlex.join(build_args),
-            "needs": needs + [SCHEDULE_JOB_NAME],
         }
 
 
@@ -97,13 +92,13 @@ def create_build_plan(pkgs: List[Package], optional_deps: str) -> List[Dict[str,
         job_lists.append(list(generate_jobs_for(build_type, optional_deps, count)))
     jobs = list(roundrobin(*job_lists))[:Config.MAXIMUM_JOB_COUNT]
 
-    # generate src build jobs depending on the build jobs above
+    # generate src build jobs
     src_build_types = [
         b for b in [Config.MINGW_SRC_BUILD_TYPE, Config.MSYS_SRC_BUILD_TYPE]
         if b in queued_build_types]
     if src_build_types:
         src_count = min(get_job_count(b) for b in src_build_types)
-        jobs.extend(list(generate_src_jobs([job["name"] for job in jobs], optional_deps, src_count)))
+        jobs.extend(list(generate_src_jobs(optional_deps, src_count)))
 
     return jobs
 
