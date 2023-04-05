@@ -22,7 +22,7 @@ on:
 permissions:
   contents: write
 
-concurrency: maint-nope
+concurrency: autobuild-maint
 
 jobs:
 

@@ -22,12 +22,12 @@ env:
 permissions:
   contents: write
 
-concurrency: nope
-
 jobs:
 
   schedule:
     runs-on: ubuntu-22.04
+
+    concurrency: autobuild-maint
 
     outputs:
       build-plan: ${{ steps.check.outputs.build-plan }}
@@ -93,6 +93,8 @@ jobs:
   build:
     timeout-minutes: 4320
     needs: schedule
+
+    concurrency: autobuild-build-${{ matrix.name }}
 
     if: ${{ needs.schedule.outputs.build-plan != '[]' }}
     strategy:
