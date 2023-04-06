@@ -243,7 +243,12 @@ def build_package(build_type: BuildType, pkg: Package, msys2_root: PathLike, bui
     repo = get_repo(build_type)
 
     with fresh_git_repo(pkg['repo_url'], repo_dir):
-        pkg_dir = os.path.join(repo_dir, pkg['repo_path'])
+        orig_pkg_dir = os.path.join(repo_dir, pkg['repo_path'])
+        # Rename it to get a shorter overall build path
+        # https://github.com/msys2/msys2-autobuild/issues/71
+        pkg_dir = os.path.join(repo_dir, 'B')
+        assert not os.path.exists(pkg_dir)
+        os.rename(orig_pkg_dir, pkg_dir)
 
         # Fetch all keys mentioned in the PKGBUILD
         validpgpkeys = to_pure_posix_path(os.path.join(SCRIPT_DIR, 'fetch-validpgpkeys.sh'))
