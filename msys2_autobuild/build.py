@@ -123,7 +123,7 @@ def run_cmd(msys2_root: PathLike, args: Sequence[PathLike], **kwargs: Any) -> No
 
 def reset_git_repo(path: PathLike):
 
-    def clean(path):
+    def clean():
         assert os.path.exists(path)
         check_call(["git", "clean", "-xfdf"], cwd=path)
         check_call(["git", "reset", "--hard", "HEAD"], cwd=path)
