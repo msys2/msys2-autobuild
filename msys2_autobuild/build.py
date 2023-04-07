@@ -146,6 +146,7 @@ def reset_git_repo(path: PathLike):
 def fresh_git_repo(url: str, path: PathLike) -> Generator:
     if not os.path.exists(path):
         check_call(["git", "clone", url, path])
+        check_call(["git", "config", "core.longpaths", "true"], cwd=path)
     else:
         reset_git_repo(path)
         check_call(["git", "fetch", "origin"], cwd=path)
