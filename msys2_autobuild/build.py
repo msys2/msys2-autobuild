@@ -1,6 +1,7 @@
 import fnmatch
 import json
 import os
+import time
 import shlex
 import shutil
 import subprocess
@@ -120,24 +121,40 @@ def run_cmd(msys2_root: PathLike, args: Sequence[PathLike], **kwargs: Any) -> No
     check_call([executable, '-lc'] + [shlex_join([str(a) for a in args])], env=env, **kwargs)
 
 
+def reset_git_repo(path: PathLike):
+
+    def clean(path):
+        assert os.path.exists(path)
+        check_call(["git", "clean", "-xfdf"], cwd=path)
+        check_call(["git", "reset", "--hard", "HEAD"], cwd=path)
+
+    for i in range(10):
+        try:
+            clean()
+        except subprocess.CalledProcessError:
+            # sometimes git clean fails right after the build
+            print(f"git clean/reset failed, sleeping for {i} seconds")
+            time.sleep(i)
+        else:
+            break
+    else:
+        # run it one more time to raise
+        clean()
+
+
 @contextmanager
 def fresh_git_repo(url: str, path: PathLike) -> Generator:
     if not os.path.exists(path):
         check_call(["git", "clone", url, path])
     else:
+        reset_git_repo(path)
         check_call(["git", "fetch", "origin"], cwd=path)
         check_call(["git", "reset", "--hard", "origin/master"], cwd=path)
     try:
         yield
     finally:
         assert os.path.exists(path)
-        try:
-            check_call(["git", "clean", "-xfdf"], cwd=path)
-        except subprocess.CalledProcessError:
-            # sometimes it fails right after the build has failed
-            # not sure why
-            pass
-        check_call(["git", "reset", "--hard", "HEAD"], cwd=path)
+        reset_git_repo(path)
 
 
 @contextmanager
