@@ -224,7 +224,9 @@ def upload_asset(release: GitRelease, path: PathLike, replace: bool = False,
     def upload() -> None:
         with make_writable(release):
             if content is None:
-                release.upload_asset(str(path), label=asset_label, name=asset_name)
+                with open(path, "rb") as fileobj:
+                    release.upload_asset_from_memory(  # type: ignore
+                        fileobj, os.path.getsize(path), label=asset_label, name=asset_name)
             else:
                 with io.BytesIO(content) as fileobj:
                     release.upload_asset_from_memory(  # type: ignore
