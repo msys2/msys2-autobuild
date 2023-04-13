@@ -4,6 +4,7 @@ import os
 import time
 import shlex
 import shutil
+import stat
 import subprocess
 import tempfile
 from concurrent.futures import ThreadPoolExecutor
@@ -128,11 +129,29 @@ def reset_git_repo(path: PathLike):
         check_call(["git", "clean", "-xfdf"], cwd=path)
         check_call(["git", "reset", "--hard", "HEAD"], cwd=path)
 
+    def make_tree_writable(topdir: PathLike) -> None:
+        # Ensure all files and directories under topdir are writable
+        # (and readable) by owner.
+        # Taken from meson
+        for d, _, files in os.walk(topdir):
+            os.chmod(d, os.stat(d).st_mode | stat.S_IWRITE | stat.S_IREAD)
+            for fname in files:
+                fpath = os.path.join(d, fname)
+                if os.path.isfile(fpath):
+                    os.chmod(fpath, os.stat(fpath).st_mode | stat.S_IWRITE | stat.S_IREAD)
+
+    made_writable = False
     for i in range(10):
         try:
             clean()
         except subprocess.CalledProcessError:
-            # sometimes git clean fails right after the build
+            try:
+                if not made_writable:
+                    print("Trying to make files writable")
+                    make_tree_writable(path)
+                    made_writable = True
+            except OSError as e:
+                print("Making files writable failed", e)
             print(f"git clean/reset failed, sleeping for {i} seconds")
             time.sleep(i)
         else:
