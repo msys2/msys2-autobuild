@@ -85,7 +85,7 @@ def asset_is_complete(asset: GitReleaseAsset) -> bool:
 
 def download_text_asset(asset: GitReleaseAsset) -> str:
     assert asset_is_complete(asset)
-    session = get_requests_session()
+    session = get_requests_session(nocache=True)
     with session.get(asset.browser_download_url, timeout=REQUESTS_TIMEOUT) as r:
         r.raise_for_status()
         return r.text
