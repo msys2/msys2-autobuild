@@ -150,6 +150,7 @@ jobs:
         install: ${{ matrix.packages }}
         location: 'D:\A'
         release: ${{ runner.arch == 'ARM64' && 'false' || 'true' }}
+        cache: ${{ runner.arch == 'ARM64' && 'false' || 'true' }}
 
     - name: Switch to the main mirror
       shell: msys2 {0}
