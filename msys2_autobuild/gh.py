@@ -13,6 +13,7 @@ from typing import Any, Dict, Generator, List, Optional
 
 import requests
 from github import Github
+from github.Auth import Auth, Token
 from github.GithubException import GithubException, UnknownObjectException
 from github.GithubObject import GithubObject
 from github.GitRelease import GitRelease
@@ -23,16 +24,16 @@ from .config import REQUESTS_RETRY, REQUESTS_TIMEOUT, BuildType, Config
 from .utils import PathLike, get_requests_session
 
 
-def get_credentials(write: bool = False) -> Dict[str, Any]:
+def get_auth(write: bool = False) -> Optional[Auth]:
     if not write and os.environ.get("GITHUB_TOKEN_READONLY", ""):
-        return {'login_or_token': os.environ["GITHUB_TOKEN_READONLY"]}
+        return Token(os.environ["GITHUB_TOKEN_READONLY"])
     elif "GITHUB_TOKEN" in os.environ:
-        return {'login_or_token': os.environ["GITHUB_TOKEN"]}
+        return Token(os.environ["GITHUB_TOKEN"])
     else:
         if not write:
             print("[Warning] 'GITHUB_TOKEN' or 'GITHUB_TOKEN_READONLY' env vars "
                   "not set which might lead to API rate limiting", file=sys.stderr)
-            return {}
+            return None
         else:
             raise Exception("'GITHUB_TOKEN' env var not set")
 
@@ -64,14 +65,15 @@ def get_repo(build_type: BuildType, write: bool = False) -> Repository:
 
 @lru_cache(maxsize=None)
 def get_github(write: bool = False) -> Github:
-    kwargs = get_credentials(write=write)
-    has_creds = bool(kwargs)
+    auth = get_auth(write=write)
+    kwargs: Dict[str, Any] = {}
+    kwargs['auth'] = auth
     # 100 is the maximum allowed
     kwargs['per_page'] = 100
     kwargs['retry'] = REQUESTS_RETRY
     kwargs['timeout'] = sum(REQUESTS_TIMEOUT)
     gh = Github(**kwargs)
-    if not has_creds and not write:
+    if auth is None and not write:
         print(f"[Warning] Rate limit status: {gh.get_rate_limit().core}", file=sys.stderr)
     return gh
 
