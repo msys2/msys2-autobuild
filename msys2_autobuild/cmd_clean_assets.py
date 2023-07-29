@@ -51,7 +51,7 @@ def clean_gha_assets(args: Any) -> None:
             with make_writable(asset):
                 asset.delete_asset()
 
-    with ThreadPoolExecutor(4) as executor:
+    with ThreadPoolExecutor(2) as executor:
         for item in executor.map(delete_asset, assets):
             pass
 
