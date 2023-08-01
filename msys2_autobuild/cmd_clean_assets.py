@@ -34,7 +34,13 @@ def get_assets_to_delete() -> Tuple[List[GitRelease], List[GitReleaseAsset]]:
 
         # Deleting and re-creating a release requires two write calls, so delete
         # the release if all assets should be deleted and there are more than 2.
-        if len(to_delete) > 2 and len(assets) == len(to_delete):
+        # min_to_delete = 3
+
+        # XXX: re-creating releases causes notifications, so avoid unless possible
+        # https://github.com/msys2/msys2-autobuild/issues/77#issuecomment-1657231719
+        min_to_delete = 400
+
+        if len(to_delete) >= min_to_delete and len(assets) == len(to_delete):
             return [release], []
         else:
             return [], to_delete
