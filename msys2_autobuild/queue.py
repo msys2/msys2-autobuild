@@ -11,7 +11,8 @@ from github.GithubException import GithubException
 from .config import (REQUESTS_TIMEOUT, ArchType, BuildType, Config,
                      build_type_is_src, get_all_build_types)
 from .gh import (CachedAssets, download_text_asset, get_asset_filename,
-                 get_current_repo, get_release, make_writable)
+                 get_current_repo, get_release, make_writable,
+                 asset_is_complete)
 from .utils import get_requests_session, queue_website_update
 
 
@@ -382,22 +383,36 @@ def update_status(pkgs: List[Package]) -> None:
 
     content = json.dumps(status_object, indent=2).encode()
 
-    # If multiple jobs update this at the same time things can fail
+    # If multiple jobs update this at the same time things can fail,
+    # assume the other one went through and just ignore all errors
     try:
+        asset = None
         asset_name = "status.json"
         for asset in release.assets:
             if asset.name == asset_name:
+                break
+
+        do_replace = True
+
+        # Avoid uploading the same file twice, to reduce API write calls
+        if asset is not None and asset_is_complete(asset) and asset.size == len(content):
+            old_content = download_text_asset(asset, cache=True)
+            if old_content == content.decode():
+                do_replace = False
+
+        if do_replace:
+            if asset is not None:
                 with make_writable(asset):
                     asset.delete_asset()
-                break
-        with io.BytesIO(content) as fileobj:
-            with make_writable(release):
-                new_asset = release.upload_asset_from_memory(  # type: ignore
-                    fileobj, len(content), asset_name)
+
+            with io.BytesIO(content) as fileobj:
+                with make_writable(release):
+                    new_asset = release.upload_asset_from_memory(  # type: ignore
+                        fileobj, len(content), asset_name)
+
+            print(f"Uploaded status file for {len(packages)} packages: {new_asset.browser_download_url}")
+            queue_website_update()
+        else:
+            print("Status unchanged")
     except (GithubException, requests.RequestException) as e:
         print(e)
-        return
-
-    print(f"Uploaded status file for {len(packages)} packages: {new_asset.browser_download_url}")
-
-    queue_website_update()

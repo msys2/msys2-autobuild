@@ -85,9 +85,9 @@ def asset_is_complete(asset: GitReleaseAsset) -> bool:
     return asset.state == "uploaded"
 
 
-def download_text_asset(asset: GitReleaseAsset) -> str:
+def download_text_asset(asset: GitReleaseAsset, cache=False) -> str:
     assert asset_is_complete(asset)
-    session = get_requests_session(nocache=True)
+    session = get_requests_session(nocache=not cache)
     with session.get(asset.browser_download_url, timeout=REQUESTS_TIMEOUT) as r:
         r.raise_for_status()
         return r.text
