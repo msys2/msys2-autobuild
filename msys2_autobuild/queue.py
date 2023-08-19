@@ -396,9 +396,13 @@ def update_status(pkgs: List[Package]) -> None:
 
         # Avoid uploading the same file twice, to reduce API write calls
         if asset is not None and asset_is_complete(asset) and asset.size == len(content):
-            old_content = download_text_asset(asset, cache=True)
-            if old_content == content.decode():
-                do_replace = False
+            try:
+                old_content = download_text_asset(asset, cache=True)
+                if old_content == content.decode():
+                    do_replace = False
+            except requests.RequestException:
+                # github sometimes returns 404 for a short time after uploading
+                pass
 
         if do_replace:
             if asset is not None:
