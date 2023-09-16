@@ -27,11 +27,10 @@ def build_type_is_src(build_type: BuildType) -> bool:
 class Config:
 
     ALLOWED_UPLOADERS = [
-        ("User", "elieux"),
-        ("User", "Alexpux"),
-        ("User", "lazka"),
-        ("User", "jeremyd2019"),
-        ("Bot", "github-actions[bot]"),
+        "elieux",
+        "Alexpux",
+        "lazka",
+        "jeremyd2019",
     ]
     """Users that are allowed to upload assets. This is checked at download time"""
 

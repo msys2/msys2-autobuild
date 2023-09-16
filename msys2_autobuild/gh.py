@@ -185,19 +185,38 @@ def get_asset_filename(asset: GitReleaseAsset) -> str:
         return asset.label
 
 
+def is_asset_from_gha(asset: GitReleaseAsset) -> bool:
+    """If the asset was uploaded from CI via GHA"""
+
+    uploader = asset.uploader
+    return uploader.type == "Bot" and uploader.login == "github-actions[bot]"
+
+
+def is_asset_from_allowed_user(asset: GitReleaseAsset) -> bool:
+    """If the asset was uploaded by an allowed user"""
+
+    uploader = asset.uploader
+    return uploader.type == "User" and uploader.login in Config.ALLOWED_UPLOADERS
+
+
+def get_asset_uploader_name(asset: GitReleaseAsset) -> str:
+    """Returns the name of the user that uploaded the asset"""
+
+    uploader = asset.uploader
+    return uploader.login
+
+
 def get_release_assets(release: GitRelease, include_incomplete: bool = False) -> List[GitReleaseAsset]:
     assets = []
     for asset in release.assets:
         # skip in case not fully uploaded yet (or uploading failed)
         if not asset_is_complete(asset) and not include_incomplete:
             continue
-        uploader = asset.uploader
-        uploader_key = (uploader.type, uploader.login)
-        # We allow uploads from some users and GHA
-        if uploader_key not in Config.ALLOWED_UPLOADERS:
+        # We allow uploads from GHA and some special users
+        if not is_asset_from_gha(asset) and not is_asset_from_allowed_user(asset):
             raise SystemExit(
                 f"ERROR: Asset '{get_asset_filename(asset)}' "
-                f"uploaded by {uploader_key}'. Aborting.")
+                f"uploaded by {get_asset_uploader_name(asset)}'. Aborting.")
         assets.append(asset)
     return assets
 
