@@ -28,7 +28,6 @@ class Config:
 
     ALLOWED_UPLOADERS = [
         "elieux",
-        "Alexpux",
         "lazka",
         "jeremyd2019",
     ]
