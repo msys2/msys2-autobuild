@@ -98,3 +98,19 @@ def parse_optional_deps(optional_deps: str) -> Dict[str, List[str]]:
 def apply_optional_deps(optional_deps: str) -> None:
     for dep, ignored in parse_optional_deps(optional_deps).items():
         Config.OPTIONAL_DEPS.setdefault(dep, []).extend(ignored)
+
+
+def ask_yes_no(prompt, default_no: bool = True):
+    """Ask a yes/no question via input() and return their answer."""
+
+    if default_no:
+        prompt += " [y/N] "
+    else:
+        prompt += " [Y/n] "
+
+    user_input = input(prompt).strip().lower()
+
+    if not user_input:
+        return False if default_no else True
+    else:
+        return user_input == 'y'

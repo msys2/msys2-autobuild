@@ -8,8 +8,9 @@ from github.GitReleaseAsset import GitReleaseAsset
 
 from .config import BuildType, Config
 from .gh import (CachedAssets, download_asset, get_asset_filename,
-                 get_asset_mtime_ns)
+                 get_asset_mtime_ns, is_asset_from_gha, get_asset_uploader_name)
 from .queue import PackageStatus, get_buildqueue_with_status
+from .utils import ask_yes_no
 
 
 def get_repo_subdir(build_type: BuildType) -> Path:
@@ -72,6 +73,13 @@ def fetch_assets(args: Any) -> None:
             asset_dir = Path(target_dir) / get_repo_subdir(build_type)
             asset_path = asset_dir / get_asset_filename(asset)
             to_fetch[str(asset_path)] = asset
+
+    if not args.noconfirm:
+        for path, asset in to_fetch.items():
+            if not is_asset_from_gha(asset):
+                if not ask_yes_no(f"WARNING: {get_asset_filename(asset)!r} is a manual upload "
+                                  f"from {get_asset_uploader_name(asset)!r}, continue?"):
+                    raise SystemExit("aborting")
 
     def file_is_uptodate(path: str, asset: GitReleaseAsset) -> bool:
         asset_path = Path(path)
@@ -164,4 +172,7 @@ def add_parser(subparsers: Any) -> None:
     sub.add_argument(
         "-t", "--build-type", action="append",
         help="Only fetch packages for given build type(s) (may be used more than once)")
+    sub.add_argument(
+        "--noconfirm", action="store_true",
+        help="Don't require user confirmation")
     sub.set_defaults(func=fetch_assets)
