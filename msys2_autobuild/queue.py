@@ -41,6 +41,11 @@ class Package(dict):
     def __eq__(self, other: object) -> bool:
         return self is other
 
+    @property
+    def _active_builds(self) -> Dict:
+        return {
+            k: v for k, v in self["builds"].items() if k in (Config.MINGW_ARCH_LIST + Config.MSYS_ARCH_LIST)}
+
     def _get_build(self, build_type: BuildType) -> Dict:
         return self["builds"].get(build_type, {})
 
@@ -101,8 +106,7 @@ class Package(dict):
         return f"{build_type}-{self['name']}-{self['version']}.failed"
 
     def get_build_types(self) -> List[BuildType]:
-        build_types = [
-            t for t in self["builds"] if t in (Config.MINGW_ARCH_LIST + Config.MSYS_ARCH_LIST)]
+        build_types = list(self._active_builds)
         if self["source"]:
             if any((k in Config.MINGW_ARCH_LIST) for k in build_types):
                 build_types.append(Config.MINGW_SRC_BUILD_TYPE)
@@ -146,13 +150,13 @@ def get_buildqueue() -> List[Package]:
     # extract the package mapping
     dep_mapping = {}
     for pkg in pkgs:
-        for build in pkg['builds'].values():
+        for build in pkg._active_builds.values():
             for name in build['packages']:
                 dep_mapping[name] = pkg
 
     # link up dependencies with the real package in the queue
     for pkg in pkgs:
-        for build in pkg['builds'].values():
+        for build in pkg._active_builds.values():
             ver_depends: Dict[str, Set[Package]] = {}
             for repo, deps in build['depends'].items():
                 for dep in deps:
@@ -161,10 +165,10 @@ def get_buildqueue() -> List[Package]:
 
     # reverse dependencies
     for pkg in pkgs:
-        for build in pkg['builds'].values():
+        for build in pkg._active_builds.values():
             r_depends: Dict[str, Set[Package]] = {}
             for pkg2 in pkgs:
-                for r_repo, build2 in pkg2['builds'].items():
+                for r_repo, build2 in pkg2._active_builds.items():
                     for repo, deps in build2['ext-depends'].items():
                         if pkg in deps:
                             r_depends.setdefault(r_repo, set()).add(pkg2)
