@@ -71,6 +71,7 @@ def get_github(write: bool = False) -> Github:
     # 100 is the maximum allowed
     kwargs['per_page'] = 100
     kwargs['timeout'] = sum(REQUESTS_TIMEOUT)
+    kwargs['seconds_between_requests'] = None
     gh = Github(**kwargs)
     if auth is None and not write:
         print(f"[Warning] Rate limit status: {gh.get_rate_limit().core}", file=sys.stderr)
