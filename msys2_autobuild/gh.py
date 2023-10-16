@@ -20,7 +20,7 @@ from github.GitRelease import GitRelease
 from github.GitReleaseAsset import GitReleaseAsset
 from github.Repository import Repository
 
-from .config import REQUESTS_RETRY, REQUESTS_TIMEOUT, BuildType, Config
+from .config import REQUESTS_TIMEOUT, BuildType, Config
 from .utils import PathLike, get_requests_session
 
 
@@ -70,7 +70,6 @@ def get_github(write: bool = False) -> Github:
     kwargs['auth'] = auth
     # 100 is the maximum allowed
     kwargs['per_page'] = 100
-    kwargs['retry'] = REQUESTS_RETRY
     kwargs['timeout'] = sum(REQUESTS_TIMEOUT)
     gh = Github(**kwargs)
     if auth is None and not write:
@@ -119,7 +118,7 @@ def wait_for_api_limit_reset(
         gh = get_github(write=write)
         while True:
             core = gh.get_rate_limit().core
-            reset = fixup_datetime(core.reset)
+            reset = core.reset
             now = datetime.now(timezone.utc)
             diff = (reset - now).total_seconds()
             print(f"{core.remaining} API calls left (write={write}), "
@@ -135,18 +134,10 @@ def wait_for_api_limit_reset(
             time.sleep(wait)
 
 
-def fixup_datetime(dt: datetime) -> datetime:
-    # pygithub returns datetime objects without a timezone
-    # https://github.com/PyGithub/PyGithub/issues/1905
-    assert dt.tzinfo is None
-    return dt.replace(tzinfo=timezone.utc)
-
-
 def get_asset_mtime_ns(asset: GitReleaseAsset) -> int:
     """Returns the mtime of an asset in nanoseconds"""
 
-    updated_at = fixup_datetime(asset.updated_at)
-    return int(updated_at.timestamp() * (1000 ** 3))
+    return int(asset.updated_at.timestamp() * (1000 ** 3))
 
 
 def download_asset(asset: GitReleaseAsset, target_path: str) -> None:
