@@ -41,7 +41,7 @@ jobs:
       run: |
         echo "$CONTEXT"
 
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
 
     - uses: actions/setup-python@v4
       with:
@@ -121,7 +121,7 @@ jobs:
         Get-PSDrive -PSProvider FileSystem
         Get-CIMInstance -Class Win32_Processor | Select-Object -Property Name
 
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
 
     - uses: actions/setup-python@v4
       with:
