@@ -107,7 +107,7 @@ def get_current_run_urls() -> Optional[Dict[str, str]]:
             raw = commit.html_url + "/checks/" + str(run.id) + "/logs"
             return {"html": html, "raw": raw}
         else:
-            raise Exception(f"No active job found for { run_name }")
+            raise Exception(f"No active job found for {run_name}")
     return None
 
 

@@ -84,10 +84,10 @@ def run_build(args: Any) -> None:
         pkg, build_type = todo
 
         try:
-            with gha_group(f"[{ pkg['repo'] }] [{ build_type }] { pkg['name'] }..."):
+            with gha_group(f"[{pkg['repo']}] [{build_type}] {pkg['name']}..."):
                 build_package(build_type, pkg, msys2_root, builddir)
         except BuildError:
-            with gha_group(f"[{ pkg['repo'] }] [{ build_type }] { pkg['name'] }: failed"):
+            with gha_group(f"[{pkg['repo']}] [{build_type}] {pkg['name']}: failed"):
                 traceback.print_exc(file=sys.stdout)
             continue
 
