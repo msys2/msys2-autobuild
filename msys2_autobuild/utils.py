@@ -47,7 +47,7 @@ def install_requests_cache() -> Generator:
         always_revalidate=True,
         cache_control=False,
         expire_after=requests_cache.EXPIRE_IMMEDIATELY,
-        backend=SQLiteCache(os.path.join(cache_dir, 'http_cache.sqlite')))
+        backend=SQLiteCache(os.path.join(cache_dir, 'http_cache_2.sqlite')))
 
     # Call this once, so it gets cached from the main thread and can be used in a thread pool
     get_requests_session(nocache=True)
