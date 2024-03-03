@@ -46,7 +46,7 @@ def install_requests_cache() -> Generator:
     cache_file = f'http_cache_{requests_cache.__version__}.sqlite'
     # delete other versions
     for f in os.listdir(cache_dir):
-        if f.startswith('http_cache_') and f != cache_file:
+        if f.startswith('http_cache') and f != cache_file:
             os.remove(os.path.join(cache_dir, f))
     requests_cache.install_cache(
         always_revalidate=True,
