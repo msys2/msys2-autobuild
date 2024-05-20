@@ -74,14 +74,10 @@ class Config:
     """Maximum jobs for each build type. Default is no limit."""
 
     MANUAL_BUILD: List[Tuple[str, List[BuildType]]] = [
-        ('mingw-w64-firebird-git', []),
-        ('mingw-w64-arm-none-eabi-gcc', []),
     ]
     """Packages that take too long to build, or can't be build and should be handled manually"""
 
     IGNORE_RDEP_PACKAGES: List[str] = [
-        'mingw-w64-qt5-static',
-        'mingw-w64-zig',
     ]
     """XXX: These would in theory block rdeps, but no one fixed them, so we ignore them"""
 
