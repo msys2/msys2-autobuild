@@ -168,6 +168,19 @@ jobs:
         msys2 -c 'pacman --noconfirm -Suu'
         msys2 -c 'pacman -Qkq'
 
+    - name: Remove potentially left over packages
+      if: ${{ runner.arch == 'ARM64' }}
+      shell: msys2 {0}
+      run: |
+        # Remove everything not needed
+        # XXX: this depends on marix.packages just being base+base-devel
+        TO_REMOVE=$(comm -23 <(pacman -Qq | sort) <((pactree -ul base | sed 's/[<>=].*//'; pactree -ul base-devel | sed 's/[<>=].*//') | sort -u))
+        if [[ -n "$TO_REMOVE" ]]; then
+            pacman --noconfirm -Rddn $TO_REMOVE
+            # This shouldn't install anything, but just in case
+            pacman -S --noconfirm --needed ${{ matrix.packages }}
+        fi
+
     - name: Process build queue
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
