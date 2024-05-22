@@ -174,11 +174,15 @@ jobs:
       run: |
         # Remove everything not needed
         # XXX: this depends on marix.packages just being base+base-devel
-        TO_REMOVE=$(comm -23 <(pacman -Qq | sort) <((pactree -ul base | sed 's/[<>=].*//'; pactree -ul base-devel | sed 's/[<>=].*//') | sort -u))
+        KEEP=("base" "base-devel")
+        # https://github.com/msys2/msys2-autobuild/pull/87#issuecomment-2125614088
+        KEEP+=("mingw-w64-clang-aarch64-clang" "zip" "unzip" "vim" "etc-update" "psmisc")
+        pacman -S --noconfirm --needed "${KEEP[@]}"
+        TO_REMOVE=$(comm -23 <(pacman -Qq | sort) <(for tokeep in "${KEEP[@]}"; do pactree -ul "$tokeep" | sed 's/[<>=].*//'; done | sort -u))
         if [[ -n "$TO_REMOVE" ]]; then
             pacman --noconfirm -Rddn $TO_REMOVE
             # This shouldn't install anything, but just in case
-            pacman -S --noconfirm --needed ${{ matrix.packages }}
+            pacman -S --noconfirm --needed ${{ matrix.packages }} "${KEEP[@]}"
         fi
 
     - name: Process build queue
