@@ -9,7 +9,7 @@ from datetime import datetime, timezone
 from functools import lru_cache
 from hashlib import sha256
 from pathlib import Path
-from typing import Any, Dict, Generator, List, Optional
+from typing import Any, Dict, Generator, List, Optional, Callable
 
 import requests
 from github import Github
@@ -141,7 +141,8 @@ def get_asset_mtime_ns(asset: GitReleaseAsset) -> int:
     return int(asset.updated_at.timestamp() * (1000 ** 3))
 
 
-def download_asset(asset: GitReleaseAsset, target_path: str) -> None:
+def download_asset(asset: GitReleaseAsset, target_path: str,
+                   onverify: Callable[[str, str], None] | None = None) -> None:
     assert asset_is_complete(asset)
     session = get_requests_session(nocache=True)
     with session.get(asset.browser_download_url, stream=True, timeout=REQUESTS_TIMEOUT) as r:
@@ -154,6 +155,8 @@ def download_asset(asset: GitReleaseAsset, target_path: str) -> None:
                     h.write(chunk)
             mtime_ns = get_asset_mtime_ns(asset)
             os.utime(temppath, ns=(mtime_ns, mtime_ns))
+            if onverify is not None:
+                onverify(temppath, target_path)
             shutil.move(temppath, target_path)
         finally:
             try:

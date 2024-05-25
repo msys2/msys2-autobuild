@@ -3,6 +3,7 @@ import os
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
+import subprocess
 
 from github.GitReleaseAsset import GitReleaseAsset
 
@@ -140,10 +141,16 @@ def fetch_assets(args: Any) -> None:
     print("Pass --fetch-all to fetch all packages.")
     print("Pass --delete to clear the target directory")
 
+    def verify_file(path: str, target: str) -> None:
+        try:
+            subprocess.run(["zstd", "--quiet", "--test", path], capture_output=True, check=True, text=True)
+        except subprocess.CalledProcessError as e:
+            raise Exception(f"zstd test failed for {target!r}: {e.stderr}") from e
+
     def fetch_item(item: Tuple[str, GitReleaseAsset]) -> Tuple[str, GitReleaseAsset]:
         asset_path, asset = item
         if not args.pretend:
-            download_asset(asset, asset_path)
+            download_asset(asset, asset_path, verify_file)
         return item
 
     with ThreadPoolExecutor(8) as executor:
