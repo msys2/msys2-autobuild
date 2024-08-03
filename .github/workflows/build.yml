@@ -147,6 +147,7 @@ jobs:
 
     # Note that ARM64 prior to Win11 requires x86 msys, but this will install x64
     - uses: msys2/setup-msys2@v2
+      id: msys2
       with:
         msystem: MSYS
         update: true
@@ -176,5 +177,4 @@ jobs:
       run: |
         $env:VCPKG_ROOT=''
         $BUILD_ROOT='C:\'
-        $MSYS2_ROOT=(msys2 -c 'cygpath -w /')
-        python -m msys2_autobuild build ${{ matrix.build-args }} "$MSYS2_ROOT" "$BUILD_ROOT"
+        python -m msys2_autobuild build ${{ matrix.build-args }} '${{ steps.msys2.outputs.msys2-location }}' "$BUILD_ROOT"
