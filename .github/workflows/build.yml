@@ -123,8 +123,7 @@ jobs:
 
     - uses: actions/checkout@v4
 
-    # Reverted from v5 to v4 due to actions/setup-python#819
-    - uses: actions/setup-python@v4
+    - uses: actions/setup-python@v5
       with:
         python-version: '3.11'
         cache: 'pip'
