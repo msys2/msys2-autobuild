@@ -137,12 +137,16 @@ class Package(dict):
 
 
 def get_buildqueue() -> List[Package]:
-    pkgs = []
     session = get_requests_session()
     r = session.get("https://packages.msys2.org/api/buildqueue2", timeout=REQUESTS_TIMEOUT)
     r.raise_for_status()
 
-    for received in r.json():
+    return parse_buildqueue(r.text)
+
+
+def parse_buildqueue(payload: str) -> List[Package]:
+    pkgs = []
+    for received in json.loads(payload):
         pkg = Package(received)
         pkg['repo'] = pkg['repo_url'].split('/')[-1]
         pkgs.append(pkg)
@@ -188,23 +192,46 @@ def get_cycles(pkgs: List[Package]) -> Set[Tuple[Package, Package]]:
             PackageStatus.FINISHED_BUT_INCOMPLETE,
         ]
 
+    # Transitive dependencies of a package. Excluding branches where a root is finished
+    def get_buildqueue_deps(pkg: Package, build_type: ArchType) -> "Dict[ArchType, Set[Package]]":
+        start = (build_type, pkg)
+        todo = set([start])
+        done = set()
+        result = set()
+
+        while todo:
+            build_type, pkg = todo.pop()
+            item = (build_type, pkg)
+            done.add(item)
+            if pkg_is_finished(pkg, build_type):
+                continue
+            result.add(item)
+            for dep_build_type, deps in pkg.get_depends(build_type).items():
+                for dep in deps:
+                    dep_item = (dep_build_type, dep)
+                    if dep_item not in done:
+                        todo.add(dep_item)
+        result.discard(start)
+
+        d: Dict[ArchType, Set[Package]] = {}
+        for build_type, pkg in result:
+            d.setdefault(build_type, set()).add(pkg)
+        return d
+
     for pkg in pkgs:
         for build_type in pkg.get_build_types():
             if build_type_is_src(build_type):
                 continue
-            if pkg_is_finished(pkg, build_type):
-                continue
             build_type = cast(ArchType, build_type)
-            for dep_type, deps in pkg.get_depends(build_type).items():
+            for dep_build_type, deps in get_buildqueue_deps(pkg, build_type).items():
                 for dep in deps:
-                    if pkg_is_finished(dep, dep_type):
-                        continue
                     # manually broken cycle
-                    if pkg.is_optional_dep(dep, dep_type) or dep.is_optional_dep(pkg, build_type):
+                    if pkg.is_optional_dep(dep, dep_build_type) or dep.is_optional_dep(pkg, build_type):
                         continue
-                    dep_deps = dep.get_depends(dep_type)
+                    dep_deps = get_buildqueue_deps(dep, dep_build_type)
                     if pkg in dep_deps.get(build_type, set()):
                         cycles.add(tuple(sorted([pkg, dep], key=lambda p: p["name"])))  # type: ignore
+
     return cycles
 
 
