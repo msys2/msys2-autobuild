@@ -19,8 +19,7 @@ on:
         required: false
         type: string
 
-permissions:
-  contents: write
+permissions: {}
 
 concurrency: autobuild-maint
 
@@ -28,6 +27,9 @@ jobs:
 
   schedule:
     runs-on: ubuntu-22.04
+
+    permissions:
+      contents: write
 
     steps:
 
