@@ -19,13 +19,15 @@ on:
 env:
   PYTHONUNBUFFERED: 1
 
-permissions:
-  contents: write
+permissions: {}
 
 jobs:
 
   schedule:
     runs-on: ubuntu-22.04
+
+    permissions:
+      contents: write
 
     concurrency: autobuild-maint
 
@@ -95,6 +97,9 @@ jobs:
   build:
     timeout-minutes: 4320
     needs: schedule
+
+    permissions:
+      contents: write
 
     concurrency: autobuild-build-${{ matrix.name }}
 
