@@ -2,7 +2,7 @@ from typing import Dict, List, Literal, Tuple, Union
 
 from urllib3.util import Retry
 
-ArchType = Literal["mingw32", "mingw64", "ucrt64", "clang64", "clang32", "clangarm64", "msys"]
+ArchType = Literal["mingw32", "mingw64", "ucrt64", "clang64", "clangarm64", "msys"]
 SourceType = Literal["mingw-src", "msys-src"]
 BuildType = Union[ArchType, SourceType]
 
@@ -33,7 +33,7 @@ class Config:
     ]
     """Users that are allowed to upload assets. This is checked at download time"""
 
-    MINGW_ARCH_LIST: List[ArchType] = ["mingw32", "mingw64", "ucrt64", "clang64", "clang32", "clangarm64"]
+    MINGW_ARCH_LIST: List[ArchType] = ["mingw32", "mingw64", "ucrt64", "clang64", "clangarm64"]
     """Arches we try to build"""
 
     MINGW_SRC_ARCH: ArchType = "ucrt64"
@@ -55,7 +55,6 @@ class Config:
         "mingw64": "msys2/msys2-autobuild",
         "ucrt64": "msys2/msys2-autobuild",
         "clang64": "msys2/msys2-autobuild",
-        "clang32": "msys2/msys2-autobuild",
         "clangarm64": "msys2-arm/msys2-autobuild",
     }
     """Fetch certain build types from other repos if available"""
