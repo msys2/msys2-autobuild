@@ -13,7 +13,7 @@ from .utils import apply_optional_deps
 def generate_jobs_for(build_type: BuildType, optional_deps: str, count: int) -> Iterator[Dict[str, Any]]:
     name = build_type
     packages = " ".join(["base-devel"])
-    runner = ["windows-2022"] if build_type != "clangarm64" else ["Windows", "ARM64", "autobuild"]
+    runner = ["windows-2025"] if build_type != "clangarm64" else ["Windows", "ARM64", "autobuild"]
     build_from = itertools.cycle(["start", "end", "middle"])
     for i in range(count):
         real_name = name if i == 0 else name + "-" + str(i + 1)
@@ -31,7 +31,7 @@ def generate_jobs_for(build_type: BuildType, optional_deps: str, count: int) -> 
 def generate_src_jobs(optional_deps: str, count: int) -> Iterator[Dict[str, Any]]:
     name = "src"
     packages = " ".join(["base-devel", "VCS"])
-    runner = ["windows-2022"]
+    runner = ["windows-2025"]
     build_types = [Config.MINGW_SRC_BUILD_TYPE, Config.MSYS_SRC_BUILD_TYPE]
     build_from = itertools.cycle(["start", "end", "middle"])
     for i in range(count):
