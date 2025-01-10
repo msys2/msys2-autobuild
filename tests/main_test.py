@@ -1,7 +1,40 @@
 # type: ignore
 
+import os
+import stat
+import tempfile
+from pathlib import Path
+
 from msys2_autobuild.utils import parse_optional_deps
 from msys2_autobuild.queue import parse_buildqueue, get_cycles
+from msys2_autobuild.build import make_tree_writable
+
+
+def test_make_tree_writable():
+    with tempfile.TemporaryDirectory() as tempdir:
+        nested_dir = Path(tempdir) / "nested"
+        nested_junction = nested_dir / "junction"
+        nested_dir.mkdir()
+        file_path = nested_dir / "test_file.txt"
+        file_path.write_text("content")
+
+        # Create a junction loop if possible, to make sure we ignore it
+        if hasattr(os.path, 'isjunction') and os.name == 'nt':
+            import _winapi
+            _winapi.CreateJunction(str(nested_dir), str(nested_junction))
+        else:
+            nested_junction.mkdir()
+
+        # Remove permissions
+        for p in [tempdir, nested_dir, file_path, nested_junction]:
+            os.chmod(p, os.stat(p).st_mode & ~stat.S_IWRITE & ~stat.S_IREAD)
+
+        make_tree_writable(tempdir)
+
+        assert os.access(tempdir, os.W_OK) and os.access(tempdir, os.R_OK)
+        assert os.access(nested_dir, os.W_OK) and os.access(nested_dir, os.R_OK)
+        assert os.access(file_path, os.W_OK) and os.access(file_path, os.R_OK)
+        assert os.access(nested_junction, os.W_OK) and os.access(nested_junction, os.R_OK)
 
 
 def test_parse_optional_deps():
