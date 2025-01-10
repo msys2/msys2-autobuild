@@ -122,23 +122,35 @@ def run_cmd(msys2_root: PathLike, args: Sequence[PathLike], **kwargs: Any) -> No
     check_call([executable, '-lc'] + [shlex_join([str(a) for a in args])], env=env, **kwargs)
 
 
+def make_tree_writable(topdir: PathLike) -> None:
+    # Ensure all files and directories under topdir are writable
+    # (and readable) by owner.
+    # Taken from meson, and adjusted
+
+    def chmod(p: PathLike) -> None:
+        print(p)
+        os.chmod(p, os.stat(p).st_mode | stat.S_IWRITE | stat.S_IREAD)
+
+    chmod(topdir)
+    for root, dirs, files in os.walk(topdir):
+        for d in dirs:
+            chmod(os.path.join(root, d))
+        # Work around Python bug following junctions
+        # https://github.com/python/cpython/issues/67596#issuecomment-1918112817
+        if hasattr(os.path, 'isjunction'):  # Python 3.12 only
+            dirs[:] = [d for d in dirs if not os.path.isjunction(os.path.join(root, d))]
+        for fname in files:
+            fpath = os.path.join(root, fname)
+            if os.path.isfile(fpath):
+                chmod(fpath)
+
+
 def reset_git_repo(path: PathLike):
 
     def clean():
         assert os.path.exists(path)
         check_call(["git", "clean", "-xfdf"], cwd=path)
         check_call(["git", "reset", "--hard", "HEAD"], cwd=path)
-
-    def make_tree_writable(topdir: PathLike) -> None:
-        # Ensure all files and directories under topdir are writable
-        # (and readable) by owner.
-        # Taken from meson
-        for d, _, files in os.walk(topdir):
-            os.chmod(d, os.stat(d).st_mode | stat.S_IWRITE | stat.S_IREAD)
-            for fname in files:
-                fpath = os.path.join(d, fname)
-                if os.path.isfile(fpath):
-                    os.chmod(fpath, os.stat(fpath).st_mode | stat.S_IWRITE | stat.S_IREAD)
 
     made_writable = False
     for i in range(10):
