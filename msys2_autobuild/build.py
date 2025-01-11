@@ -128,7 +128,6 @@ def make_tree_writable(topdir: PathLike) -> None:
     # Taken from meson, and adjusted
 
     def chmod(p: PathLike) -> None:
-        print(p)
         os.chmod(p, os.stat(p).st_mode | stat.S_IWRITE | stat.S_IREAD)
 
     chmod(topdir)
