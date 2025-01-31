@@ -7,7 +7,7 @@ from pathlib import Path
 
 from msys2_autobuild.utils import parse_optional_deps
 from msys2_autobuild.queue import parse_buildqueue, get_cycles
-from msys2_autobuild.build import make_tree_writable
+from msys2_autobuild.build import make_tree_writable, remove_junctions
 
 
 def test_make_tree_writable():
@@ -35,6 +35,23 @@ def test_make_tree_writable():
         assert os.access(nested_dir, os.W_OK) and os.access(nested_dir, os.R_OK)
         assert os.access(file_path, os.W_OK) and os.access(file_path, os.R_OK)
         assert os.access(nested_junction, os.W_OK) and os.access(nested_junction, os.R_OK)
+
+
+def test_remove_junctions():
+    with tempfile.TemporaryDirectory() as tempdir:
+        nested_dir = Path(tempdir) / "nested"
+        nested_junction = nested_dir / "junction"
+        nested_dir.mkdir()
+
+        # Create a junction loop if possible, to make sure we ignore it
+        if hasattr(os.path, 'isjunction') and os.name == 'nt':
+            import _winapi
+            _winapi.CreateJunction(str(nested_dir), str(nested_junction))
+            assert nested_junction.exists()
+            assert os.path.isjunction(nested_junction)
+
+        remove_junctions(tempdir)
+        assert not nested_junction.exists()
 
 
 def test_parse_optional_deps():
