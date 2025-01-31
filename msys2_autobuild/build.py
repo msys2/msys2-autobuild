@@ -144,6 +144,21 @@ def make_tree_writable(topdir: PathLike) -> None:
                 chmod(fpath)
 
 
+def remove_junctions(topdir: PathLike) -> None:
+    # work around a git issue where it can't handle junctions
+    # https://github.com/git-for-windows/git/issues/5320
+    if not hasattr(os.path, 'isjunction'):  # Python 3.12 only
+        return
+    for root, dirs, _ in os.walk(topdir):
+        no_junctions = []
+        for d in dirs:
+            if not os.path.isjunction(os.path.join(root, d)):
+                no_junctions.append(d)
+            else:
+                os.remove(os.path.join(root, d))
+        dirs[:] = no_junctions
+
+
 def reset_git_repo(path: PathLike):
 
     def clean():
@@ -160,6 +175,7 @@ def reset_git_repo(path: PathLike):
                 if not made_writable:
                     print("Trying to make files writable")
                     make_tree_writable(path)
+                    remove_junctions(path)
                     made_writable = True
             except OSError as e:
                 print("Making files writable failed", e)
