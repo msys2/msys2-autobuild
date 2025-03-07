@@ -51,16 +51,18 @@ def make_writable(obj: GithubObject) -> Generator:
 
 
 @lru_cache(maxsize=None)
+def _get_repo(name: str, write: bool = False) -> Repository:
+    gh = get_github(write=write)
+    return gh.get_repo(name, lazy=True)
+
+
 def get_current_repo(write: bool = False) -> Repository:
-    gh = get_github(write=write)
     repo_full_name = os.environ.get("GITHUB_REPOSITORY", "msys2/msys2-autobuild")
-    return gh.get_repo(repo_full_name, lazy=True)
+    return _get_repo(repo_full_name, write)
 
 
-@lru_cache(maxsize=None)
-def get_repo(build_type: BuildType, write: bool = False) -> Repository:
-    gh = get_github(write=write)
-    return gh.get_repo(Config.ASSETS_REPO[build_type], lazy=True)
+def get_repo_for_build_type(build_type: BuildType, write: bool = False) -> Repository:
+    return _get_repo(Config.ASSETS_REPO[build_type], write)
 
 
 @lru_cache(maxsize=None)
@@ -278,13 +280,13 @@ class CachedAssets:
 
     def get_assets(self, build_type: BuildType) -> List[GitReleaseAsset]:
         if build_type not in self._assets:
-            repo = get_repo(build_type)
+            repo = get_repo_for_build_type(build_type)
             release = get_release(repo, 'staging-' + build_type)
             self._assets[build_type] = get_release_assets(release)
         return self._assets[build_type]
 
     def get_failed_assets(self, build_type: BuildType) -> List[GitReleaseAsset]:
-        repo = get_repo(build_type)
+        repo = get_repo_for_build_type(build_type)
         key = repo.full_name
         if key not in self._failed:
             release = get_release(repo, 'staging-failed')

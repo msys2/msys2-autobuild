@@ -17,7 +17,7 @@ from github.GitReleaseAsset import GitReleaseAsset
 
 from .config import ArchType, BuildType, Config
 from .gh import (CachedAssets, download_asset, get_asset_filename,
-                 get_current_run_urls, get_release, get_repo, upload_asset,
+                 get_current_run_urls, get_release, get_repo_for_build_type, upload_asset,
                  wait_for_api_limit_reset)
 from .queue import Package
 from .utils import SCRIPT_DIR, PathLike
@@ -304,7 +304,7 @@ def build_package(build_type: BuildType, pkg: Package, msys2_root: PathLike, bui
     repo_dir = os.path.join(builddir, repo_name)
     to_upload: List[str] = []
 
-    repo = get_repo(build_type)
+    repo = get_repo_for_build_type(build_type)
 
     with fresh_git_repo(pkg['repo_url'], repo_dir):
         orig_pkg_dir = os.path.join(repo_dir, pkg['repo_path'])
