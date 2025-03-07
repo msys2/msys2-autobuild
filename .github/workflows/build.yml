@@ -184,6 +184,5 @@ jobs:
         GITHUB_RUN_NAME: ${{ matrix.name }}
         MSYS2_ROOT: ${{ steps.msys2.outputs.msys2-location }}
       run: |
-        $env:VCPKG_ROOT=''
         $BUILD_ROOT=Join-Path (Split-Path $env:GITHUB_WORKSPACE -Qualifier) "\"
         python -m msys2_autobuild build ${{ matrix.build-args }} "$env:MSYS2_ROOT" "$BUILD_ROOT"
