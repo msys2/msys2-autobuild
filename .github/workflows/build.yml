@@ -147,7 +147,10 @@ jobs:
       env:
         PIP_DISABLE_PIP_VERSION_CHECK: 1
       run: |
-        python -m pip install --user -r requirements.txt
+        python -m venv .venv
+        .\.venv\Scripts\activate
+        python -m pip install -r requirements.txt
+        echo "$env:VIRTUAL_ENV\Scripts" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
 
     - name: autobuild cache
       uses: actions/cache@v4
