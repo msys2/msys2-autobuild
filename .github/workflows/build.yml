@@ -136,18 +136,23 @@ jobs:
         persist-credentials: false
 
     - uses: actions/setup-python@v5
+      id: python
       with:
         python-version: '3.13'
         cache: 'pip'
         cache-dependency-path: 'requirements.txt'
         # Note that ARM64 prior to Win11 requires x86, but this will install x64
         architecture: 'x64'
+        # Avoid it setting CMake/pkg-config variables
+        # https://github.com/actions/setup-python/blob/main/docs/advanced-usage.md#environment-variables
+        update-environment: false
 
     - name: Install deps
       env:
         PIP_DISABLE_PIP_VERSION_CHECK: 1
+        PYTHON_PATH: ${{ steps.python.outputs.python-path }}
       run: |
-        python -m venv .venv
+        & "$env:PYTHON_PATH" -m venv .venv
         .\.venv\Scripts\activate
         python -m pip install -r requirements.txt
         echo "$env:VIRTUAL_ENV\Scripts" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
