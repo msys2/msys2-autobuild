@@ -139,13 +139,20 @@ jobs:
       id: python
       with:
         python-version: '3.13'
-        cache: 'pip'
-        cache-dependency-path: 'requirements.txt'
         # Note that ARM64 prior to Win11 requires x86, but this will install x64
         architecture: 'x64'
         # Avoid it setting CMake/pkg-config variables
         # https://github.com/actions/setup-python/blob/main/docs/advanced-usage.md#environment-variables
         update-environment: false
+
+    # Work around https://github.com/actions/setup-python/issues/1050
+    - name: Cache pip dependencies
+      uses: actions/cache@v4
+      with:
+        path: ~\AppData\Local\pip\Cache
+        key: ${{ runner.os }}-${{ runner.arch }}-pip-${{ hashFiles('requirements.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-${{ runner.arch }}-pip-
 
     - name: Install deps
       env:
