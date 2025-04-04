@@ -163,6 +163,15 @@ def reset_git_repo(path: PathLike):
 
     def clean():
         assert os.path.exists(path)
+
+        # Try to avoid git hanging in a junction loop, by removing them
+        # before running git clean/reset
+        # https://github.com/msys2/msys2-autobuild/issues/108#issuecomment-2776420879
+        try:
+            remove_junctions(path)
+        except OSError as e:
+            print("Removing junctions failed", e)
+
         check_call(["git", "clean", "-xfdf"], cwd=path)
         check_call(["git", "reset", "--hard", "HEAD"], cwd=path)
 
