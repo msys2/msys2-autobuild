@@ -62,7 +62,7 @@ def get_current_repo(write: bool = False) -> Repository:
 
 
 def get_repo_for_build_type(build_type: BuildType, write: bool = False) -> Repository:
-    return _get_repo(Config.ASSETS_REPO[build_type], write)
+    return _get_repo(Config.RUNNER_CONFIG[build_type]["repo"], write)
 
 
 @lru_cache(maxsize=None)

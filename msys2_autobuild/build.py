@@ -39,7 +39,7 @@ def get_build_environ(build_type: BuildType) -> Dict[str, str]:
     environ = os.environ.copy()
 
     # Set PACKAGER for makepkg
-    packager_ref = Config.ASSETS_REPO[build_type]
+    packager_ref = Config.RUNNER_CONFIG[build_type]["repo"]
     if "GITHUB_SHA" in environ and "GITHUB_RUN_ID" in environ:
         packager_ref += "/" + environ["GITHUB_SHA"][:8] + "/" + environ["GITHUB_RUN_ID"]
     environ["PACKAGER"] = f"CI ({packager_ref})"
