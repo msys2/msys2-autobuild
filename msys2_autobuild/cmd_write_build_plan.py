@@ -13,7 +13,8 @@ from .utils import apply_optional_deps
 def generate_jobs_for(build_type: BuildType, optional_deps: str, count: int) -> Iterator[Dict[str, Any]]:
     name = build_type
     packages = " ".join(["base-devel"])
-    runner = ["windows-2025"] if build_type != "clangarm64" else ["Windows", "ARM64", "autobuild"]
+    runner = Config.RUNNER_CONFIG[build_type]["labels"]
+    hosted = Config.RUNNER_CONFIG[build_type]["hosted"]
     build_from = itertools.cycle(["start", "end", "middle"])
     for i in range(count):
         real_name = name if i == 0 else name + "-" + str(i + 1)
@@ -24,6 +25,7 @@ def generate_jobs_for(build_type: BuildType, optional_deps: str, count: int) -> 
             "name": real_name,
             "packages": packages,
             "runner": runner,
+            "hosted": hosted,
             "build-args": shlex.join(build_args),
         }
 
@@ -31,8 +33,9 @@ def generate_jobs_for(build_type: BuildType, optional_deps: str, count: int) -> 
 def generate_src_jobs(optional_deps: str, count: int) -> Iterator[Dict[str, Any]]:
     name = "src"
     packages = " ".join(["base-devel", "VCS"])
-    runner = ["windows-2025"]
     build_types = [Config.MINGW_SRC_BUILD_TYPE, Config.MSYS_SRC_BUILD_TYPE]
+    runner = Config.RUNNER_CONFIG[build_types[0]]["labels"]
+    hosted = Config.RUNNER_CONFIG[build_types[0]]["hosted"]
     build_from = itertools.cycle(["start", "end", "middle"])
     for i in range(count):
         real_name = name if i == 0 else name + "-" + str(i + 1)
@@ -43,6 +46,7 @@ def generate_src_jobs(optional_deps: str, count: int) -> Iterator[Dict[str, Any]
             "name": real_name,
             "packages": packages,
             "runner": runner,
+            "hosted": hosted,
             "build-args": shlex.join(build_args),
         }
 
@@ -68,7 +72,7 @@ def create_build_plan(pkgs: List[Package], optional_deps: str) -> List[Dict[str,
     for pkg in pkgs:
         for build_type in pkg.get_build_types():
             # skip if we can't build it
-            if Config.ASSETS_REPO[build_type] != get_current_repo().full_name:
+            if Config.RUNNER_CONFIG[build_type]["repo"] != get_current_repo().full_name:
                 continue
             if pkg.get_status(build_type) == PackageStatus.WAITING_FOR_BUILD:
                 queued_build_types[build_type] = queued_build_types.get(build_type, 0) + 1

@@ -47,17 +47,49 @@ class Config:
 
     MSYS_SRC_BUILD_TYPE: BuildType = "msys-src"
 
-    ASSETS_REPO: Dict[BuildType, str] = {
-        "msys-src": "msys2/msys2-autobuild",
-        "msys": "msys2/msys2-autobuild",
-        "mingw-src": "msys2/msys2-autobuild",
-        "mingw32": "msys2/msys2-autobuild",
-        "mingw64": "msys2/msys2-autobuild",
-        "ucrt64": "msys2/msys2-autobuild",
-        "clang64": "msys2/msys2-autobuild",
-        "clangarm64": "msys2-arm/msys2-autobuild",
+    RUNNER_CONFIG: Dict[BuildType, Dict] = {
+        "msys-src": {
+            "repo": "msys2/msys2-autobuild",
+            "labels": ["windows-2025"],
+            "hosted": True,
+        },
+        "msys": {
+            "repo": "msys2/msys2-autobuild",
+            "labels": ["windows-2025"],
+            "hosted": True,
+        },
+        "mingw-src": {
+            "repo": "msys2/msys2-autobuild",
+            "labels": ["windows-2025"],
+            "hosted": True,
+        },
+        "mingw32": {
+            "repo": "msys2/msys2-autobuild",
+            "labels": ["windows-2025"],
+            "hosted": True,
+        },
+        "mingw64": {
+            "repo": "msys2/msys2-autobuild",
+            "labels": ["windows-2025"],
+            "hosted": True,
+        },
+        "ucrt64": {
+            "repo": "msys2/msys2-autobuild",
+            "labels": ["windows-2025"],
+            "hosted": True,
+        },
+        "clang64": {
+            "repo": "msys2/msys2-autobuild",
+            "labels": ["windows-2025"],
+            "hosted": True,
+        },
+        "clangarm64": {
+            "repo": "msys2-arm/msys2-autobuild",
+            "labels": ["Windows", "ARM64", "autobuild"],
+            "hosted": False,
+        },
     }
-    """Fetch certain build types from other repos if available"""
+    """Runner config to use for each build type."""
 
     SOFT_JOB_TIMEOUT = 60 * 60 * 3
     """Runtime after which we shouldn't start a new build"""

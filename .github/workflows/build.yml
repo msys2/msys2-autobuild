@@ -117,7 +117,7 @@ jobs:
     steps:
 
     - name: Configure Pagefile
-      if: ${{ runner.arch != 'ARM64' }}
+      if: ${{ matrix.hosted }}
       # https://github.com/al-cheb/configure-pagefile-action/issues/16
       continue-on-error: true
       uses: al-cheb/configure-pagefile-action@a3b6ebd6b634da88790d9c58d4b37a7f4a7b8708
@@ -178,9 +178,9 @@ jobs:
         msystem: MSYS
         update: true
         install: ${{ matrix.packages }}
-        location: 'D:\A'
-        release: ${{ runner.arch == 'ARM64' && 'false' || 'true' }}
-        cache: ${{ runner.arch == 'ARM64' && 'false' || 'true' }}
+        location: ${{ matrix.hosted && '\A' || 'D:\A' }}
+        release: ${{ matrix.hosted }}
+        cache: ${{ matrix.hosted }}
 
     - name: Switch to the main mirror
       shell: msys2 {0}
