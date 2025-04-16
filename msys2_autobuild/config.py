@@ -52,6 +52,7 @@ class Config:
             "repo": "msys2/msys2-autobuild",
             "labels": ["windows-2025"],
             "hosted": True,
+            "max_jobs": 1,
         },
         "msys": {
             "repo": "msys2/msys2-autobuild",
@@ -62,6 +63,7 @@ class Config:
             "repo": "msys2/msys2-autobuild",
             "labels": ["windows-2025"],
             "hosted": True,
+            "max_jobs": 1,
         },
         "mingw32": {
             "repo": "msys2/msys2-autobuild",
@@ -87,6 +89,7 @@ class Config:
             "repo": "msys2-arm/msys2-autobuild",
             "labels": ["Windows", "ARM64", "autobuild"],
             "hosted": False,
+            "max_jobs": 1,
         },
     }
     """Runner config to use for each build type."""
@@ -96,13 +99,6 @@ class Config:
 
     MAXIMUM_JOB_COUNT = 15
     """Maximum number of jobs to spawn"""
-
-    MAXIMUM_BUILD_TYPE_JOB_COUNT: Dict[BuildType, int] = {
-        "msys-src": 1,
-        "mingw-src": 1,
-        "clangarm64": 1,
-    }
-    """Maximum jobs for each build type. Default is no limit."""
 
     MANUAL_BUILD: List[Tuple[str, List[BuildType]]] = [
     ]

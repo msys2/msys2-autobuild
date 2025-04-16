@@ -85,7 +85,7 @@ def create_build_plan(pkgs: List[Package], optional_deps: str) -> List[Dict[str,
             count = 2
         else:
             count = 1
-        return min(Config.MAXIMUM_BUILD_TYPE_JOB_COUNT.get(build_type, count), count)
+        return min(Config.RUNNER_CONFIG[build_type].get("max_jobs", count), count)
 
     # generate the build jobs
     job_lists = []
