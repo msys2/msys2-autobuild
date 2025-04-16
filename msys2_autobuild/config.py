@@ -86,10 +86,9 @@ class Config:
             "hosted": True,
         },
         "clangarm64": {
-            "repo": "msys2-arm/msys2-autobuild",
-            "labels": ["Windows", "ARM64", "autobuild"],
-            "hosted": False,
-            "max_jobs": 1,
+            "repo": "msys2/msys2-autobuild",
+            "labels": ["windows-11-arm"],
+            "hosted": True,
         },
     }
     """Runner config to use for each build type."""
