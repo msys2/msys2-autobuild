@@ -172,7 +172,7 @@ jobs:
         restore-keys: autobuild_cache-
 
     # Note that ARM64 prior to Win11 requires x86 msys, but this will install x64
-    - uses: msys2/setup-msys2@v2
+    - uses: msys2/setup-msys2@v2  # zizmor: ignore[unpinned-uses]
       id: msys2
       with:
         msystem: MSYS
