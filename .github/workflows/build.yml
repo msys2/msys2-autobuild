@@ -178,7 +178,7 @@ jobs:
         msystem: MSYS
         update: true
         install: ${{ matrix.packages }}
-        location: '\A'
+        location: '\M'
         release: ${{ matrix.hosted }}
         cache: ${{ matrix.hosted }}
 

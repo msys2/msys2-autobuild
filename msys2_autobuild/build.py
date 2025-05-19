@@ -309,7 +309,7 @@ def build_package(build_type: BuildType, pkg: Package, msys2_root: PathLike, bui
     assert os.path.isabs(msys2_root)
     os.makedirs(builddir, exist_ok=True)
 
-    repo_name = {"MINGW-packages": "M", "MSYS2-packages": "S"}.get(pkg['repo'], pkg['repo'])
+    repo_name = {"MINGW-packages": "W", "MSYS2-packages": "S"}.get(pkg['repo'], pkg['repo'])
     repo_dir = os.path.join(builddir, repo_name)
     to_upload: List[str] = []
 
