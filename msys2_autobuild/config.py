@@ -50,39 +50,39 @@ class Config:
     RUNNER_CONFIG: Dict[BuildType, Dict] = {
         "msys-src": {
             "repo": "msys2/msys2-autobuild",
-            "labels": ["windows-2025"],
+            "labels": ["windows-2022"],
             "hosted": True,
             "max_jobs": 1,
         },
         "msys": {
             "repo": "msys2/msys2-autobuild",
-            "labels": ["windows-2025"],
+            "labels": ["windows-2022"],
             "hosted": True,
         },
         "mingw-src": {
             "repo": "msys2/msys2-autobuild",
-            "labels": ["windows-2025"],
+            "labels": ["windows-2022"],
             "hosted": True,
             "max_jobs": 1,
         },
         "mingw32": {
             "repo": "msys2/msys2-autobuild",
-            "labels": ["windows-2025"],
+            "labels": ["windows-2022"],
             "hosted": True,
         },
         "mingw64": {
             "repo": "msys2/msys2-autobuild",
-            "labels": ["windows-2025"],
+            "labels": ["windows-2022"],
             "hosted": True,
         },
         "ucrt64": {
             "repo": "msys2/msys2-autobuild",
-            "labels": ["windows-2025"],
+            "labels": ["windows-2022"],
             "hosted": True,
         },
         "clang64": {
             "repo": "msys2/msys2-autobuild",
-            "labels": ["windows-2025"],
+            "labels": ["windows-2022"],
             "hosted": True,
         },
         "clangarm64": {
