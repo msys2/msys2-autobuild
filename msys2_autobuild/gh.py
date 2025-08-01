@@ -77,7 +77,7 @@ def get_github(write: bool = False) -> Github:
     kwargs['lazy'] = True
     gh = Github(**kwargs)
     if auth is None and not write:
-        print(f"[Warning] Rate limit status: {gh.get_rate_limit().core}", file=sys.stderr)
+        print(f"[Warning] Rate limit status: {gh.get_rate_limit().resources.core}", file=sys.stderr)
     return gh
 
 
@@ -121,7 +121,7 @@ def wait_for_api_limit_reset(
     for write in [False, True]:
         gh = get_github(write=write)
         while True:
-            core = gh.get_rate_limit().core
+            core = gh.get_rate_limit().resources.core
             reset = core.reset
             now = datetime.now(timezone.utc)
             diff = (reset - now).total_seconds()
