@@ -186,7 +186,7 @@ def get_asset_filename(asset: GitReleaseAsset) -> str:
 
 
 @contextmanager
-def verify_asset_digest(asset: GitReleaseAsset) -> Generator[Any]:
+def verify_asset_digest(asset: GitReleaseAsset) -> Generator[Any, None, None]:
     type_, value = get_asset_digest(asset)
     value = value.lower()
     h = hashlib.new(type_)
