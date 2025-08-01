@@ -4,10 +4,10 @@ import shutil
 import sys
 import tempfile
 import time
+import hashlib
 from contextlib import contextmanager
 from datetime import datetime, timezone
 from functools import lru_cache
-from hashlib import sha256
 from pathlib import Path
 from typing import Any, Dict, Generator, List, Optional, Callable
 
@@ -153,9 +153,11 @@ def download_asset(asset: GitReleaseAsset, target_path: str,
         fd, temppath = tempfile.mkstemp()
         try:
             os.chmod(temppath, 0o644)
-            with os.fdopen(fd, "wb") as h:
-                for chunk in r.iter_content(4096):
-                    h.write(chunk)
+            with verify_asset_digest(asset) as hash:
+                with os.fdopen(fd, "wb") as h:
+                    for chunk in r.iter_content(256 * 1024):
+                        hash.update(chunk)
+                        h.write(chunk)
             mtime_ns = get_asset_mtime_ns(asset)
             os.utime(temppath, ns=(mtime_ns, mtime_ns))
             if onverify is not None:
@@ -171,7 +173,7 @@ def download_asset(asset: GitReleaseAsset, target_path: str,
 def get_gh_asset_name(basename: PathLike, text: bool = False) -> str:
     # GitHub will throw out charaters like '~' or '='. It also doesn't like
     # when there is no file extension and will try to add one
-    return sha256(str(basename).encode("utf-8")).hexdigest() + (".bin" if not text else ".txt")
+    return hashlib.sha256(str(basename).encode("utf-8")).hexdigest() + (".bin" if not text else ".txt")
 
 
 def get_asset_filename(asset: GitReleaseAsset) -> str:
@@ -181,6 +183,28 @@ def get_asset_filename(asset: GitReleaseAsset) -> str:
         assert os.path.splitext(get_gh_asset_name(asset.label))[0] == \
             os.path.splitext(asset.name)[0]
         return asset.label
+
+
+@contextmanager
+def verify_asset_digest(asset: GitReleaseAsset) -> Generator[Any]:
+    type_, value = get_asset_digest(asset)
+    value = value.lower()
+    h = hashlib.new(type_)
+    try:
+        yield h
+    finally:
+        hexdigest = h.hexdigest().lower()
+        if h.hexdigest() != value:
+            raise Exception(f"Digest mismatch for asset {get_asset_filename(asset)}: "
+                            f"got {hexdigest}, expected {value}")
+
+
+def get_asset_digest(asset: GitReleaseAsset) -> tuple[str, str]:
+    # https://github.com/PyGithub/PyGithub/issues/3324
+    digest = asset._rawData['digest']
+    assert digest
+    type_, value = asset._rawData['digest'].split(":", 1)
+    return type_, value
 
 
 def is_asset_from_gha(asset: GitReleaseAsset) -> bool:
