@@ -43,7 +43,7 @@ jobs:
       run: |
         echo "$CONTEXT"
 
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
       with:
         persist-credentials: false
 
@@ -131,7 +131,7 @@ jobs:
         Get-PSDrive -PSProvider FileSystem
         Get-CIMInstance -Class Win32_Processor | Select-Object -Property Name
 
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
       with:
         persist-credentials: false
 
