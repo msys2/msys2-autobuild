@@ -115,11 +115,7 @@ def run_cmd(msys2_root: PathLike, args: Sequence[PathLike], **kwargs: Any) -> No
     env["MSYSTEM"] = "MSYS"
     env["MSYS2_PATH_TYPE"] = "minimal"
 
-    def shlex_join(split_command: Sequence[str]) -> str:
-        # shlex.join got added in 3.8 while we support 3.6
-        return ' '.join(shlex.quote(arg) for arg in split_command)
-
-    check_call([executable, '-lc'] + [shlex_join([str(a) for a in args])], env=env, **kwargs)
+    check_call([executable, '-lc'] + [shlex.join([str(a) for a in args])], env=env, **kwargs)
 
 
 def make_tree_writable(topdir: PathLike) -> None:
