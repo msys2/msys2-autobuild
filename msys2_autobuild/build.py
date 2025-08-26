@@ -352,7 +352,7 @@ def build_package(build_type: BuildType, pkg: Package, msys2_root: PathLike, bui
                         '--rmdeps',
                         '--cleanbuild'
                     ], env=env, cwd=pkg_dir)
-                elif build_type in Config.MSYS_SRC_ARCH:
+                elif build_type in Config.MSYS_ARCH_LIST:
                     run_cmd(msys2_root, [
                         'makepkg',
                         '--noconfirm',
