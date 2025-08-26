@@ -132,8 +132,7 @@ def make_tree_writable(topdir: PathLike) -> None:
             chmod(os.path.join(root, d))
         # Work around Python bug following junctions
         # https://github.com/python/cpython/issues/67596#issuecomment-1918112817
-        if hasattr(os.path, 'isjunction'):  # Python 3.12 only
-            dirs[:] = [d for d in dirs if not os.path.isjunction(os.path.join(root, d))]
+        dirs[:] = [d for d in dirs if not os.path.isjunction(os.path.join(root, d))]
         for fname in files:
             fpath = os.path.join(root, fname)
             if os.path.isfile(fpath):
@@ -143,8 +142,6 @@ def make_tree_writable(topdir: PathLike) -> None:
 def remove_junctions(topdir: PathLike) -> None:
     # work around a git issue where it can't handle junctions
     # https://github.com/git-for-windows/git/issues/5320
-    if not hasattr(os.path, 'isjunction'):  # Python 3.12 only
-        return
     for root, dirs, _ in os.walk(topdir):
         no_junctions = []
         for d in dirs:

@@ -19,7 +19,7 @@ def test_make_tree_writable():
         file_path.write_text("content")
 
         # Create a junction loop if possible, to make sure we ignore it
-        if hasattr(os.path, 'isjunction') and os.name == 'nt':
+        if os.name == 'nt':
             import _winapi
             _winapi.CreateJunction(str(nested_dir), str(nested_junction))
         else:
@@ -44,7 +44,7 @@ def test_remove_junctions():
         nested_dir.mkdir()
 
         # Create a junction loop if possible, to make sure we ignore it
-        if hasattr(os.path, 'isjunction') and os.name == 'nt':
+        if os.name == 'nt':
             import _winapi
             _winapi.CreateJunction(str(nested_dir), str(nested_junction))
             assert nested_junction.exists()
