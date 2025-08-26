@@ -5,7 +5,7 @@ description = ""
 authors = [
   { name = "Christoph Reiter", email = "reiter.christoph@gmail.com" }
 ]
-requires-python = "~=3.11"
+requires-python = "~=3.12"
 dependencies = [
   "PyGithub>=2.7.0,<3",
   "tabulate>=0.9.0,<0.10",
