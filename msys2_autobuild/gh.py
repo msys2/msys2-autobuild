@@ -6,10 +6,11 @@ import tempfile
 import time
 import hashlib
 from contextlib import contextmanager
-from datetime import datetime, timezone
-from functools import lru_cache
+from datetime import datetime, UTC
+from functools import cache
 from pathlib import Path
-from typing import Any, Dict, Generator, List, Optional, Callable
+from typing import Any
+from collections.abc import Generator, Callable
 
 import requests
 from github import Github
@@ -24,7 +25,7 @@ from .config import REQUESTS_TIMEOUT, BuildType, Config
 from .utils import PathLike, get_requests_session
 
 
-def get_auth(write: bool = False) -> Optional[Auth]:
+def get_auth(write: bool = False) -> Auth | None:
     if not write and os.environ.get("GITHUB_TOKEN_READONLY", ""):
         return Token(os.environ["GITHUB_TOKEN_READONLY"])
     elif "GITHUB_TOKEN" in os.environ:
@@ -50,7 +51,7 @@ def make_writable(obj: GithubObject) -> Generator:
         obj._requester = old_requester  # type: ignore
 
 
-@lru_cache(maxsize=None)
+@cache
 def _get_repo(name: str, write: bool = False) -> Repository:
     gh = get_github(write=write)
     return gh.get_repo(name, lazy=True)
@@ -65,10 +66,10 @@ def get_repo_for_build_type(build_type: BuildType, write: bool = False) -> Repos
     return _get_repo(Config.RUNNER_CONFIG[build_type]["repo"], write)
 
 
-@lru_cache(maxsize=None)
+@cache
 def get_github(write: bool = False) -> Github:
     auth = get_auth(write=write)
-    kwargs: Dict[str, Any] = {}
+    kwargs: dict[str, Any] = {}
     kwargs['auth'] = auth
     # 100 is the maximum allowed
     kwargs['per_page'] = 100
@@ -96,7 +97,7 @@ def download_text_asset(asset: GitReleaseAsset, cache=False) -> str:
         return r.text
 
 
-def get_current_run_urls() -> Optional[Dict[str, str]]:
+def get_current_run_urls() -> dict[str, str] | None:
     # The only connection we have is the job name, so this depends
     # on unique job names in all workflows
     if "GITHUB_SHA" in os.environ and "GITHUB_RUN_NAME" in os.environ:
@@ -123,7 +124,7 @@ def wait_for_api_limit_reset(
         while True:
             core = gh.get_rate_limit().resources.core
             reset = core.reset
-            now = datetime.now(timezone.utc)
+            now = datetime.now(UTC)
             diff = (reset - now).total_seconds()
             print(f"{core.remaining} API calls left (write={write}), "
                   f"{diff} seconds until the next reset")
@@ -228,7 +229,7 @@ def get_asset_uploader_name(asset: GitReleaseAsset) -> str:
     return uploader.login
 
 
-def get_release_assets(release: GitRelease, include_incomplete: bool = False) -> List[GitReleaseAsset]:
+def get_release_assets(release: GitRelease, include_incomplete: bool = False) -> list[GitReleaseAsset]:
     assets = []
     for asset in release.assets:
         # skip in case not fully uploaded yet (or uploading failed)
@@ -244,7 +245,7 @@ def get_release_assets(release: GitRelease, include_incomplete: bool = False) ->
 
 
 def upload_asset(release: GitRelease, path: PathLike, replace: bool = False,
-                 text: bool = False, content: Optional[bytes] = None) -> None:
+                 text: bool = False, content: bytes | None = None) -> None:
     path = Path(path)
     basename = os.path.basename(str(path))
     asset_name = get_gh_asset_name(basename, text)
@@ -299,17 +300,17 @@ def get_release(repo: Repository, name: str, create: bool = True) -> GitRelease:
 class CachedAssets:
 
     def __init__(self) -> None:
-        self._assets: Dict[BuildType, List[GitReleaseAsset]] = {}
-        self._failed: Dict[str, List[GitReleaseAsset]] = {}
+        self._assets: dict[BuildType, list[GitReleaseAsset]] = {}
+        self._failed: dict[str, list[GitReleaseAsset]] = {}
 
-    def get_assets(self, build_type: BuildType) -> List[GitReleaseAsset]:
+    def get_assets(self, build_type: BuildType) -> list[GitReleaseAsset]:
         if build_type not in self._assets:
             repo = get_repo_for_build_type(build_type)
             release = get_release(repo, 'staging-' + build_type)
             self._assets[build_type] = get_release_assets(release)
         return self._assets[build_type]
 
-    def get_failed_assets(self, build_type: BuildType) -> List[GitReleaseAsset]:
+    def get_failed_assets(self, build_type: BuildType) -> list[GitReleaseAsset]:
         repo = get_repo_for_build_type(build_type)
         key = repo.full_name
         if key not in self._failed:

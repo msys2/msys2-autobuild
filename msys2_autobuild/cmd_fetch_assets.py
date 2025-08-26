@@ -2,7 +2,7 @@ import fnmatch
 import os
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
-from typing import Any, Dict, List, Tuple
+from typing import Any
 import subprocess
 
 from github.GitReleaseAsset import GitReleaseAsset
@@ -32,7 +32,7 @@ def fetch_assets(args: Any) -> None:
     fetch_all = args.fetch_all
     fetch_complete = args.fetch_complete
 
-    all_patterns: Dict[BuildType, List[str]] = {}
+    all_patterns: dict[BuildType, list[str]] = {}
     all_blocked = []
     for pkg in get_buildqueue_with_status():
         for build_type in pkg.get_build_types():
@@ -52,13 +52,13 @@ def fetch_assets(args: Any) -> None:
 
     all_assets = {}
     cached_assets = CachedAssets()
-    assets_to_download: Dict[BuildType, List[GitReleaseAsset]] = {}
+    assets_to_download: dict[BuildType, list[GitReleaseAsset]] = {}
     for build_type, patterns in all_patterns.items():
         if build_type not in all_assets:
             all_assets[build_type] = cached_assets.get_assets(build_type)
         assets = all_assets[build_type]
 
-        assets_mapping: Dict[str, List[GitReleaseAsset]] = {}
+        assets_mapping: dict[str, list[GitReleaseAsset]] = {}
         for asset in assets:
             assets_mapping.setdefault(get_asset_filename(asset), []).append(asset)
 
@@ -147,7 +147,7 @@ def fetch_assets(args: Any) -> None:
         except subprocess.CalledProcessError as e:
             raise Exception(f"zstd test failed for {target!r}: {e.stderr}") from e
 
-    def fetch_item(item: Tuple[str, GitReleaseAsset]) -> Tuple[str, GitReleaseAsset]:
+    def fetch_item(item: tuple[str, GitReleaseAsset]) -> tuple[str, GitReleaseAsset]:
         asset_path, asset = item
         if not args.pretend:
             download_asset(asset, asset_path, verify_file)

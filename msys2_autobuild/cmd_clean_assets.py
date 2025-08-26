@@ -1,6 +1,6 @@
 import re
 import fnmatch
-from typing import Any, List, Tuple
+from typing import Any
 
 from github.GitReleaseAsset import GitReleaseAsset
 from github.GitRelease import GitRelease
@@ -11,7 +11,7 @@ from .gh import (get_asset_filename, get_current_repo, get_release,
 from .queue import get_buildqueue
 
 
-def get_assets_to_delete() -> Tuple[List[GitRelease], List[GitReleaseAsset]]:
+def get_assets_to_delete() -> tuple[list[GitRelease], list[GitReleaseAsset]]:
 
     print("Fetching packages to build...")
     keep_patterns = []
@@ -25,7 +25,7 @@ def get_assets_to_delete() -> Tuple[List[GitRelease], List[GitReleaseAsset]]:
         filename = get_asset_filename(asset)
         return not keep_pattern_regex.match(filename)
 
-    def get_to_delete(release: GitRelease) -> Tuple[List[GitRelease], List[GitReleaseAsset]]:
+    def get_to_delete(release: GitRelease) -> tuple[list[GitRelease], list[GitReleaseAsset]]:
         assets = get_release_assets(release, include_incomplete=True)
         to_delete = []
         for asset in assets:
@@ -45,7 +45,7 @@ def get_assets_to_delete() -> Tuple[List[GitRelease], List[GitReleaseAsset]]:
         else:
             return [], to_delete
 
-    def get_all_releases() -> List[GitRelease]:
+    def get_all_releases() -> list[GitRelease]:
         repo = get_current_repo()
 
         releases = []

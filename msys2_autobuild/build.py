@@ -11,7 +11,8 @@ from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
 from pathlib import Path, PurePath, PurePosixPath
 from subprocess import check_call
-from typing import Any, Dict, Generator, List, Sequence, TypeVar, Tuple
+from typing import Any, TypeVar
+from collections.abc import Generator, Sequence
 
 from github.GitReleaseAsset import GitReleaseAsset
 
@@ -35,7 +36,7 @@ def to_pure_posix_path(path: PathLike) -> PurePath:
     return PurePosixPath("/" + str(path).replace(":", "", 1).replace("\\", "/"))
 
 
-def get_build_environ(build_type: BuildType) -> Dict[str, str]:
+def get_build_environ(build_type: BuildType) -> dict[str, str]:
     environ = os.environ.copy()
 
     # Set PACKAGER for makepkg
@@ -94,7 +95,7 @@ def temp_pacman_conf(msys2_root: PathLike) -> Generator[Path, None, None]:
             pass
 
 
-def clean_environ(environ: Dict[str, str]) -> Dict[str, str]:
+def clean_environ(environ: dict[str, str]) -> dict[str, str]:
     """Returns an environment without any CI related variables.
 
     This is to avoid leaking secrets to package build scripts we call.
@@ -212,7 +213,7 @@ def staging_dependencies(
         builddir: PathLike) -> Generator[PathLike, None, None]:
 
     def add_to_repo(repo_root: PathLike, pacman_config: PathLike, repo_name: str,
-                    assets: List[GitReleaseAsset]) -> None:
+                    assets: list[GitReleaseAsset]) -> None:
         repo_dir = Path(repo_root) / repo_name
         os.makedirs(repo_dir, exist_ok=True)
 
@@ -221,7 +222,7 @@ def staging_dependencies(
             asset_path = os.path.join(repo_dir, get_asset_filename(asset))
             todo.append((asset_path, asset))
 
-        def fetch_item(item: Tuple[str, GitReleaseAsset]) -> Tuple[str, GitReleaseAsset]:
+        def fetch_item(item: tuple[str, GitReleaseAsset]) -> tuple[str, GitReleaseAsset]:
             asset_path, asset = item
             download_asset(asset, asset_path)
             return item
@@ -236,7 +237,7 @@ def staging_dependencies(
         repo_name = f"autobuild-{repo_name}"
         repo_db_path = os.path.join(repo_dir, f"{repo_name}.db.tar.gz")
 
-        with open(pacman_config, "r", encoding="utf-8") as h:
+        with open(pacman_config, encoding="utf-8") as h:
             text = h.read()
             uri = to_pure_posix_path(repo_dir).as_uri()
             if uri not in text:
@@ -250,12 +251,12 @@ SigLevel=Never
         # repo-add 15 packages at a time so we don't hit the size limit for CLI arguments
         ChunkItem = TypeVar("ChunkItem")
 
-        def chunks(lst: List[ChunkItem], n: int) -> Generator[List[ChunkItem], None, None]:
+        def chunks(lst: list[ChunkItem], n: int) -> Generator[list[ChunkItem], None, None]:
             for i in range(0, len(lst), n):
                 yield lst[i:i + n]
 
-        base_args: List[PathLike] = ["repo-add", to_pure_posix_path(repo_db_path)]
-        posix_paths: List[PathLike] = [to_pure_posix_path(p) for p in package_paths]
+        base_args: list[PathLike] = ["repo-add", to_pure_posix_path(repo_db_path)]
+        posix_paths: list[PathLike] = [to_pure_posix_path(p) for p in package_paths]
         for chunk in chunks(posix_paths, 15):
             args = base_args + chunk
             run_cmd(msys2_root, args, cwd=repo_dir)
@@ -266,7 +267,7 @@ SigLevel=Never
         shutil.rmtree(repo_root, ignore_errors=True)
         os.makedirs(repo_root, exist_ok=True)
         with temp_pacman_conf(msys2_root) as pacman_config:
-            to_add: Dict[ArchType, List[GitReleaseAsset]] = {}
+            to_add: dict[ArchType, list[GitReleaseAsset]] = {}
             for dep_type, deps in pkg.get_depends(build_type).items():
                 assets = cached_assets.get_assets(dep_type)
                 for dep in deps:
@@ -304,7 +305,7 @@ def build_package(build_type: BuildType, pkg: Package, msys2_root: PathLike, bui
 
     repo_name = {"MINGW-packages": "W", "MSYS2-packages": "S"}.get(pkg['repo'], pkg['repo'])
     repo_dir = os.path.join(builddir, repo_name)
-    to_upload: List[str] = []
+    to_upload: list[str] = []
 
     repo = get_repo_for_build_type(build_type)
 

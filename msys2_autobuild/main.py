@@ -1,7 +1,6 @@
 import argparse
 import sys
 import logging
-from typing import List
 
 from . import (cmd_build, cmd_clean_assets, cmd_clear_failed, cmd_fetch_assets,
                cmd_show_build, cmd_update_status, cmd_upload_assets,
@@ -9,7 +8,7 @@ from . import (cmd_build, cmd_clean_assets, cmd_clear_failed, cmd_fetch_assets,
 from .utils import install_requests_cache
 
 
-def main(argv: List[str]) -> None:
+def main(argv: list[str]) -> None:
     parser = argparse.ArgumentParser(description="Build packages", allow_abbrev=False)
     parser.add_argument(
         '-v', '--verbose',

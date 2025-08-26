@@ -1,18 +1,17 @@
-from typing import Dict, List, Literal, Tuple, Union
+from typing import Literal, TypeAlias
 
 from urllib3.util import Retry
 
 ArchType = Literal["mingw32", "mingw64", "ucrt64", "clang64", "clangarm64", "msys"]
 SourceType = Literal["mingw-src", "msys-src"]
-BuildType = Union[ArchType, SourceType]
-
+BuildType: TypeAlias = ArchType | SourceType
 
 REQUESTS_TIMEOUT = (15, 30)
 REQUESTS_RETRY = Retry(total=3, backoff_factor=1, status_forcelist=[500, 502])
 
 
-def get_all_build_types() -> List[BuildType]:
-    all_build_types: List[BuildType] = []
+def get_all_build_types() -> list[BuildType]:
+    all_build_types: list[BuildType] = []
     all_build_types.extend(Config.MSYS_ARCH_LIST)
     all_build_types.extend(Config.MINGW_ARCH_LIST)
     all_build_types.append(Config.MINGW_SRC_BUILD_TYPE)
@@ -33,7 +32,7 @@ class Config:
     ]
     """Users that are allowed to upload assets. This is checked at download time"""
 
-    MINGW_ARCH_LIST: List[ArchType] = ["mingw32", "mingw64", "ucrt64", "clang64", "clangarm64"]
+    MINGW_ARCH_LIST: list[ArchType] = ["mingw32", "mingw64", "ucrt64", "clang64", "clangarm64"]
     """Arches we try to build"""
 
     MINGW_SRC_ARCH: ArchType = "ucrt64"
@@ -41,13 +40,13 @@ class Config:
 
     MINGW_SRC_BUILD_TYPE: BuildType = "mingw-src"
 
-    MSYS_ARCH_LIST: List[ArchType] = ["msys"]
+    MSYS_ARCH_LIST: list[ArchType] = ["msys"]
 
     MSYS_SRC_ARCH: ArchType = "msys"
 
     MSYS_SRC_BUILD_TYPE: BuildType = "msys-src"
 
-    RUNNER_CONFIG: Dict[BuildType, Dict] = {
+    RUNNER_CONFIG: dict[BuildType, dict] = {
         "msys-src": {
             "repo": "msys2/msys2-autobuild",
             "labels": ["windows-2022"],
@@ -99,15 +98,15 @@ class Config:
     MAXIMUM_JOB_COUNT = 15
     """Maximum number of jobs to spawn"""
 
-    MANUAL_BUILD: List[Tuple[str, List[BuildType]]] = [
+    MANUAL_BUILD: list[tuple[str, list[BuildType]]] = [
     ]
     """Packages that take too long to build, or can't be build and should be handled manually"""
 
-    IGNORE_RDEP_PACKAGES: List[str] = [
+    IGNORE_RDEP_PACKAGES: list[str] = [
     ]
     """XXX: These would in theory block rdeps, but no one fixed them, so we ignore them"""
 
-    OPTIONAL_DEPS: Dict[str, List[str]] = {
+    OPTIONAL_DEPS: dict[str, list[str]] = {
         "mingw-w64-headers-git": ["mingw-w64-winpthreads", "mingw-w64-tools-git"],
         "mingw-w64-crt-git": ["mingw-w64-winpthreads"],
         "mingw-w64-llvm": ["mingw-w64-libc++"],

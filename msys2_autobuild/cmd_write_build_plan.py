@@ -1,6 +1,7 @@
 import json
 import shlex
-from typing import Any, Dict, List, Iterator
+from typing import Any
+from collections.abc import Iterator
 import itertools
 
 from .config import BuildType, Config, build_type_is_src
@@ -10,7 +11,7 @@ from .queue import (Package, PackageStatus, get_buildqueue_with_status,
 from .utils import apply_optional_deps
 
 
-def generate_jobs_for(build_type: BuildType, optional_deps: str, count: int) -> Iterator[Dict[str, Any]]:
+def generate_jobs_for(build_type: BuildType, optional_deps: str, count: int) -> Iterator[dict[str, Any]]:
     name = build_type
     packages = " ".join(["base-devel"])
     runner = Config.RUNNER_CONFIG[build_type]["labels"]
@@ -30,7 +31,7 @@ def generate_jobs_for(build_type: BuildType, optional_deps: str, count: int) -> 
         }
 
 
-def generate_src_jobs(optional_deps: str, count: int) -> Iterator[Dict[str, Any]]:
+def generate_src_jobs(optional_deps: str, count: int) -> Iterator[dict[str, Any]]:
     name = "src"
     packages = " ".join(["base-devel", "VCS"])
     build_types = [Config.MINGW_SRC_BUILD_TYPE, Config.MSYS_SRC_BUILD_TYPE]
@@ -67,8 +68,8 @@ def roundrobin(*iterables):  # type: ignore
             nexts = itertools.cycle(itertools.islice(nexts, num_active))
 
 
-def create_build_plan(pkgs: List[Package], optional_deps: str) -> List[Dict[str, Any]]:
-    queued_build_types: Dict[BuildType, int] = {}
+def create_build_plan(pkgs: list[Package], optional_deps: str) -> list[dict[str, Any]]:
+    queued_build_types: dict[BuildType, int] = {}
     for pkg in pkgs:
         for build_type in pkg.get_build_types():
             # skip if we can't build it
@@ -113,7 +114,7 @@ def write_build_plan(args: Any) -> None:
 
     apply_optional_deps(optional_deps)
 
-    def write_out(result: List[Dict[str, Any]]) -> None:
+    def write_out(result: list[dict[str, Any]]) -> None:
         with open(target_file, "wb") as h:
             h.write(json.dumps(result).encode())
 

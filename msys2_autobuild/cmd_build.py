@@ -3,7 +3,7 @@ import shutil
 import sys
 import time
 import traceback
-from typing import Any, List, Literal, Optional, Tuple
+from typing import Any, Literal
 
 from .build import BuildError, build_package, run_cmd
 from .config import BuildType, Config
@@ -16,8 +16,8 @@ BuildFrom = Literal["start", "middle", "end"]
 
 
 def get_package_to_build(
-        pkgs: List[Package], build_types: Optional[List[BuildType]],
-        build_from: BuildFrom) -> Optional[Tuple[Package, BuildType]]:
+        pkgs: list[Package], build_types: list[BuildType] | None,
+        build_from: BuildFrom) -> tuple[Package, BuildType] | None:
 
     can_build = []
     for pkg in pkgs:

@@ -1,4 +1,4 @@
-from typing import Any, List
+from typing import Any
 
 from tabulate import tabulate
 
@@ -6,7 +6,7 @@ from .queue import Package, PackageStatus, get_buildqueue_with_status, get_cycle
 from .utils import apply_optional_deps, gha_group
 
 
-def show_cycles(pkgs: List[Package]) -> None:
+def show_cycles(pkgs: list[Package]) -> None:
     cycles = get_cycles(pkgs)
     if cycles:
         def format_package(p: Package) -> str:
@@ -46,7 +46,7 @@ def show_build(args: Any) -> None:
             else:
                 failed.append((pkg, build_type, status, details))
 
-    def show_table(name: str, items: List) -> None:
+    def show_table(name: str, items: list) -> None:
         with gha_group(f"{name} ({len(items)})"):
             print(tabulate([(p["name"], bt, p["version"], str(s), d) for (p, bt, s, d) in items],
                            headers=["Package", "Build", "Version", "Status", "Details"]))

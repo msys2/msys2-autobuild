@@ -3,7 +3,7 @@ import io
 import json
 from concurrent.futures import ThreadPoolExecutor
 from enum import Enum
-from typing import Any, Dict, List, Optional, Set, Tuple, cast
+from typing import Any, cast
 
 import requests
 from github.GithubException import GithubException
@@ -33,7 +33,7 @@ class PackageStatus(Enum):
 class Package(dict):
 
     def __repr__(self) -> str:
-        return "Package(%r)" % self["name"]
+        return "Package({!r})".format(self["name"])
 
     def __hash__(self) -> int:  # type: ignore
         return id(self)
@@ -42,27 +42,27 @@ class Package(dict):
         return self is other
 
     @property
-    def _active_builds(self) -> Dict:
+    def _active_builds(self) -> dict:
         return {
             k: v for k, v in self["builds"].items() if k in (Config.MINGW_ARCH_LIST + Config.MSYS_ARCH_LIST)}
 
-    def _get_build(self, build_type: BuildType) -> Dict:
+    def _get_build(self, build_type: BuildType) -> dict:
         return self["builds"].get(build_type, {})
 
     def get_status(self, build_type: BuildType) -> PackageStatus:
         build = self._get_build(build_type)
         return build.get("status", PackageStatus.UNKNOWN)
 
-    def get_status_details(self, build_type: BuildType) -> Dict[str, Any]:
+    def get_status_details(self, build_type: BuildType) -> dict[str, Any]:
         build = self._get_build(build_type)
         return dict(build.get("status_details", {}))
 
     def set_status(self, build_type: BuildType, status: PackageStatus,
-                   description: Optional[str] = None,
-                   urls: Optional[Dict[str, str]] = None) -> None:
+                   description: str | None = None,
+                   urls: dict[str, str] | None = None) -> None:
         build = self["builds"].setdefault(build_type, {})
         build["status"] = status
-        meta: Dict[str, Any] = {}
+        meta: dict[str, Any] = {}
         meta["desc"] = description
         if urls is None:
             urls = {}
@@ -82,7 +82,7 @@ class Package(dict):
             blocked.setdefault(dep, set()).add(dep_type)
         descs = []
         for pkg, types in blocked.items():
-            descs.append("%s (%s)" % (pkg["name"], "/".join(types)))
+            descs.append("{} ({})".format(pkg["name"], "/".join(types)))
         self.set_status(build_type, status, "Blocked by: " + ", ".join(descs))
         build = self._get_build(build_type)
         build.setdefault("status_details", {})["blocked"] = blocked
@@ -91,7 +91,7 @@ class Package(dict):
         build = self._get_build(build_type)
         return build.get("new", False)
 
-    def get_build_patterns(self, build_type: BuildType) -> List[str]:
+    def get_build_patterns(self, build_type: BuildType) -> list[str]:
         patterns = []
         if build_type_is_src(build_type):
             patterns.append(f"{self['name']}-{self['version']}.src.tar.[!s]*")
@@ -105,7 +105,7 @@ class Package(dict):
     def get_failed_name(self, build_type: BuildType) -> str:
         return f"{build_type}-{self['name']}-{self['version']}.failed"
 
-    def get_build_types(self) -> List[BuildType]:
+    def get_build_types(self) -> list[BuildType]:
         build_types = list(self._active_builds)
         if self["source"]:
             if any((k in Config.MINGW_ARCH_LIST) for k in build_types):
@@ -114,7 +114,7 @@ class Package(dict):
                 build_types.append(Config.MSYS_SRC_BUILD_TYPE)
         return build_types
 
-    def _get_dep_build(self, build_type: BuildType) -> Dict:
+    def _get_dep_build(self, build_type: BuildType) -> dict:
         if build_type == Config.MINGW_SRC_BUILD_TYPE:
             build_type = Config.MINGW_SRC_ARCH
         elif build_type == Config.MSYS_SRC_BUILD_TYPE:
@@ -127,16 +127,16 @@ class Package(dict):
         # be fixed manually.
         return dep["name"] in Config.OPTIONAL_DEPS.get(self["name"], []) and not dep.is_new(dep_type)
 
-    def get_depends(self, build_type: BuildType) -> "Dict[ArchType, Set[Package]]":
+    def get_depends(self, build_type: BuildType) -> "dict[ArchType, set[Package]]":
         build = self._get_dep_build(build_type)
         return build.get('ext-depends', {})
 
-    def get_rdepends(self, build_type: BuildType) -> "Dict[ArchType, Set[Package]]":
+    def get_rdepends(self, build_type: BuildType) -> "dict[ArchType, set[Package]]":
         build = self._get_dep_build(build_type)
         return build.get('ext-rdepends', {})
 
 
-def get_buildqueue() -> List[Package]:
+def get_buildqueue() -> list[Package]:
     session = get_requests_session()
     r = session.get("https://packages.msys2.org/api/buildqueue2", timeout=REQUESTS_TIMEOUT)
     r.raise_for_status()
@@ -144,7 +144,7 @@ def get_buildqueue() -> List[Package]:
     return parse_buildqueue(r.text)
 
 
-def parse_buildqueue(payload: str) -> List[Package]:
+def parse_buildqueue(payload: str) -> list[Package]:
     pkgs = []
     for received in json.loads(payload):
         pkg = Package(received)
@@ -161,7 +161,7 @@ def parse_buildqueue(payload: str) -> List[Package]:
     # link up dependencies with the real package in the queue
     for pkg in pkgs:
         for build in pkg._active_builds.values():
-            ver_depends: Dict[str, Set[Package]] = {}
+            ver_depends: dict[str, set[Package]] = {}
             for repo, deps in build['depends'].items():
                 for dep in deps:
                     ver_depends.setdefault(repo, set()).add(dep_mapping[dep])
@@ -170,7 +170,7 @@ def parse_buildqueue(payload: str) -> List[Package]:
     # reverse dependencies
     for pkg in pkgs:
         for build in pkg._active_builds.values():
-            r_depends: Dict[str, Set[Package]] = {}
+            r_depends: dict[str, set[Package]] = {}
             for pkg2 in pkgs:
                 for r_repo, build2 in pkg2._active_builds.items():
                     for repo, deps in build2['ext-depends'].items():
@@ -181,8 +181,8 @@ def parse_buildqueue(payload: str) -> List[Package]:
     return pkgs
 
 
-def get_cycles(pkgs: List[Package]) -> Set[Tuple[Package, Package]]:
-    cycles: Set[Tuple[Package, Package]] = set()
+def get_cycles(pkgs: list[Package]) -> set[tuple[Package, Package]]:
+    cycles: set[tuple[Package, Package]] = set()
 
     # In case the package is already built it doesn't matter if it is part of a cycle
     def pkg_is_finished(pkg: Package, build_type: BuildType) -> bool:
@@ -193,7 +193,7 @@ def get_cycles(pkgs: List[Package]) -> Set[Tuple[Package, Package]]:
         ]
 
     # Transitive dependencies of a package. Excluding branches where a root is finished
-    def get_buildqueue_deps(pkg: Package, build_type: ArchType) -> "Dict[ArchType, Set[Package]]":
+    def get_buildqueue_deps(pkg: Package, build_type: ArchType) -> "dict[ArchType, set[Package]]":
         start = (build_type, pkg)
         todo = set([start])
         done = set()
@@ -213,7 +213,7 @@ def get_cycles(pkgs: List[Package]) -> Set[Tuple[Package, Package]]:
                         todo.add(dep_item)
         result.discard(start)
 
-        d: Dict[ArchType, Set[Package]] = {}
+        d: dict[ArchType, set[Package]] = {}
         for build_type, pkg in result:
             d.setdefault(build_type, set()).add(pkg)
         return d
@@ -235,7 +235,7 @@ def get_cycles(pkgs: List[Package]) -> Set[Tuple[Package, Package]]:
     return cycles
 
 
-def get_buildqueue_with_status(full_details: bool = False) -> List[Package]:
+def get_buildqueue_with_status(full_details: bool = False) -> list[Package]:
     cached_assets = CachedAssets()
 
     assets_failed = []
@@ -259,7 +259,7 @@ def get_buildqueue_with_status(full_details: bool = False) -> List[Package]:
                 return False
         return True
 
-    def get_failed_urls(build_type: BuildType, pkg: Package) -> Optional[Dict[str, str]]:
+    def get_failed_urls(build_type: BuildType, pkg: Package) -> dict[str, str] | None:
         failed_names = [get_asset_filename(a) for a in assets_failed]
         name = pkg.get_failed_name(build_type)
         if name in failed_names:
@@ -386,11 +386,11 @@ def get_buildqueue_with_status(full_details: bool = False) -> List[Package]:
     return pkgs
 
 
-def update_status(pkgs: List[Package]) -> None:
+def update_status(pkgs: list[Package]) -> None:
     repo = get_current_repo()
     release = get_release(repo, "status")
 
-    status_object: Dict[str, Any] = {}
+    status_object: dict[str, Any] = {}
 
     packages = []
     for pkg in pkgs:
