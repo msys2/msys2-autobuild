@@ -95,6 +95,27 @@ def temp_pacman_conf(msys2_root: PathLike) -> Generator[Path, None, None]:
             pass
 
 
+@contextmanager
+def temp_makepkg_confd(msys2_root: PathLike, config_name: str) -> Generator[Path, None, None]:
+    """Gives a path to a temporary $config_name.d file"""
+
+    conf_dir = get_python_path(msys2_root, f"/etc/{config_name}.d")
+    os.makedirs(conf_dir, exist_ok=True)
+    conf_file = conf_dir / "msys2_autobuild.conf"
+    try:
+        open(conf_file, "wb").close()
+        yield conf_file
+    finally:
+        try:
+            os.unlink(conf_file)
+        except OSError:
+            pass
+        try:
+            os.rmdir(conf_dir)
+        except OSError:
+            pass
+
+
 def clean_environ(environ: dict[str, str]) -> dict[str, str]:
     """Returns an environment without any CI related variables.
 
@@ -327,41 +348,57 @@ def build_package(build_type: BuildType, pkg: Package, msys2_root: PathLike, bui
                 # this makes makepkg use our custom pacman script
                 env['PACMAN'] = str(to_pure_posix_path(temp_pacman))
                 if build_type == Config.MINGW_SRC_BUILD_TYPE:
-                    env['MINGW_ARCH'] = Config.MINGW_SRC_ARCH
-                    run_cmd(msys2_root, [
-                        'makepkg-mingw',
-                        '--noconfirm',
-                        '--noprogressbar',
-                        '--allsource'
-                    ], env=env, cwd=pkg_dir)
+                    with temp_makepkg_confd(msys2_root, "makepkg_mingw.conf") as makepkg_conf:
+                        with open(makepkg_conf, "w", encoding="utf-8") as h:
+                            h.write("COMPRESSZST=(zstd -c -T0 --ultra -22 -)\n")
+
+                        env['MINGW_ARCH'] = Config.MINGW_SRC_ARCH
+                        run_cmd(msys2_root, [
+                            'makepkg-mingw',
+                            '--noconfirm',
+                            '--noprogressbar',
+                            '--allsource'
+                        ], env=env, cwd=pkg_dir)
                 elif build_type == Config.MSYS_SRC_BUILD_TYPE:
-                    run_cmd(msys2_root, [
-                        'makepkg',
-                        '--noconfirm',
-                        '--noprogressbar',
-                        '--allsource'
-                    ], env=env, cwd=pkg_dir)
+                    with temp_makepkg_confd(msys2_root, "makepkg.conf") as makepkg_conf:
+                        with open(makepkg_conf, "w", encoding="utf-8") as h:
+                            h.write("COMPRESSZST=(zstd -c -T0 --ultra -22 -)\n")
+
+                        run_cmd(msys2_root, [
+                            'makepkg',
+                            '--noconfirm',
+                            '--noprogressbar',
+                            '--allsource'
+                        ], env=env, cwd=pkg_dir)
                 elif build_type in Config.MINGW_ARCH_LIST:
-                    env['MINGW_ARCH'] = build_type
-                    run_cmd(msys2_root, [
-                        'makepkg-mingw',
-                        '--noconfirm',
-                        '--noprogressbar',
-                        '--nocheck',
-                        '--syncdeps',
-                        '--rmdeps',
-                        '--cleanbuild'
-                    ], env=env, cwd=pkg_dir)
+                    with temp_makepkg_confd(msys2_root, "makepkg_mingw.conf") as makepkg_conf:
+                        with open(makepkg_conf, "w", encoding="utf-8") as h:
+                            h.write("COMPRESSZST=(zstd -c -T0 --ultra -20 -)\n")
+
+                        env['MINGW_ARCH'] = build_type
+                        run_cmd(msys2_root, [
+                            'makepkg-mingw',
+                            '--noconfirm',
+                            '--noprogressbar',
+                            '--nocheck',
+                            '--syncdeps',
+                            '--rmdeps',
+                            '--cleanbuild'
+                        ], env=env, cwd=pkg_dir)
                 elif build_type in Config.MSYS_ARCH_LIST:
-                    run_cmd(msys2_root, [
-                        'makepkg',
-                        '--noconfirm',
-                        '--noprogressbar',
-                        '--nocheck',
-                        '--syncdeps',
-                        '--rmdeps',
-                        '--cleanbuild'
-                    ], env=env, cwd=pkg_dir)
+                    with temp_makepkg_confd(msys2_root, "makepkg.conf") as makepkg_conf:
+                        with open(makepkg_conf, "w", encoding="utf-8") as h:
+                            h.write("COMPRESSZST=(zstd -c -T0 --ultra -20 -)\n")
+
+                        run_cmd(msys2_root, [
+                            'makepkg',
+                            '--noconfirm',
+                            '--noprogressbar',
+                            '--nocheck',
+                            '--syncdeps',
+                            '--rmdeps',
+                            '--cleanbuild'
+                        ], env=env, cwd=pkg_dir)
                 else:
                     assert 0
 
