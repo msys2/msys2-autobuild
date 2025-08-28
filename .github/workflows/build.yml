@@ -139,8 +139,6 @@ jobs:
       id: python
       with:
         python-version: '3.13'
-        # Note that ARM64 prior to Win11 requires x86, but this will install x64
-        architecture: 'x64'
         # Avoid it setting CMake/pkg-config variables
         # https://github.com/actions/setup-python/blob/main/docs/advanced-usage.md#environment-variables
         update-environment: false
