@@ -188,7 +188,10 @@ def get_asset_filename(asset: GitReleaseAsset) -> str:
 
 @contextmanager
 def verify_asset_digest(asset: GitReleaseAsset) -> Generator[Any, None, None]:
-    type_, value = get_asset_digest(asset)
+    digest = asset.digest
+    if digest is None:
+        raise Exception(f"Asset {get_asset_filename(asset)} has no digest")
+    type_, value = digest.split(":", 1)
     value = value.lower()
     h = hashlib.new(type_)
     try:
@@ -198,14 +201,6 @@ def verify_asset_digest(asset: GitReleaseAsset) -> Generator[Any, None, None]:
         if h.hexdigest() != value:
             raise Exception(f"Digest mismatch for asset {get_asset_filename(asset)}: "
                             f"got {hexdigest}, expected {value}")
-
-
-def get_asset_digest(asset: GitReleaseAsset) -> tuple[str, str]:
-    # https://github.com/PyGithub/PyGithub/issues/3324
-    digest = asset._rawData['digest']
-    assert digest
-    type_, value = asset._rawData['digest'].split(":", 1)
-    return type_, value
 
 
 def is_asset_from_gha(asset: GitReleaseAsset) -> bool:
