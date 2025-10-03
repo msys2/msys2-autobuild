@@ -98,20 +98,14 @@ def download_text_asset(asset: GitReleaseAsset, cache=False) -> str:
 
 
 def get_current_run_urls() -> dict[str, str] | None:
-    # The only connection we have is the job name, so this depends
-    # on unique job names in all workflows
-    if "GITHUB_SHA" in os.environ and "GITHUB_RUN_NAME" in os.environ:
-        sha = os.environ["GITHUB_SHA"]
-        run_name = os.environ["GITHUB_RUN_NAME"]
-        commit = get_current_repo().get_commit(sha)
-        check_runs = commit.get_check_runs(
-            check_name=run_name, status="in_progress", filter="latest")
-        for run in check_runs:
-            html = run.html_url + "?check_suite_focus=true"
-            raw = commit.html_url + "/checks/" + str(run.id) + "/logs"
-            return {"html": html, "raw": raw}
-        else:
-            raise Exception(f"No active job found for {run_name}")
+    if "JOB_CHECK_RUN_ID" in os.environ:
+        job_check_run_id = os.environ["JOB_CHECK_RUN_ID"]
+        repo = get_current_repo()
+        run = repo.get_check_run(int(job_check_run_id))
+        html = run.html_url + "?check_suite_focus=true"
+        commit = repo.get_commit(run.head_sha)
+        raw = commit.html_url + "/checks/" + str(run.id) + "/logs"
+        return {"html": html, "raw": raw}
     return None
 
 
