@@ -202,5 +202,6 @@ jobs:
         JOB_CHECK_RUN_ID: ${{ job.check_run_id }}
         MSYS2_ROOT: ${{ steps.msys2.outputs.msys2-location }}
       run: |
+        echo "JOB_CHECK_RUN_ID=$env:JOB_CHECK_RUN_ID"
         $BUILD_ROOT=Join-Path (Split-Path $env:GITHUB_WORKSPACE -Qualifier) "\"
         python -m msys2_autobuild build ${{ matrix.build-args }} "$env:MSYS2_ROOT" "$BUILD_ROOT"
