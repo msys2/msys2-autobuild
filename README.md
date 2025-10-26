@@ -11,11 +11,11 @@ msys2-autobuild is a Python tool for
 ```console
 $ pacman -S mingw-w64-x86_64-python-tabulate mingw-w64-x86_64-python-pygithub mingw-w64-x86_64-python-requests
 # or
-$ poetry install
+$ uv sync
 # or
 $ python -m pip install --user -r requirements.txt
 # or
-$ pipx install git+https://github.com/msys2/msys2-autobuild
+$ uv tool install git+https://github.com/msys2/msys2-autobuild
 ```
 
 ## Usage
