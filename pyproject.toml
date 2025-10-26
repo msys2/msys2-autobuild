@@ -18,6 +18,9 @@ dependencies = [
 [project.scripts]
 msys2-autobuild = "msys2_autobuild.main:run"
 
+[tool.uv.build-backend]
+module-root = ""
+
 [dependency-groups]
 dev = [
   "pytest>=8.0.0,<9",
@@ -28,5 +31,5 @@ dev = [
 ]
 
 [build-system]
-requires = ["poetry-core>=2.2.0"]
-build-backend = "poetry.core.masonry.api"
+requires = ["uv_build>=0.9.5,<0.10.0"]
+build-backend = "uv_build"
