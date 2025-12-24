@@ -205,3 +205,48 @@ jobs:
         echo "JOB_CHECK_RUN_ID=$env:JOB_CHECK_RUN_ID"
         $BUILD_ROOT=Join-Path (Split-Path $env:GITHUB_WORKSPACE -Qualifier) "\"
         python -m msys2_autobuild build ${{ matrix.build-args }} "$env:MSYS2_ROOT" "$BUILD_ROOT"
+
+  finalize:
+    runs-on: ubuntu-24.04
+    needs: [schedule, build]
+    if: always() && needs.schedule.outputs.build-plan != '[]'
+
+    permissions:
+      contents: write
+
+    concurrency: autobuild-maint
+
+    steps:
+
+    - uses: actions/checkout@v5
+      with:
+        persist-credentials: false
+
+    - uses: actions/setup-python@v5
+      with:
+        python-version: '3.13'
+        cache: 'pip'
+        cache-dependency-path: 'requirements.txt'
+
+    - name: Install deps
+      env:
+        PIP_DISABLE_PIP_VERSION_CHECK: 1
+      run: |
+        python -m venv .venv
+        source .venv/bin/activate
+        python -m pip install -r requirements.txt
+        echo "$VIRTUAL_ENV/bin" >> $GITHUB_PATH
+
+    - name: autobuild cache
+      uses: actions/cache@v4
+      with:
+        path: ${{ github.workspace }}/.autobuild_cache
+        key: autobuild_cache-${{ github.job }}-${{ github.run_id }}-${{ github.run_attempt }}
+        restore-keys: autobuild_cache-
+
+    - name: Update build status
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GITHUB_TOKEN_READONLY: ${{ secrets.GITHUBTOKENREADONLY }}
+      run: |
+        python -m msys2_autobuild update-status
