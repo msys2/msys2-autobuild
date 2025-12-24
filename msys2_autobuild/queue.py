@@ -394,6 +394,8 @@ def get_status(pkgs: list[Package]) -> dict[str, Any]:
     repo = get_current_repo()
     workflow_runs = repo.get_workflow_runs(status="in_progress")
     for run in workflow_runs:
+        if run.name != "build":
+            continue
         jobs = run.jobs("all")
         for job in jobs:
             if job.status == "in_progress" and job.name not in ["schedule", "finalize"]:
