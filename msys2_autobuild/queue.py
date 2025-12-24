@@ -389,6 +389,21 @@ def get_buildqueue_with_status(full_details: bool = False) -> list[Package]:
 def get_status(pkgs: list[Package]) -> dict[str, Any]:
     status_object: dict[str, Any] = {}
 
+    # All currently running jobs
+    all_jobs = []
+    repo = get_current_repo()
+    workflow_runs = repo.get_workflow_runs(status="in_progress")
+    for run in workflow_runs:
+        jobs = run.jobs("all")
+        for job in jobs:
+            if job.status == "in_progress":
+                all_jobs.append({
+                    "name": job.name,
+                    "html_url": job.html_url,
+                    "started_at": job.started_at.isoformat()
+                })
+    status_object["jobs"] = sorted(all_jobs, key=lambda j: (j["started_at"], j["html_url"]))
+
     packages = []
     for pkg in pkgs:
         pkg_result = {}
