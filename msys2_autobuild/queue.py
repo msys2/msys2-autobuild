@@ -386,10 +386,7 @@ def get_buildqueue_with_status(full_details: bool = False) -> list[Package]:
     return pkgs
 
 
-def update_status(pkgs: list[Package]) -> None:
-    repo = get_current_repo()
-    release = get_release(repo, "status")
-
+def get_status(pkgs: list[Package]) -> dict[str, Any]:
     status_object: dict[str, Any] = {}
 
     packages = []
@@ -412,6 +409,14 @@ def update_status(pkgs: list[Package]) -> None:
         cycles.append([a["name"], b["name"]])
     status_object["cycles"] = sorted(cycles)
 
+    return status_object
+
+
+def update_status(pkgs: list[Package]) -> None:
+    repo = get_current_repo()
+    release = get_release(repo, "status")
+
+    status_object = get_status(pkgs)
     content = json.dumps(status_object, indent=2).encode()
 
     # If multiple jobs update this at the same time things can fail,
@@ -445,7 +450,8 @@ def update_status(pkgs: list[Package]) -> None:
                     new_asset = release.upload_asset_from_memory(  # type: ignore
                         fileobj, len(content), asset_name)
 
-            print(f"Uploaded status file for {len(packages)} packages: {new_asset.browser_download_url}")
+            package_count = len(status_object['packages'])
+            print(f"Uploaded status file for {package_count} packages: {new_asset.browser_download_url}")
             queue_website_update()
         else:
             print("Status unchanged")

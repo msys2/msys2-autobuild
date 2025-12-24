@@ -4,7 +4,7 @@ import logging
 
 from . import (cmd_build, cmd_clean_assets, cmd_clear_failed, cmd_fetch_assets,
                cmd_show_build, cmd_update_status, cmd_upload_assets,
-               cmd_write_build_plan)
+               cmd_write_build_plan, cmd_show_status)
 from .utils import install_requests_cache
 
 
@@ -22,6 +22,7 @@ def main(argv: list[str]) -> None:
     cmd_show_build.add_parser(subparsers)
     cmd_write_build_plan.add_parser(subparsers)
     cmd_update_status.add_parser(subparsers)
+    cmd_show_status.add_parser(subparsers)
     cmd_fetch_assets.add_parser(subparsers)
     cmd_upload_assets.add_parser(subparsers)
     cmd_clear_failed.add_parser(subparsers)

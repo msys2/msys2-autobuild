@@ -32,11 +32,12 @@ options:
   -h, --help            show this help message and exit
 
 subcommands:
-  {build,show,write-build-plan,update-status,fetch-assets,upload-assets,clear-failed,clean-assets}
+  {build,show,write-build-plan,update-status,show-status,fetch-assets,upload-assets,clear-failed,clean-assets}
     build               Build all packages
     show                Show all packages to be built
     write-build-plan    Write a GHA build matrix setup
     update-status       Update the status file
+    show-status         Show the status
     fetch-assets        Download all staging packages
     upload-assets       Upload packages
     clear-failed        Clear the failed state for packages
