@@ -4,6 +4,7 @@ import json
 from concurrent.futures import ThreadPoolExecutor
 from enum import Enum
 from typing import Any, cast
+import itertools
 
 import requests
 from github.GithubException import GithubException
@@ -392,8 +393,9 @@ def get_status(pkgs: list[Package]) -> dict[str, Any]:
     # All currently running jobs
     all_jobs = []
     repo = get_current_repo()
-    workflow_runs = repo.get_workflow_runs(status="in_progress")
-    for run in workflow_runs:
+    workflow_runs_in_progress = repo.get_workflow_runs(status="in_progress")
+    workflow_runs_pending = repo.get_workflow_runs(status="pending")
+    for run in itertools.chain(workflow_runs_in_progress, workflow_runs_pending):
         if run.name != "build":
             continue
         jobs = run.jobs("all")
