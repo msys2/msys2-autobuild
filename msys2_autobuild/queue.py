@@ -396,7 +396,7 @@ def get_status(pkgs: list[Package]) -> dict[str, Any]:
     for run in workflow_runs:
         jobs = run.jobs("all")
         for job in jobs:
-            if job.status == "in_progress":
+            if job.status == "in_progress" and job.name != "schedule":
                 all_jobs.append({
                     "name": job.name,
                     "html_url": job.html_url,
