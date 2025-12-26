@@ -404,7 +404,7 @@ def get_status(pkgs: list[Package]) -> dict[str, Any]:
         def is_building(job: WorkflowJob) -> bool:
             if job.status != "in_progress":
                 return False
-            if job.name in ["schedule", "finalize"]:
+            if job.name == "schedule":
                 return False
             for step in job.steps:
                 if step.name == "Process build queue":
