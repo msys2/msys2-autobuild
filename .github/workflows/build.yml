@@ -206,6 +206,13 @@ jobs:
         $BUILD_ROOT=Join-Path (Split-Path $env:GITHUB_WORKSPACE -Qualifier) "\"
         python -m msys2_autobuild build ${{ matrix.build-args }} "$env:MSYS2_ROOT" "$BUILD_ROOT"
 
+    - name: Update build status
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GITHUB_TOKEN_READONLY: ${{ secrets.GITHUBTOKENREADONLY }}
+      run: |
+        python -m msys2_autobuild update-status
+
   finalize:
     runs-on: ubuntu-24.04
     needs: [schedule, build]

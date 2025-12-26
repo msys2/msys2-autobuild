@@ -8,6 +8,7 @@ import itertools
 
 import requests
 from github.GithubException import GithubException
+from github.WorkflowJob import WorkflowJob
 
 from .config import (REQUESTS_TIMEOUT, ArchType, BuildType, Config,
                      build_type_is_src, get_all_build_types)
@@ -399,8 +400,20 @@ def get_status(pkgs: list[Package]) -> dict[str, Any]:
         if run.name != "build":
             continue
         jobs = run.jobs("all")
+
+        def is_building(job: WorkflowJob) -> bool:
+            if job.status != "in_progress":
+                return False
+            if job.name in ["schedule", "finalize"]:
+                return False
+            for step in job.steps:
+                if step.name == "Process build queue":
+                    return step.status != "completed"
+            else:
+                raise Exception("No 'Process build queue' step found")
+
         for job in jobs:
-            if job.status == "in_progress" and job.name not in ["schedule", "finalize"]:
+            if is_building(job):
                 all_jobs.append({
                     "name": job.name,
                     "html_url": job.html_url,
