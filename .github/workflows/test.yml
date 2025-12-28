@@ -33,9 +33,9 @@ jobs:
       run: |
         uv run mypy .
 
-    - name: Run flake8
+    - name: Run ruff
       run: |
-        uv run flake8 .
+        uv run ruff check
 
     - name: Run tests
       run: |
