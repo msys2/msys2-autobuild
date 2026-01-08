@@ -1,4 +1,5 @@
 import fnmatch
+import hashlib
 import io
 import json
 from concurrent.futures import ThreadPoolExecutor
@@ -467,14 +468,12 @@ def update_status(pkgs: list[Package]) -> None:
         do_replace = True
 
         # Avoid uploading the same file twice, to reduce API write calls
-        if asset is not None and asset_is_complete(asset) and asset.size == len(content):
-            try:
-                old_content = download_text_asset(asset, cache=True)
-                if old_content == content.decode():
-                    do_replace = False
-            except requests.RequestException:
-                # github sometimes returns 404 for a short time after uploading
-                pass
+        if asset is not None and asset_is_complete(asset) and asset.digest is not None:
+            type_, value = asset.digest.split(":", 1)
+            h = hashlib.new(type_)
+            h.update(content)
+            if h.hexdigest().lower() == value.lower():
+                do_replace = False
 
         if do_replace:
             if asset is not None:
