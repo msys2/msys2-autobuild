@@ -410,6 +410,7 @@ def get_status(pkgs: list[Package]) -> dict[str, Any]:
                 if step.name == "Process build queue":
                     return step.status != "completed"
             else:
+                print(job.name, job.status, [(s.name, s.status) for s in job.steps])
                 raise Exception("No 'Process build queue' step found")
 
         for job in jobs:
