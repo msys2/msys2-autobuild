@@ -298,7 +298,7 @@ class CachedAssets:
             release = get_release(repo, 'staging-' + build_type)
             self._assets[build_type] = get_release_assets(release)
 
-            if len(release.assets) > 900:
+            if len(release.assets) > 700:
                 release = get_release(repo, 'staging-' + build_type + "-2")
                 self._assets[build_type].extend(get_release_assets(release))
 
