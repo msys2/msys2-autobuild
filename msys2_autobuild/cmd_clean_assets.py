@@ -40,7 +40,7 @@ def get_assets_to_delete() -> tuple[list[GitRelease], list[GitReleaseAsset]]:
         # https://github.com/msys2/msys2-autobuild/issues/77#issuecomment-1657231719
         min_to_delete = 400
 
-        if len(to_delete) >= min_to_delete and len(assets) == len(to_delete):
+        if len(to_delete) >= min_to_delete and len(assets) == len(to_delete) and False:
             return [release], []
         else:
             return [], to_delete
