@@ -423,7 +423,5 @@ def build_package(build_type: BuildType, pkg: Package, msys2_root: PathLike, bui
             else:
                 wait_for_api_limit_reset()
                 release = repo.get_release("staging-" + build_type)
-                if len(release.assets) >= (1000 - len(to_upload) - 100):
-                    release = repo.get_release("staging-" + build_type + "-2")
                 for path in to_upload:
                     upload_asset(release, path)
