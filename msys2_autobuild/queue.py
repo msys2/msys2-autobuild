@@ -1,5 +1,6 @@
 import fnmatch
 import hashlib
+import functools
 import io
 import json
 from concurrent.futures import ThreadPoolExecutor
@@ -44,7 +45,7 @@ class Package(dict):
     def __eq__(self, other: object) -> bool:
         return self is other
 
-    @property
+    @functools.cached_property
     def _active_builds(self) -> dict:
         return {
             k: v for k, v in self["builds"].items() if k in (Config.MINGW_ARCH_LIST + Config.MSYS_ARCH_LIST)}
@@ -242,8 +243,12 @@ def get_buildqueue_with_status(full_details: bool = False) -> list[Package]:
     cached_assets = CachedAssets()
 
     assets_failed = []
+    failed_names = []
+    done_names = {}
     for build_type in get_all_build_types():
         assets_failed.extend(cached_assets.get_failed_assets(build_type))
+        done_names[build_type] = [get_asset_filename(a) for a in cached_assets.get_assets(build_type)]
+        failed_names = [get_asset_filename(a) for a in assets_failed]
 
     failed_urls = {}
     if full_details:
@@ -256,21 +261,18 @@ def get_buildqueue_with_status(full_details: bool = False) -> list[Package]:
                     failed_urls[get_asset_filename(asset)] = result["urls"]
 
     def pkg_is_done(build_type: BuildType, pkg: Package) -> bool:
-        done_names = [get_asset_filename(a) for a in cached_assets.get_assets(build_type)]
         for pattern in pkg.get_build_patterns(build_type):
-            if not fnmatch.filter(done_names, pattern):
+            if not fnmatch.filter(done_names[build_type], pattern):
                 return False
         return True
 
     def get_failed_urls(build_type: BuildType, pkg: Package) -> dict[str, str] | None:
-        failed_names = [get_asset_filename(a) for a in assets_failed]
         name = pkg.get_failed_name(build_type)
         if name in failed_names:
             return failed_urls.get(name)
         return None
 
     def pkg_has_failed(build_type: BuildType, pkg: Package) -> bool:
-        failed_names = [get_asset_filename(a) for a in assets_failed]
         name = pkg.get_failed_name(build_type)
         return name in failed_names
 
