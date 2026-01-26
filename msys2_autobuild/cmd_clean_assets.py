@@ -11,7 +11,7 @@ from .gh import (get_asset_filename, get_current_repo, get_release,
 from .queue import get_buildqueue
 
 
-def get_assets_to_delete() -> tuple[list[GitRelease], list[GitReleaseAsset]]:
+def get_assets_to_delete() -> list[GitReleaseAsset]:
 
     print("Fetching packages to build...")
     keep_patterns = []
@@ -25,25 +25,13 @@ def get_assets_to_delete() -> tuple[list[GitRelease], list[GitReleaseAsset]]:
         filename = get_asset_filename(asset)
         return not keep_pattern_regex.match(filename)
 
-    def get_to_delete(release: GitRelease) -> tuple[list[GitRelease], list[GitReleaseAsset]]:
+    def get_to_delete(release: GitRelease) -> list[GitReleaseAsset]:
         assets = get_release_assets(release, include_incomplete=True)
         to_delete = []
         for asset in assets:
             if should_be_deleted(asset):
                 to_delete.append(asset)
-
-        # Deleting and re-creating a release requires two write calls, so delete
-        # the release if all assets should be deleted and there are more than 2.
-        # min_to_delete = 3
-
-        # XXX: re-creating releases causes notifications, so avoid unless possible
-        # https://github.com/msys2/msys2-autobuild/issues/77#issuecomment-1657231719
-        min_to_delete = 400
-
-        if len(to_delete) >= min_to_delete and len(assets) == len(to_delete) and False:
-            return [release], []
-        else:
-            return [], to_delete
+        return to_delete
 
     def get_all_releases() -> list[GitRelease]:
         repo = get_current_repo()
@@ -55,27 +43,15 @@ def get_assets_to_delete() -> tuple[list[GitRelease], list[GitReleaseAsset]]:
         return releases
 
     print("Fetching assets...")
-    releases = []
     assets = []
     for release in get_all_releases():
-        r, a = get_to_delete(release)
-        releases.extend(r)
-        assets.extend(a)
+        assets.extend(get_to_delete(release))
 
-    return releases, assets
+    return assets
 
 
 def clean_gha_assets(args: Any) -> None:
-    repo = get_current_repo()
-    releases, assets = get_assets_to_delete()
-
-    print("Resetting releases...")
-    for release in releases:
-        print(f"Resetting {release.tag_name}...")
-        if not args.dry_run:
-            with make_writable(release):
-                release.delete_release()
-            get_release(repo, release.tag_name)
+    assets = get_assets_to_delete()
 
     print("Deleting assets...")
     for asset in assets:
