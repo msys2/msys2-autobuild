@@ -422,6 +422,6 @@ def build_package(build_type: BuildType, pkg: Package, msys2_root: PathLike, bui
                 raise BuildError(e)
             else:
                 wait_for_api_limit_reset()
-                release = repo.get_release("staging-" + build_type)
+                release = get_release(repo, "staging-" + build_type)
                 for path in to_upload:
                     upload_asset(release, path)
