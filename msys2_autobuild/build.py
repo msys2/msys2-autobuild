@@ -406,7 +406,8 @@ def build_package(build_type: BuildType, pkg: Package, msys2_root: PathLike, bui
                 for pattern in pkg.get_build_patterns(build_type):
                     found = fnmatch.filter(entries, pattern)
                     if not found:
-                        raise BuildError(f"{pattern} not found, likely wrong version built (files: {entries})")
+                        raise BuildError(
+                            f"{pattern} not found, likely wrong version built (files: {entries})")
                     to_upload.extend([os.path.join(pkg_dir, e) for e in found])
 
             except (subprocess.CalledProcessError, BuildError) as e:
