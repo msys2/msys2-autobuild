@@ -297,11 +297,6 @@ class CachedAssets:
             repo = get_repo_for_build_type(build_type)
             release = get_release(repo, 'staging-' + build_type)
             self._assets[build_type] = get_release_assets(release)
-
-            if len(release.assets) > 500:
-                release = get_release(repo, 'staging-' + build_type + "-2")
-                self._assets[build_type].extend(get_release_assets(release))
-
         return self._assets[build_type]
 
     def get_failed_assets(self, build_type: BuildType) -> list[GitReleaseAsset]:
