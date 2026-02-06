@@ -4,6 +4,7 @@ from datetime import timedelta
 from functools import cache
 from typing import Any, AnyStr, TypeAlias
 from collections.abc import Generator
+from importlib.metadata import version
 
 import requests
 from requests.adapters import HTTPAdapter
@@ -44,7 +45,7 @@ def install_requests_cache() -> Generator:
     # github sends by default with 60 seconds.
     cache_dir = os.path.join(os.getcwd(), '.autobuild_cache')
     os.makedirs(cache_dir, exist_ok=True)
-    cache_file = f'http_cache_{requests_cache.__version__}.sqlite'
+    cache_file = f'http_cache_{version('requests-cache')}.sqlite'
     # delete other versions
     for f in os.listdir(cache_dir):
         if f.startswith('http_cache') and f != cache_file:
