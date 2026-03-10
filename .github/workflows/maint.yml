@@ -28,6 +28,8 @@ jobs:
   schedule:
     runs-on: ubuntu-24.04
 
+    environment: build
+
     permissions:
       contents: write
 

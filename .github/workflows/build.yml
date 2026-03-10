@@ -26,6 +26,8 @@ jobs:
   schedule:
     runs-on: ubuntu-24.04
 
+    environment: build
+
     permissions:
       contents: write
 
@@ -100,6 +102,8 @@ jobs:
   build:
     timeout-minutes: 4320
     needs: schedule
+
+    environment: build
 
     permissions:
       contents: write
