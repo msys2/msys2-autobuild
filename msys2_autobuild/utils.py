@@ -45,7 +45,7 @@ def install_requests_cache() -> Generator:
     # github sends by default with 60 seconds.
     cache_dir = os.path.join(os.getcwd(), '.autobuild_cache')
     os.makedirs(cache_dir, exist_ok=True)
-    cache_file = f'http_cache_{version('requests-cache')}.sqlite'
+    cache_file = f'http_cache_{version('requests-cache')}_json.sqlite'
     # delete other versions
     for f in os.listdir(cache_dir):
         if f.startswith('http_cache') and f != cache_file:
@@ -54,7 +54,9 @@ def install_requests_cache() -> Generator:
         always_revalidate=True,
         cache_control=False,
         expire_after=requests_cache.EXPIRE_IMMEDIATELY,
-        backend=SQLiteCache(os.path.join(cache_dir, cache_file)))
+        # We use the json serializer for security, in case of cache poisoning
+        # pickle could lead to execution.
+        backend=SQLiteCache(os.path.join(cache_dir, cache_file), serializer='json'))
 
     # Call this once, so it gets cached from the main thread and can be used in a thread pool
     get_requests_session(nocache=True)
