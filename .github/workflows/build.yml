@@ -45,11 +45,11 @@ jobs:
       run: |
         echo "$CONTEXT"
 
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       with:
         persist-credentials: false
 
-    - uses: actions/setup-python@v6
+    - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
       with:
         python-version: '3.13'
         cache: 'pip'
@@ -65,7 +65,7 @@ jobs:
         echo "$VIRTUAL_ENV/bin" >> $GITHUB_PATH
 
     - name: autobuild cache
-      uses: actions/cache@v5
+      uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
       with:
         path: ${{ github.workspace }}/.autobuild_cache
         key: autobuild_cache-${{ github.job }}-${{ github.run_id }}-${{ github.run_attempt }}
@@ -135,11 +135,11 @@ jobs:
         Get-PSDrive -PSProvider FileSystem
         Get-CIMInstance -Class Win32_Processor | Select-Object -Property Name
 
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       with:
         persist-credentials: false
 
-    - uses: actions/setup-python@v6
+    - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
       id: python
       with:
         python-version: '3.13'
@@ -149,7 +149,7 @@ jobs:
 
     # Work around https://github.com/actions/setup-python/issues/1050
     - name: Cache pip dependencies
-      uses: actions/cache@v5
+      uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
       with:
         path: ~\AppData\Local\pip\Cache
         key: ${{ runner.os }}-${{ runner.arch }}-pip-${{ hashFiles('requirements.txt') }}
@@ -167,14 +167,14 @@ jobs:
         echo "$env:VIRTUAL_ENV\Scripts" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
 
     - name: autobuild cache
-      uses: actions/cache@v5
+      uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
       with:
         path: ${{ github.workspace }}/.autobuild_cache
         key: autobuild_cache-${{ github.job }}-${{ github.run_id }}-${{ github.run_attempt }}
         restore-keys: autobuild_cache-
 
     # Note that ARM64 prior to Win11 requires x86 msys, but this will install x64
-    - uses: msys2/setup-msys2@v2  # zizmor: ignore[unpinned-uses]
+    - uses: msys2/setup-msys2@cafece8e6baf9247cf9b1bf95097b0b983cc558d # v2.31.0
       id: msys2
       with:
         msystem: MSYS
