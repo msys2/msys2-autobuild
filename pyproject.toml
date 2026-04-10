@@ -22,17 +22,20 @@ msys2-autobuild = "msys2_autobuild.main:run"
 [tool.uv.build-backend]
 module-root = ""
 
+[tool.ty.environment]
+python-version = "3.12"
+
 [dependency-groups]
 dev = [
   "pytest>=8.0.0,<10",
-  "mypy==1.19.1",
   "ruff>=0.15.0,<0.16.0",
   "types-tabulate>=0.10.0.0,<0.11",
   "types-requests>=2.25.0,<3",
+  "ty>=0.0.29",
 ]
 
 [build-system]
-requires = ["uv_build>=0.9.5,<0.10.0"]
+requires = ["uv_build>=0.9.5,<0.12.0"]
 build-backend = "uv_build"
 
 [tool.ruff]

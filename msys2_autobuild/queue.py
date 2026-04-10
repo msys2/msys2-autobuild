@@ -39,7 +39,7 @@ class Package(dict):
     def __repr__(self) -> str:
         return "Package({!r})".format(self["name"])
 
-    def __hash__(self) -> int:  # type: ignore
+    def __hash__(self) -> int:
         return id(self)
 
     def __eq__(self, other: object) -> bool:
@@ -484,7 +484,7 @@ def update_status(pkgs: list[Package]) -> None:
 
             with io.BytesIO(content) as fileobj:
                 with make_writable(release):
-                    new_asset = release.upload_asset_from_memory(  # type: ignore
+                    new_asset = release.upload_asset_from_memory(
                         fileobj, len(content), asset_name)
 
             package_count = len(status_object['packages'])

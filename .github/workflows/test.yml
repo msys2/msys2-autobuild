@@ -29,9 +29,9 @@ jobs:
         python -m pip install --upgrade uv
         uv sync
 
-    - name: Run mypy
+    - name: Run ty
       run: |
-        uv run mypy .
+        uv run ty check .
 
     - name: Run ruff
       run: |
