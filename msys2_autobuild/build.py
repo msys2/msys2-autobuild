@@ -13,6 +13,7 @@ from pathlib import Path, PurePath, PurePosixPath
 from subprocess import check_call
 from typing import Any, TypeVar
 from collections.abc import Generator, Sequence
+from urllib.parse import quote_from_bytes
 
 from github.GitReleaseAsset import GitReleaseAsset
 
@@ -34,6 +35,15 @@ def get_python_path(msys2_root: PathLike, msys2_path: PathLike) -> Path:
 
 def to_pure_posix_path(path: PathLike) -> PurePath:
     return PurePosixPath("/" + str(path).replace(":", "", 1).replace("\\", "/"))
+
+
+def to_pure_posix_uri(path: PathLike) -> str:
+    return pure_posix_path_to_uri(to_pure_posix_path(path))
+
+
+def pure_posix_path_to_uri(path: PurePath) -> str:
+    assert path.is_absolute()
+    return 'file://' + quote_from_bytes(os.fsencode(str(path)))
 
 
 def get_build_environ(build_type: BuildType) -> dict[str, str]:
@@ -260,7 +270,7 @@ def staging_dependencies(
 
         with open(pacman_config, encoding="utf-8") as h:
             text = h.read()
-            uri = to_pure_posix_path(repo_dir).as_uri()
+            uri = to_pure_posix_uri(repo_dir)
             if uri not in text:
                 with open(pacman_config, "w", encoding="utf-8") as h2:
                     h2.write(f"""[{repo_name}]

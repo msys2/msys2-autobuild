@@ -42,13 +42,13 @@ def get_auth(write: bool = False) -> Auth | None:
 @contextmanager
 def make_writable(obj: GithubObject) -> Generator:
     # XXX: This switches the read-only token with a potentially writable one
-    old_requester = obj._requester  # type: ignore
+    old_requester = obj._requester
     repo = get_current_repo(write=True)
     try:
-        obj._requester = repo._requester  # type: ignore
+        obj._requester = repo._requester
         yield
     finally:
-        obj._requester = old_requester  # type: ignore
+        obj._requester = old_requester
 
 
 @cache
@@ -258,11 +258,11 @@ def upload_asset(release: GitRelease, path: PathLike, replace: bool = False,
         with make_writable(release):
             if content is None:
                 with open(path, "rb") as fileobj:
-                    release.upload_asset_from_memory(  # type: ignore
+                    release.upload_asset_from_memory(
                         fileobj, os.path.getsize(path), label=asset_label, name=asset_name)
             else:
                 with io.BytesIO(content) as fileobj:
-                    release.upload_asset_from_memory(  # type: ignore
+                    release.upload_asset_from_memory(
                         fileobj, len(content), label=asset_label, name=asset_name)
 
     try:

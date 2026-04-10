@@ -53,7 +53,7 @@ def generate_src_jobs(optional_deps: str, count: int) -> Iterator[dict[str, Any]
 
 
 # from https://docs.python.org/3/library/itertools.html
-def roundrobin(*iterables):  # type: ignore
+def roundrobin(*iterables):
     "roundrobin('ABC', 'D', 'EF') --> A D E B F C"
     # Recipe credited to George Sakkis
     num_active = len(iterables)

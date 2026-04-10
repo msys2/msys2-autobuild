@@ -1,5 +1,3 @@
-# type: ignore
-
 import os
 import stat
 import tempfile
@@ -7,7 +5,8 @@ from pathlib import Path
 
 from msys2_autobuild.utils import parse_optional_deps
 from msys2_autobuild.queue import parse_buildqueue, get_cycles
-from msys2_autobuild.build import make_tree_writable, remove_junctions
+from msys2_autobuild.build import make_tree_writable, remove_junctions, \
+    to_pure_posix_path, to_pure_posix_uri
 
 
 def test_make_tree_writable():
@@ -138,3 +137,11 @@ def test_get_cycles():
     assert (pkgs[0], pkgs[2]) in cycles
     assert (pkgs[0], pkgs[1]) in cycles
     assert (pkgs[2], pkgs[1]) in cycles
+
+
+def test_to_pure_posix_path():
+    assert str(to_pure_posix_path("C:\\path\\to\\file")) == "/C/path/to/file"
+
+
+def test_to_pure_posix_uri():
+    assert to_pure_posix_uri("C:\\path\\to\\file") == "file:///C/path/to/file"
