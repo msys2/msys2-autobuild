@@ -14,6 +14,7 @@ dependencies = [
   "requests-cache>=1.0.0,<2",
   "urllib3>=2.2.1,<3",
   "cryptography==46.0.3",
+  "gha-artifact-client>=0.2.0",
 ]
 
 [project.scripts]
