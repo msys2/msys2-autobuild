@@ -190,10 +190,20 @@ jobs:
         msys2 -c 'pacman --noconfirm -Suu'
         msys2 -c 'pacman -Qkq'
 
+    - name: Get artifact credentials
+      id: vars
+      uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
+      with:
+        script: |
+          core.setOutput('ACTIONS_RUNTIME_TOKEN', process.env['ACTIONS_RUNTIME_TOKEN'])
+          core.setOutput('ACTIONS_RESULTS_URL', process.env['ACTIONS_RESULTS_URL'])
+
     - name: Process build queue
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         GITHUB_TOKEN_READONLY: ${{ secrets.GITHUBTOKENREADONLY }}
+        ACTIONS_RUNTIME_TOKEN: ${{ steps.vars.outputs.ACTIONS_RUNTIME_TOKEN }}
+        ACTIONS_RESULTS_URL: ${{ steps.vars.outputs.ACTIONS_RESULTS_URL }}
         # https://github.com/actions/runner/issues/324#issuecomment-3324382354
         # https://github.com/actions/runner/pull/4053
         JOB_CHECK_RUN_ID: ${{ job.check_run_id }}

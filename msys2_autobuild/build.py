@@ -20,7 +20,7 @@ from github.GitReleaseAsset import GitReleaseAsset
 from .config import ArchType, BuildType, Config
 from .gh import (CachedAssets, download_asset, get_asset_filename,
                  get_current_run_urls, get_release, get_repo_for_build_type, upload_asset,
-                 wait_for_api_limit_reset)
+                 wait_for_api_limit_reset, is_running_in_gha, upload_artifact)
 from .queue import Package
 from .utils import SCRIPT_DIR, PathLike
 
@@ -436,3 +436,8 @@ def build_package(build_type: BuildType, pkg: Package, msys2_root: PathLike, bui
                 release = get_release(repo, "staging-" + build_type)
                 for path in to_upload:
                     upload_asset(release, path)
+
+                # XXX: this is a test to see if uploading artifacts instead of assets works for our use case
+                if is_running_in_gha():
+                    for path in to_upload:
+                        upload_artifact(path)
