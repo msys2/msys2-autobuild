@@ -20,6 +20,7 @@ from github.GithubObject import GithubObject
 from github.GitRelease import GitRelease
 from github.GitReleaseAsset import GitReleaseAsset
 from github.Repository import Repository
+from gha_artifact_client import ArtifactClientApi
 
 from .config import REQUESTS_TIMEOUT, BuildType, Config
 from .utils import PathLike, get_requests_session
@@ -231,6 +232,26 @@ def get_release_assets(release: GitRelease, include_incomplete: bool = False) ->
                 f"uploaded by {get_asset_uploader_name(asset)}'. Aborting.")
         assets.append(asset)
     return assets
+
+
+def is_running_in_gha() -> bool:
+    return "GITHUB_ACTIONS" in os.environ and os.environ["GITHUB_ACTIONS"] == "true"
+
+
+def can_upload_artifacts() -> bool:
+    return "ACTIONS_RUNTIME_TOKEN" in os.environ and "ACTIONS_RESULTS_URL" in os.environ
+
+
+def upload_artifact(path: PathLike, text: bool = False, retention_hours: int = 7) -> None:
+    assert can_upload_artifacts()
+
+    path = Path(path)
+    basename = os.path.basename(str(path))
+    asset_name = get_gh_asset_name(basename, text)
+
+    client = ArtifactClientApi()
+    result = client.upload_artifact(path, name=asset_name, expires_in=3600 * retention_hours)
+    print(f"Uploaded {asset_name} as {result.id}")
 
 
 def upload_asset(release: GitRelease, path: PathLike, replace: bool = False,
