@@ -135,7 +135,7 @@ def clean_environ(environ: dict[str, str]) -> dict[str, str]:
 
     new_env = environ.copy()
     for key in list(new_env):
-        if key.startswith(("GITHUB_", "RUNNER_")):
+        if key.startswith(("GITHUB_", "RUNNER_", "ACTIONS_")):
             del new_env[key]
     return new_env
 
