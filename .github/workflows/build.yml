@@ -124,7 +124,7 @@ jobs:
       if: ${{ matrix.hosted }}
       # https://github.com/al-cheb/configure-pagefile-action/issues/16
       continue-on-error: true
-      uses: al-cheb/configure-pagefile-action@a3b6ebd6b634da88790d9c58d4b37a7f4a7b8708
+      uses: al-cheb/configure-pagefile-action@9b6da52fb72a3c6147c1aad2df22d8d905681adc # v1.5
       with:
         minimum-size: 4GB
         maximum-size: 16GB
@@ -192,7 +192,7 @@ jobs:
 
     - name: Get artifact credentials
       id: vars
-      uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
+      uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
       with:
         script: |
           core.setOutput('ACTIONS_RUNTIME_TOKEN', process.env['ACTIONS_RUNTIME_TOKEN'])
