@@ -64,13 +64,6 @@ jobs:
         python -m pip install -r requirements.txt
         echo "$VIRTUAL_ENV/bin" >> $GITHUB_PATH
 
-    - name: autobuild cache
-      uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
-      with:
-        path: ${{ github.workspace }}/.autobuild_cache
-        key: autobuild_cache-${{ github.job }}-${{ github.run_id }}-${{ github.run_attempt }}
-        restore-keys: autobuild_cache-
-
     - name: Check what we should run
       id: check
       env:
