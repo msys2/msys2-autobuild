@@ -20,6 +20,7 @@ from github.GithubException import GithubException, UnknownObjectException
 from github.GithubObject import GithubObject
 from github.GitRelease import GitRelease
 from github.GitReleaseAsset import GitReleaseAsset
+from github.Artifact import Artifact
 from github.Repository import Repository
 from gha_artifact_client import ArtifactClientApi
 
@@ -99,11 +100,23 @@ def download_text_asset(asset: GitReleaseAsset, cache=False) -> str:
         return r.text
 
 
+def get_workflow_run_id() -> int|None:
+    if "GITHUB_RUN_ID" not in os.environ:
+        return None
+    return int(os.environ["GITHUB_RUN_ID"])
+
+
+def get_job_check_run_id() -> int|None:
+    if "JOB_CHECK_RUN_ID" not in os.environ:
+        return None
+    return int(os.environ["JOB_CHECK_RUN_ID"])
+
+
 def get_current_run_urls() -> dict[str, str] | None:
-    if "JOB_CHECK_RUN_ID" in os.environ:
-        job_check_run_id = os.environ["JOB_CHECK_RUN_ID"]
+    job_check_run_id = get_job_check_run_id()
+    if job_check_run_id is not None:
         repo = get_current_repo()
-        run = repo.get_check_run(int(job_check_run_id))
+        run = repo.get_check_run(job_check_run_id)
         html = run.html_url + "?check_suite_focus=true"
         commit = repo.get_commit(run.head_sha)
         raw = commit.html_url + "/checks/" + str(run.id) + "/logs"
@@ -139,6 +152,28 @@ def get_asset_mtime_ns(asset: GitReleaseAsset) -> int:
     """Returns the mtime of an asset in nanoseconds"""
 
     return int(asset.updated_at.timestamp() * (1000 ** 3))
+
+
+def download_artifact(artifact: Artifact) -> bytes:
+    """Downloads the artifact and returns its content as bytes"""
+
+    assert not artifact.expired
+
+    # "You must have the actions scope to download artifacts"
+    with make_writable(artifact):
+        requester = artifact.requester
+    status, responseHeaders, output = requester.requestBlob("GET",
+        artifact.archive_download_url, headers={"Accept": "application/vnd.github+json"})
+    assert status == 302 and output == ""
+
+    # Now download the signed URL and verify the digest
+    session = get_requests_session(nocache=True)
+    with session.get(responseHeaders["location"], timeout=REQUESTS_TIMEOUT) as r:
+        r.raise_for_status()
+        content = r.content
+        with verify_artifact_digest(artifact) as hash:
+            hash.update(content)
+        return content
 
 
 def download_asset(asset: GitReleaseAsset, target_path: str,
@@ -195,6 +230,10 @@ def get_asset_filename(asset: GitReleaseAsset) -> str:
     return asset.label
 
 
+def get_artifact_filename(artifact: Artifact) -> str:
+    return decode_filename(artifact.name.rsplit(".", 1)[0])
+
+
 @contextmanager
 def verify_asset_digest(asset: GitReleaseAsset) -> Generator[Any, None, None]:
     digest = asset.digest
@@ -209,6 +248,20 @@ def verify_asset_digest(asset: GitReleaseAsset) -> Generator[Any, None, None]:
         hexdigest = h.hexdigest().lower()
         if h.hexdigest() != value:
             raise Exception(f"Digest mismatch for asset {get_asset_filename(asset)}: "
+                            f"got {hexdigest}, expected {value}")
+
+@contextmanager
+def verify_artifact_digest(artifact: Artifact) -> Generator[Any, None, None]:
+    digest = artifact.digest
+    type_, value = digest.split(":", 1)
+    value = value.lower()
+    h = hashlib.new(type_)
+    try:
+        yield h
+    finally:
+        hexdigest = h.hexdigest().lower()
+        if h.hexdigest() != value:
+            raise Exception(f"Digest mismatch for asset {get_artifact_filename(artifact)}: "
                             f"got {hexdigest}, expected {value}")
 
 
@@ -256,7 +309,8 @@ def can_upload_artifacts() -> bool:
     return "ACTIONS_RUNTIME_TOKEN" in os.environ and "ACTIONS_RESULTS_URL" in os.environ
 
 
-def upload_artifact(path: PathLike, text: bool = False, retention_hours: int = 7) -> None:
+def upload_artifact(path: PathLike, text: bool = False, retention_hours: int = 7,
+                    content: bytes | None = None) -> None:
     assert can_upload_artifacts()
 
     path = Path(path)
@@ -264,7 +318,12 @@ def upload_artifact(path: PathLike, text: bool = False, retention_hours: int = 7
     asset_name = get_upload_safe_name(basename, text)
 
     client = ArtifactClientApi()
-    result = client.upload_artifact(path, name=asset_name, expires_in=3600 * retention_hours)
+    if content is None:
+        result = client.upload_artifact(
+            path, name=asset_name, expires_in=3600 * retention_hours)
+    else:
+        result = client.upload_artifact_bytes(
+            content, name=asset_name, expires_in=3600 * retention_hours)
     print(f"Uploaded {asset_name} as {result.id}")
 
 

@@ -8,8 +8,7 @@ from typing import Any, Literal
 from .build import BuildError, build_package, run_cmd
 from .config import BuildType, Config
 from .gh import wait_for_api_limit_reset
-from .queue import (Package, PackageStatus, get_buildqueue_with_status,
-                    update_status)
+from .queue import (Package, PackageStatus, get_buildqueue_with_status)
 from .utils import apply_optional_deps, gha_group
 
 BuildFrom = Literal["start", "middle", "end"]
@@ -17,7 +16,8 @@ BuildFrom = Literal["start", "middle", "end"]
 
 def get_package_to_build(
         pkgs: list[Package], build_types: list[BuildType] | None,
-        build_from: BuildFrom) -> tuple[Package, BuildType] | None:
+        build_from: BuildFrom,
+        skip: list[tuple[Package, BuildType]] = []) -> tuple[Package, BuildType] | None:
 
     can_build = []
     for pkg in pkgs:
@@ -26,6 +26,8 @@ def get_package_to_build(
                 continue
             if pkg.get_status(build_type) == PackageStatus.WAITING_FOR_BUILD:
                 can_build.append((pkg, build_type))
+
+    can_build = [item for item in can_build if item not in skip]
 
     if not can_build:
         return None
@@ -68,19 +70,20 @@ def run_build(args: Any) -> None:
 
     print(f"Building {build_types} starting from {args.build_from}")
 
+    skip = []
     while True:
         wait_for_api_limit_reset()
 
-        pkgs = get_buildqueue_with_status(full_details=True)
-        update_status(pkgs)
+        pkgs = get_buildqueue_with_status()
 
         if (time.monotonic() - start_time) >= Config.SOFT_JOB_TIMEOUT:
             print("timeout reached")
             break
 
-        todo = get_package_to_build(pkgs, build_types, args.build_from)
+        todo = get_package_to_build(pkgs, build_types, args.build_from, skip)
         if not todo:
             break
+        skip.append(todo)
         pkg, build_type = todo
 
         try:
