@@ -4,6 +4,7 @@ import shutil
 import sys
 import tempfile
 import time
+import base64
 import hashlib
 from contextlib import contextmanager
 from datetime import datetime, UTC
@@ -166,19 +167,32 @@ def download_asset(asset: GitReleaseAsset, target_path: str,
                 pass
 
 
-def get_gh_asset_name(basename: PathLike, text: bool = False) -> str:
-    # GitHub will throw out charaters like '~' or '='. It also doesn't like
+def encode_filename(filename: str) -> str:
+    """Encode to something which is valid in GH asset names and artifact names"""
+    return base64.urlsafe_b64encode(filename.encode()).decode().rstrip('=')
+
+
+def decode_filename(encoded: str) -> str:
+    """Decode a filename encoded with encode_filename"""
+    padding = '=' * (4 - len(encoded) % 4) if len(encoded) % 4 else ''
+    return base64.urlsafe_b64decode(encoded + padding).decode()
+
+
+def get_upload_safe_name(basename: PathLike, text: bool = False) -> str:
+    # GitHub will throw out characters like '~' or '='. It also doesn't like
     # when there is no file extension and will try to add one
-    return hashlib.sha256(str(basename).encode("utf-8")).hexdigest() + (".bin" if not text else ".txt")
+    name = str(basename)
+    if not name:
+        # leading "." would not work
+        raise ValueError("Asset name cannot be empty")
+    return encode_filename(name) + (".bin" if not text else ".txt")
 
 
 def get_asset_filename(asset: GitReleaseAsset) -> str:
-    if not asset.label:
-        return asset.name
-    else:
-        assert os.path.splitext(get_gh_asset_name(asset.label))[0] == \
-            os.path.splitext(asset.name)[0]
-        return asset.label
+    assert asset.label
+    assert os.path.splitext(get_upload_safe_name(asset.label))[0] == \
+        os.path.splitext(asset.name)[0]
+    return asset.label
 
 
 @contextmanager
@@ -247,7 +261,7 @@ def upload_artifact(path: PathLike, text: bool = False, retention_hours: int = 7
 
     path = Path(path)
     basename = os.path.basename(str(path))
-    asset_name = get_gh_asset_name(basename, text)
+    asset_name = get_upload_safe_name(basename, text)
 
     client = ArtifactClientApi()
     result = client.upload_artifact(path, name=asset_name, expires_in=3600 * retention_hours)
@@ -258,7 +272,7 @@ def upload_asset(release: GitRelease, path: PathLike, replace: bool = False,
                  text: bool = False, content: bytes | None = None) -> None:
     path = Path(path)
     basename = os.path.basename(str(path))
-    asset_name = get_gh_asset_name(basename, text)
+    asset_name = get_upload_safe_name(basename, text)
     asset_label = basename
 
     def can_try_upload_again() -> bool:
