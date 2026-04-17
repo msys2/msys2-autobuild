@@ -13,7 +13,7 @@ from pathlib import Path, PurePath, PurePosixPath
 from subprocess import check_call
 from typing import Any, TypeVar
 from collections.abc import Generator, Sequence
-from urllib.parse import quote_from_bytes
+from urllib.parse import quote_from_bytes, quote
 
 from github.GitReleaseAsset import GitReleaseAsset
 
@@ -46,14 +46,22 @@ def pure_posix_path_to_uri(path: PurePath) -> str:
     return 'file://' + quote_from_bytes(os.fsencode(str(path)))
 
 
+def get_packager(build_type: BuildType) -> str:
+    """Returns a string to use as the PACKAGER for makepkg, which identifies the
+    CI run that built the package"""
+    environ = os.environ
+    packager_ref = Config.RUNNER_CONFIG[build_type]["repo"]
+    if "GITHUB_RUN_ID" in environ and "JOB_CHECK_RUN_ID" in environ:
+        packager_ref += "/actions/runs/" + quote(environ["GITHUB_RUN_ID"], safe="") + \
+            "/job/" + quote(environ["JOB_CHECK_RUN_ID"], safe="")
+    return f"CI ({packager_ref})"
+
+
 def get_build_environ(build_type: BuildType) -> dict[str, str]:
     environ = os.environ.copy()
 
     # Set PACKAGER for makepkg
-    packager_ref = Config.RUNNER_CONFIG[build_type]["repo"]
-    if "GITHUB_SHA" in environ and "GITHUB_RUN_ID" in environ:
-        packager_ref += "/" + environ["GITHUB_SHA"][:8] + "/" + environ["GITHUB_RUN_ID"]
-    environ["PACKAGER"] = f"CI ({packager_ref})"
+    environ["PACKAGER"] = get_packager(build_type)
 
     return environ
 
