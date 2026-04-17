@@ -165,6 +165,8 @@ jobs:
 
     # Note that ARM64 prior to Win11 requires x86 msys, but this will install x64
     - uses: msys2/setup-msys2@e9898307ac31d1a803454791be09ab9973336e1c # v2.31.1
+      env:
+        __SETUP_MSYS2_USE_MAIN_MIRROR_ONLY: 'true'
       id: msys2
       with:
         msystem: MSYS
@@ -173,19 +175,6 @@ jobs:
         location: '\M'
         release: ${{ matrix.hosted }}
         cache: ${{ matrix.hosted }}
-
-    - name: Switch to the main mirror
-      shell: msys2 {0}
-      run: |
-        echo 'Server = https://repo.msys2.org/mingw/$repo/' > /etc/pacman.d/mirrorlist.mingw
-        echo 'Server = https://repo.msys2.org/msys/$arch/' > /etc/pacman.d/mirrorlist.msys
-        pacman-conf.exe
-
-    - name: Update using the main mirror & Check install
-      run: |
-        msys2 -c 'pacman --noconfirm -Suuy'
-        msys2 -c 'pacman --noconfirm -Suu'
-        msys2 -c 'pacman -Qkq'
 
     - name: Get artifact credentials
       id: vars
