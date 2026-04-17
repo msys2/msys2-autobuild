@@ -106,6 +106,9 @@ class Package(dict):
             assert 0
         return patterns
 
+    def get_failed_patterns(self, build_type: BuildType) -> list[str]:
+        return [self.get_failed_name(build_type)]
+
     def get_failed_name(self, build_type: BuildType) -> str:
         return f"{build_type}-{self['name']}-{self['version']}.failed"
 
@@ -391,42 +394,47 @@ def get_buildqueue_with_status(full_details: bool = False) -> list[Package]:
     return pkgs
 
 
+def get_build_jobs_status(jobs: list[WorkflowJob]) -> list[dict[str, str]]:
+    jobs_status = []
+
+    def is_building(job: WorkflowJob) -> bool:
+        if job.status != "in_progress":
+            return False
+        if job.name == "schedule" or job.name == "supervise":
+            return False
+        for step in job.steps:
+            if step.name == "Process build queue":
+                return step.status != "completed"
+        else:
+            if len(job.steps) <= 1:
+                # When a job starts up it returns only the initial "Set up job" step
+                # for a short time
+                return False
+            raise Exception("No 'Process build queue' step found")
+
+    for job in jobs:
+        if is_building(job):
+            jobs_status.append({
+                "name": job.name,
+                "html_url": job.html_url,
+                "started_at": job.started_at.isoformat()
+            })
+    return sorted(jobs_status, key=lambda j: (j["started_at"], j["html_url"]))
+
+
 def get_status(pkgs: list[Package]) -> dict[str, Any]:
     status_object: dict[str, Any] = {}
 
     # All currently running jobs
-    all_jobs = []
     repo = get_current_repo()
     workflow_runs_in_progress = repo.get_workflow_runs(status="in_progress")
     workflow_runs_pending = repo.get_workflow_runs(status="pending")
+    build_jobs = []
     for run in itertools.chain(workflow_runs_in_progress, workflow_runs_pending):
         if run.name != "build":
             continue
-        jobs = run.jobs("all")
-
-        def is_building(job: WorkflowJob) -> bool:
-            if job.status != "in_progress":
-                return False
-            if job.name == "schedule":
-                return False
-            for step in job.steps:
-                if step.name == "Process build queue":
-                    return step.status != "completed"
-            else:
-                if len(job.steps) <= 1:
-                    # When a job starts up it returns only the initial "Set up job" step
-                    # for a short time
-                    return False
-                raise Exception("No 'Process build queue' step found")
-
-        for job in jobs:
-            if is_building(job):
-                all_jobs.append({
-                    "name": job.name,
-                    "html_url": job.html_url,
-                    "started_at": job.started_at.isoformat()
-                })
-    status_object["jobs"] = sorted(all_jobs, key=lambda j: (j["started_at"], j["html_url"]))
+        build_jobs.extend(run.jobs("all"))
+    status_object["jobs"] = get_build_jobs_status(build_jobs)
 
     packages = []
     for pkg in pkgs:

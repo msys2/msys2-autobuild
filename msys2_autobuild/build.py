@@ -19,8 +19,8 @@ from github.GitReleaseAsset import GitReleaseAsset
 
 from .config import ArchType, BuildType, Config
 from .gh import (CachedAssets, download_asset, get_asset_filename,
-                 get_current_run_urls, get_release, get_repo_for_build_type, upload_asset,
-                 wait_for_api_limit_reset, is_running_in_gha, upload_artifact)
+                 get_current_run_urls, is_running_in_gha, upload_artifact,
+                 get_workflow_run_id, get_job_check_run_id)
 from .queue import Package
 from .utils import SCRIPT_DIR, PathLike
 
@@ -49,11 +49,12 @@ def pure_posix_path_to_uri(path: PurePath) -> str:
 def get_packager(build_type: BuildType) -> str:
     """Returns a string to use as the PACKAGER for makepkg, which identifies the
     CI run that built the package"""
-    environ = os.environ
     packager_ref = Config.RUNNER_CONFIG[build_type]["repo"]
-    if "GITHUB_RUN_ID" in environ and "JOB_CHECK_RUN_ID" in environ:
-        packager_ref += "/actions/runs/" + quote(environ["GITHUB_RUN_ID"], safe="") + \
-            "/job/" + quote(environ["JOB_CHECK_RUN_ID"], safe="")
+    workflow_run_id = get_workflow_run_id()
+    job_check_run_id = get_job_check_run_id()
+    if workflow_run_id is not None and job_check_run_id is not None:
+        packager_ref += "/actions/runs/" + quote(str(workflow_run_id), safe="") + \
+            "/job/" + quote(str(job_check_run_id), safe="")
     return f"CI ({packager_ref})"
 
 
@@ -346,8 +347,6 @@ def build_package(build_type: BuildType, pkg: Package, msys2_root: PathLike, bui
     repo_dir = os.path.join(builddir, repo_name)
     to_upload: list[str] = []
 
-    repo = get_repo_for_build_type(build_type)
-
     with fresh_git_repo(pkg['repo_url'], repo_dir):
         orig_pkg_dir = os.path.join(repo_dir, pkg['repo_path'])
         # Rename it to get a shorter overall build path
@@ -429,23 +428,16 @@ def build_package(build_type: BuildType, pkg: Package, msys2_root: PathLike, bui
                     to_upload.extend([os.path.join(pkg_dir, e) for e in found])
 
             except (subprocess.CalledProcessError, BuildError) as e:
-                wait_for_api_limit_reset()
-                release = get_release(repo, "staging-failed")
-                run_urls = get_current_run_urls()
-                failed_data = {}
-                if run_urls is not None:
-                    failed_data["urls"] = run_urls
-                content = json.dumps(failed_data).encode()
-                upload_asset(release, pkg.get_failed_name(build_type), text=True, content=content)
+                if is_running_in_gha():
+                    run_urls = get_current_run_urls()
+                    failed_data = {}
+                    if run_urls is not None:
+                        failed_data["urls"] = run_urls
+                    content = json.dumps(failed_data).encode()
+                    upload_artifact(pkg.get_failed_name(build_type), content=content)
 
                 raise BuildError(e)
             else:
-                wait_for_api_limit_reset()
-                release = get_release(repo, "staging-" + build_type)
-                for path in to_upload:
-                    upload_asset(release, path)
-
-                # XXX: this is a test to see if uploading artifacts instead of assets works for our use case
                 if is_running_in_gha():
                     for path in to_upload:
                         upload_artifact(path)
