@@ -234,7 +234,7 @@ def reset_git_repo(path: PathLike):
 @contextmanager
 def fresh_git_repo(url: str, path: PathLike) -> Generator:
     if not os.path.exists(path):
-        check_call(["git", "clone", url, path])
+        check_call(["git", "clone", "--depth", "1", url, path])
         check_call(["git", "config", "core.longpaths", "true"], cwd=path)
     else:
         reset_git_repo(path)
