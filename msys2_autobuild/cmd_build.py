@@ -27,7 +27,9 @@ def get_package_to_build(
             if pkg.get_status(build_type) == PackageStatus.WAITING_FOR_BUILD:
                 can_build.append((pkg, build_type))
 
-    can_build = [item for item in can_build if item not in skip]
+    skip_set = {(pkg.key, build_type) for pkg, build_type in skip}
+    can_build = [(pkg, build_type) for pkg, build_type in can_build
+                if (pkg.key, build_type) not in skip_set]
 
     if not can_build:
         return None

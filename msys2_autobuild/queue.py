@@ -45,6 +45,10 @@ class Package(dict):
     def __eq__(self, other: object) -> bool:
         return self is other
 
+    @property
+    def key(self) -> tuple[str, str]:
+        return (self["name"], self["version"])
+
     @functools.cached_property
     def _active_builds(self) -> dict:
         return {
