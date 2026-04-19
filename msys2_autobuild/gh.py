@@ -126,9 +126,11 @@ def get_current_run_urls() -> dict[str, str] | None:
 
 def wait_for_api_limit_reset(
         min_remaining_write: int = 50, min_remaining: int = 250, min_sleep: float = 60,
-        max_sleep: float = 300) -> None:
+        max_sleep: float = 300, read_only: bool=False) -> None:
 
     for write in [False, True]:
+        if read_only and write:
+            continue
         gh = get_github(write=write)
         while True:
             core = gh.get_rate_limit().resources.core

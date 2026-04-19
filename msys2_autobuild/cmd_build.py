@@ -72,7 +72,7 @@ def run_build(args: Any) -> None:
 
     skip = []
     while True:
-        wait_for_api_limit_reset()
+        wait_for_api_limit_reset(read_only=True)
 
         pkgs = get_buildqueue_with_status()
 
