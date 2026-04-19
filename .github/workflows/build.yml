@@ -104,6 +104,7 @@ jobs:
 
     permissions:
       contents: write
+      actions: write
 
     if: ${{ needs.schedule.outputs.build-plan != '[]' }}
     runs-on: ubuntu-24.04
