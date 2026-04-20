@@ -7,7 +7,7 @@ from typing import Any, Literal
 
 from .build import BuildError, build_package, run_cmd
 from .config import BuildType, Config
-from .gh import wait_for_api_limit_reset
+from .gh import wait_for_api_limit_reset, list_artifact_ids
 from .queue import (Package, PackageStatus, get_buildqueue_with_status)
 from .utils import apply_optional_deps, gha_group
 
@@ -44,6 +44,18 @@ def get_package_to_build(
         raise Exception("Unknown order:", build_from)
 
 
+def wait_for_artifacts_to_be_drained() -> None:
+    print("Waiting for artifacts to be drained...")
+    for _ in range(12):
+        ids = list_artifact_ids()
+        if not ids:
+            break
+        print(f"Waiting for artifacts to be drained, {len(ids)} remaining...")
+        time.sleep(10)
+    else:
+        print("Warning: artifacts did not drain within timeout")
+
+
 def run_build(args: Any) -> None:
     builddir = os.path.abspath(args.builddir)
     msys2_root = os.path.abspath(args.msys2_root)
@@ -76,15 +88,20 @@ def run_build(args: Any) -> None:
     while True:
         wait_for_api_limit_reset(read_only=True)
 
-        pkgs = get_buildqueue_with_status()
-
         if (time.monotonic() - start_time) >= Config.SOFT_JOB_TIMEOUT:
             print("timeout reached")
             break
 
+        pkgs = get_buildqueue_with_status()
         todo = get_package_to_build(pkgs, build_types, args.build_from, skip)
         if not todo:
-            break
+            # If there is nothing to build, wait for the artifacts to be drained,
+            # some future builds might depend on them
+            wait_for_artifacts_to_be_drained()
+            pkgs = get_buildqueue_with_status()
+            todo = get_package_to_build(pkgs, build_types, args.build_from, skip)
+            if not todo:
+                break
         skip.append(todo)
         pkg, build_type = todo
 

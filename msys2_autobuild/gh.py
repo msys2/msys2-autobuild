@@ -329,6 +329,12 @@ def upload_artifact(path: PathLike, text: bool = False, retention_hours: int = 7
     print(f"Uploaded {asset_name} as {result.id}")
 
 
+def list_artifact_ids() -> list[int]:
+    client = ArtifactClientApi()
+    result = client.list_artifacts()
+    return [a.id for a in result.artifacts]
+
+
 def upload_asset(release: GitRelease, path: PathLike, replace: bool = False,
                  text: bool = False, content: bytes | None = None) -> None:
     path = Path(path)
