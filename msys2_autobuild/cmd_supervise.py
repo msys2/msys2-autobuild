@@ -72,6 +72,14 @@ def supervise(args: Any) -> None:
     while True:
         wait_for_api_limit_reset()
 
+        is_any_job_running = False
+        for job in run.jobs():
+            if job.id == get_job_check_run_id():
+                continue
+            if job.status not in ("completed", "failure"):
+                is_any_job_running = True
+                break
+
         try:
             artifacts = list(run.get_artifacts())
             was_deployed = deploy_artifacts(artifacts)
@@ -92,14 +100,6 @@ def supervise(args: Any) -> None:
             traceback.print_exc()
             print("Error while supervising, will retry in 5 minutes...")
             time.sleep(300)
-
-        is_any_job_running = False
-        for job in run.jobs():
-            if job.id == get_job_check_run_id():
-                continue
-            if job.status not in ("completed", "failure"):
-                is_any_job_running = True
-                break
 
         if is_any_job_running:
             print("Build jobs are still running, checking again in 30 seconds...")
