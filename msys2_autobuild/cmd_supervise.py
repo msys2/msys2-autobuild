@@ -35,19 +35,30 @@ def supervise(args: Any) -> None:
         artifacts_map = {get_artifact_filename(artifact): artifact for artifact in artifacts}
         pkgs = get_buildqueue_with_status()
         release_map: dict[str, list[Artifact]] = {}
+        all_matched= []
         for pkg in pkgs:
             for build_type in pkg.get_build_types():
                 matches = []
                 for pattern in pkg.get_build_patterns(build_type):
                     matches.extend(fnmatch.filter(artifacts_map.keys(), pattern))
-                release_map.setdefault(
-                    'staging-' + build_type, []).extend([artifacts_map[match] for match in matches])
+                matched = [artifacts_map[match] for match in matches]
+                release_map.setdefault('staging-' + build_type, []).extend(matched)
+                all_matched.extend(matched)
 
                 matches = []
                 for pattern in pkg.get_failed_patterns(build_type):
                     matches.extend(fnmatch.filter(artifacts_map.keys(), pattern))
-                release_map.setdefault(
-                    'staging-failed', []).extend([artifacts_map[match] for match in matches])
+                matched = [artifacts_map[match] for match in matches]
+                release_map.setdefault('staging-failed', []).extend(matched)
+                all_matched.extend(matched)
+
+        # Delete all artifacts that did not match any release pattern
+        for artifact in artifacts:
+            if artifact not in all_matched:
+                print(f"Warning: artifact {get_artifact_filename(artifact)} did not match. Deleting it.")
+                if not dry_run:
+                    with make_writable(artifact):
+                        artifact.delete()
 
         # Upload the artifacts to the releases and delete them from the workflow run
         changed = False
