@@ -26,7 +26,7 @@ concurrency: autobuild-maint
 jobs:
 
   schedule:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-slim
 
     environment:
       name: build
