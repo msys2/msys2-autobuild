@@ -24,7 +24,7 @@ permissions: {}
 jobs:
 
   schedule:
-    runs-on: ubuntu-slim
+    runs-on: ubuntu-24.04
 
     environment:
       name: build
@@ -109,7 +109,7 @@ jobs:
       actions: write
 
     if: ${{ needs.schedule.outputs.build-plan != '[]' }}
-    runs-on: ubuntu-slim
+    runs-on: ubuntu-24.04
 
     steps:
 
