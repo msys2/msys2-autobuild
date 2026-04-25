@@ -404,8 +404,6 @@ def get_build_jobs_status(jobs: list[WorkflowJob]) -> list[dict[str, str]]:
     def is_building(job: WorkflowJob) -> bool:
         if job.status != "in_progress":
             return False
-        if job.name == "schedule" or job.name == "supervise":
-            return False
         for step in job.steps:
             if step.name == "Process build queue":
                 return step.status != "completed"
@@ -431,12 +429,11 @@ def get_status(pkgs: list[Package]) -> dict[str, Any]:
 
     # All currently running jobs
     repo = get_current_repo()
-    workflow_runs_in_progress = repo.get_workflow_runs(status="in_progress")
-    workflow_runs_pending = repo.get_workflow_runs(status="pending")
+    workflow = repo.get_workflow("build-jobs.yml")
+    workflow_runs_in_progress = workflow.get_runs(status="in_progress")
+    workflow_runs_pending = workflow.get_runs(status="pending")
     build_jobs = []
     for run in itertools.chain(workflow_runs_in_progress, workflow_runs_pending):
-        if run.name != "build":
-            continue
         build_jobs.extend(run.jobs("all"))
     status_object["jobs"] = get_build_jobs_status(build_jobs)
 

@@ -23,7 +23,7 @@ $ uv tool install git+https://github.com/msys2/msys2-autobuild
 ```console
 $ msys2-autobuild --help
 usage: msys2-autobuild [-h] [-v]
-                       {build,show,write-build-plan,update-status,show-status,fetch-assets,upload-assets,clear-failed,clean-assets,supervise} ...
+    {build,show,write-build-plan,update-status,show-status,fetch-assets,upload-assets,clear-failed,clean-assets,supervise,exec-build-plan} ...
 
 Build packages
 
@@ -32,7 +32,7 @@ options:
   -v, --verbose         Increase verbosity (can be used multiple times)
 
 subcommands:
-  {build,show,write-build-plan,update-status,show-status,fetch-assets,upload-assets,clear-failed,clean-assets,supervise}
+  {build,show,write-build-plan,update-status,show-status,fetch-assets,upload-assets,clear-failed,clean-assets,supervise,exec-build-plan}
     build               Build all packages
     show                Show all packages to be built
     write-build-plan    Write a GHA build matrix setup
@@ -43,6 +43,7 @@ subcommands:
     clear-failed        Clear the failed state for packages
     clean-assets        Clean up GHA assets
     supervise           Supervise build jobs
+    exec-build-plan     Execute the build plan
 ```
 
 ## Configuration

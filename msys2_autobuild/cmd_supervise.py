@@ -6,23 +6,14 @@ import traceback
 from github.Artifact import Artifact
 
 from .gh import get_current_repo, get_artifact_filename, get_release, \
-    download_artifact, upload_asset, make_writable, wait_for_api_limit_reset, \
-    get_workflow_run_id, get_job_check_run_id
+    download_artifact, upload_asset, make_writable, wait_for_api_limit_reset
 from .queue import get_buildqueue_with_status, update_status, get_build_jobs_status
 
 
 def supervise(args: Any) -> None:
     dry_run = args.dry_run
     repo = get_current_repo()
-
-    if args.workflow_run_id is None:
-        env_run_id = get_workflow_run_id()
-        if env_run_id is None:
-            print("Error: --workflow-run-id not specified and GITHUB_RUN_ID env var not set")
-            return
-        workflow_run_id = env_run_id
-    else:
-        workflow_run_id = args.workflow_run_id
+    workflow_run_id = args.workflow_run_id
 
     def deploy_artifacts(artifacts: list[Artifact]) -> bool:
         """Upload the artifacts to the releases and delete them from the workflow run.
@@ -85,8 +76,6 @@ def supervise(args: Any) -> None:
 
         is_any_job_running = False
         for job in run.jobs():
-            if job.id == get_job_check_run_id():
-                continue
             if job.status not in ("completed", "failure"):
                 is_any_job_running = True
                 break
@@ -126,7 +115,8 @@ def add_parser(subparsers: Any) -> None:
     sub.add_argument(
         "--workflow-run-id",
         type=int,
-        help="Workflow run to supervise, if not specified uses GITHUB_RUN_ID env var")
+        help="Workflow run to supervise",
+        required=True)
     sub.add_argument(
         "--dry-run", action="store_true", help="Only show what is going to be uploaded")
     sub.set_defaults(func=supervise)
