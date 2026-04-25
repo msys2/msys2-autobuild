@@ -39,6 +39,7 @@ jobs:
 
     outputs:
       build-plan: ${{ steps.check.outputs.build-plan }}
+      exec-result: ${{ steps.exec.outputs.exec-result }}
 
     steps:
 
@@ -100,6 +101,7 @@ jobs:
 
     - name: Dispatch build jobs
       if: steps.check.outputs.build-plan != '[]'
+      id: exec
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         GITHUB_TOKEN_READONLY: ${{ secrets.GITHUBTOKENREADONLY }}
