@@ -17,10 +17,6 @@ jobs:
   build:
     timeout-minutes: 4320
 
-    environment:
-      name: build-jobs
-      deployment: false
-
     permissions:
       contents: read
 
@@ -105,7 +101,7 @@ jobs:
 
     - name: Process build queue
       env:
-        GITHUB_TOKEN_READONLY: ${{ secrets.GITHUBTOKENREADONLY }}
+        GITHUB_TOKEN_READONLY: ${{ secrets.GITHUB_TOKEN }}
         ACTIONS_RUNTIME_TOKEN: ${{ steps.vars.outputs.ACTIONS_RUNTIME_TOKEN }}
         ACTIONS_RESULTS_URL: ${{ steps.vars.outputs.ACTIONS_RESULTS_URL }}
         # https://github.com/actions/runner/issues/324#issuecomment-3324382354
