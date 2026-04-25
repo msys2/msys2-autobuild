@@ -1,0 +1,117 @@
+name: 'build-jobs'
+
+on:
+  workflow_dispatch:
+    inputs:
+      build-plan:
+        default: '[]'
+        required: true
+        type: string
+
+env:
+  PYTHONUNBUFFERED: 1
+
+permissions: {}
+
+jobs:
+  build:
+    timeout-minutes: 4320
+
+    environment:
+      name: build-jobs
+      deployment: false
+
+    permissions:
+      contents: read
+
+    concurrency: autobuild-build-jobs-${{ matrix.name }}
+
+    if: ${{ inputs.build-plan != '[]' && github.ref == 'refs/heads/build-branch' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJson(inputs.build-plan) }}
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.runner }}
+
+    steps:
+
+    - name: Configure Pagefile
+      if: ${{ matrix.hosted }}
+      # https://github.com/al-cheb/configure-pagefile-action/issues/16
+      continue-on-error: true
+      uses: al-cheb/configure-pagefile-action@9b6da52fb72a3c6147c1aad2df22d8d905681adc # v1.5
+      with:
+        minimum-size: 4GB
+        maximum-size: 16GB
+        disk-root: "C:"
+
+    - name: Runner details
+      run: |
+        Get-PSDrive -PSProvider FileSystem
+        Get-CIMInstance -Class Win32_Processor | Select-Object -Property Name
+
+    - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      with:
+        persist-credentials: false
+
+    - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+      id: python
+      with:
+        python-version: '3.14'
+        # Avoid it setting CMake/pkg-config variables
+        # https://github.com/actions/setup-python/blob/main/docs/advanced-usage.md#environment-variables
+        update-environment: false
+
+    # Work around https://github.com/actions/setup-python/issues/1050
+    - name: Cache pip dependencies
+      uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+      with:
+        path: ~\AppData\Local\pip\Cache
+        key: ${{ runner.os }}-${{ runner.arch }}-pip-${{ hashFiles('requirements.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-${{ runner.arch }}-pip-
+
+    - name: Install deps
+      env:
+        PIP_DISABLE_PIP_VERSION_CHECK: 1
+        PYTHON_PATH: ${{ steps.python.outputs.python-path }}
+      run: |
+        & "$env:PYTHON_PATH" -m venv .venv
+        .\.venv\Scripts\activate
+        python -m pip install -r requirements.txt
+        echo "$env:VIRTUAL_ENV\Scripts" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+
+    # Note that ARM64 prior to Win11 requires x86 msys, but this will install x64
+    - uses: msys2/setup-msys2@e9898307ac31d1a803454791be09ab9973336e1c # v2.31.1
+      env:
+        __SETUP_MSYS2_USE_MAIN_MIRROR_ONLY: 'true'
+      id: msys2
+      with:
+        msystem: MSYS
+        update: true
+        install: ${{ matrix.packages }}
+        location: '\M'
+        release: ${{ matrix.hosted }}
+        cache: ${{ matrix.hosted }}
+
+    - name: Get artifact credentials
+      id: vars
+      uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+      with:
+        script: |
+          core.setOutput('ACTIONS_RUNTIME_TOKEN', process.env['ACTIONS_RUNTIME_TOKEN'])
+          core.setOutput('ACTIONS_RESULTS_URL', process.env['ACTIONS_RESULTS_URL'])
+
+    - name: Process build queue
+      env:
+        GITHUB_TOKEN_READONLY: ${{ secrets.GITHUBTOKENREADONLY }}
+        ACTIONS_RUNTIME_TOKEN: ${{ steps.vars.outputs.ACTIONS_RUNTIME_TOKEN }}
+        ACTIONS_RESULTS_URL: ${{ steps.vars.outputs.ACTIONS_RESULTS_URL }}
+        # https://github.com/actions/runner/issues/324#issuecomment-3324382354
+        # https://github.com/actions/runner/pull/4053
+        JOB_CHECK_RUN_ID: ${{ job.check_run_id }}
+        MSYS2_ROOT: ${{ steps.msys2.outputs.msys2-location }}
+      run: |
+        $BUILD_ROOT=Join-Path (Split-Path $env:GITHUB_WORKSPACE -Qualifier) "\"
+        python -m msys2_autobuild build ${{ matrix.build-args }} "$env:MSYS2_ROOT" "$BUILD_ROOT"
