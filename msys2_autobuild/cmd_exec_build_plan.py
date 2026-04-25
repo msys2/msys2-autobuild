@@ -1,7 +1,7 @@
 import json
 from typing import Any
 
-from .gh import get_current_repo, create_dispatch
+from .gh import get_current_repo, create_dispatch, make_writable
 
 
 def exec_build_plan(args: Any) -> None:
@@ -14,7 +14,8 @@ def exec_build_plan(args: Any) -> None:
 
     repo = get_current_repo()
     workflow = repo.get_workflow("build-jobs.yml")
-    workflow_run = create_dispatch(workflow, branch, inputs={"build_plan": build_plan})
+    with make_writable(workflow):
+        workflow_run = create_dispatch(workflow, branch, inputs={"build_plan": build_plan})
 
     with open(target_file, "wb") as h:
         h.write(json.dumps({
