@@ -7,7 +7,7 @@ from .gh import get_current_repo, create_dispatch
 def exec_build_plan(args: Any) -> None:
     target_file = args.target_file
     build_plan_file = args.build_plan_file
-    branch = args.branch
+    branch = args.target_branch
 
     with open(build_plan_file, "rb") as h:
         build_plan = h.read().decode()
