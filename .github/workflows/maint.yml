@@ -33,8 +33,6 @@ jobs:
       name: build
       deployment: false
 
-    if: ${{ github.ref == 'refs/heads/main' }}
-
     permissions:
       contents: write
 
