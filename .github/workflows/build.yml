@@ -24,6 +24,7 @@ permissions: {}
 jobs:
 
   schedule:
+    if: ${{ github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-24.04
 
     environment:
@@ -119,7 +120,7 @@ jobs:
       contents: write
       actions: write
 
-    if: ${{ needs.schedule.outputs.build-plan != '[]' }}
+    if: ${{ needs.schedule.outputs.build-plan != '[]' && github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-24.04
 
     steps:

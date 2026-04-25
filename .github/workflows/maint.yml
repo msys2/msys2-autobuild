@@ -26,11 +26,14 @@ concurrency: autobuild-maint
 jobs:
 
   schedule:
+    if: ${{ github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-24.04
 
     environment:
       name: build
       deployment: false
+
+    if: ${{ github.ref == 'refs/heads/main' }}
 
     permissions:
       contents: write
