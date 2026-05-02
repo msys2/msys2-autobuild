@@ -24,6 +24,7 @@ from github.Artifact import Artifact
 from github.Repository import Repository
 from github.Workflow import Workflow
 from github.WorkflowRun import WorkflowRun
+from github import GithubRetry
 from gha_artifact_client import ArtifactClientApi
 
 from .config import REQUESTS_TIMEOUT, BuildType, Config
@@ -81,6 +82,7 @@ def get_github(write: bool = False) -> Github:
     kwargs['timeout'] = sum(REQUESTS_TIMEOUT)
     kwargs['seconds_between_requests'] = None
     kwargs['lazy'] = True
+    kwargs['retry'] = GithubRetry(total=3)
     gh = Github(**kwargs)
     if auth is None and not write:
         print(f"[Warning] Rate limit status: {gh.get_rate_limit().resources.core}", file=sys.stderr)
