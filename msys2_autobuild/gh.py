@@ -120,6 +120,8 @@ def get_current_run_urls() -> dict[str, str] | None:
         repo = get_current_repo()
         run = repo.get_check_run(job_check_run_id)
         html = run.html_url + "?check_suite_focus=true"
+        if run.conclusion is None:
+            return {"html": html}
         commit = repo.get_commit(run.head_sha)
         raw = commit.html_url + "/checks/" + str(run.id) + "/logs"
         return {"html": html, "raw": raw}
