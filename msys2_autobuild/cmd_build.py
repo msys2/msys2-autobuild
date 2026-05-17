@@ -46,7 +46,7 @@ def get_package_to_build(
 
 def wait_for_artifacts_to_be_drained() -> None:
     print("Waiting for artifacts to be drained...")
-    for _ in range(12):
+    for _ in range(18):
         ids = list_artifact_ids()
         if not ids:
             break
