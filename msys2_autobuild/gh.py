@@ -362,7 +362,7 @@ def upload_asset(release: GitRelease, path: PathLike, replace: bool = False,
     asset_name = get_upload_safe_name(basename, text)
     asset_label = basename
 
-    def can_try_upload_again() -> bool:
+    def should_upload() -> bool:
         for asset in get_release_assets(release, include_incomplete=True):
             if asset_name == asset.name:
                 # We want to treat incomplete assets as if they weren't there
@@ -388,9 +388,10 @@ def upload_asset(release: GitRelease, path: PathLike, replace: bool = False,
                         fileobj, len(content), label=asset_label, name=asset_name)
 
     try:
-        upload()
+        if should_upload():
+            upload()
     except (GithubException, requests.RequestException):
-        if can_try_upload_again():
+        if should_upload():
             upload()
 
     print(f"Uploaded {asset_name} as {asset_label}")
