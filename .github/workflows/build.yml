@@ -75,7 +75,6 @@ jobs:
       id: check
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        GITHUB_TOKEN_READONLY: ${{ secrets.GITHUBTOKENREADONLY }}
         OPTIONAL_DEPS: ${{ github.event.inputs.optional_deps }}
       run: |
         python -m msys2_autobuild write-build-plan --optional-deps "$OPTIONAL_DEPS" build_plan.json
@@ -86,7 +85,6 @@ jobs:
       if: steps.check.outputs.build-plan != '[]'
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        GITHUB_TOKEN_READONLY: ${{ secrets.GITHUBTOKENREADONLY }}
       run: |
         python -m msys2_autobuild clean-assets
 
@@ -94,7 +92,6 @@ jobs:
       if: steps.check.outputs.build-plan != '[]'
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        GITHUB_TOKEN_READONLY: ${{ secrets.GITHUBTOKENREADONLY }}
         OPTIONAL_DEPS: ${{ github.event.inputs.optional_deps }}
       run: |
         python -m msys2_autobuild show --optional-deps "$OPTIONAL_DEPS"
@@ -104,7 +101,6 @@ jobs:
       id: exec
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        GITHUB_TOKEN_READONLY: ${{ secrets.GITHUBTOKENREADONLY }}
       run: |
         python -m msys2_autobuild exec-build-plan --target-branch "build-branch" build_plan.json exec_result.json
         execResult="$(cat exec_result.json)"
@@ -151,7 +147,6 @@ jobs:
     - name: Supervise build
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        GITHUB_TOKEN_READONLY: ${{ secrets.GITHUBTOKENREADONLY }}
         JOB_CHECK_RUN_ID: ${{ job.check_run_id }}
         TARGET_WORKFLOW_RUN_ID: ${{ fromJson(needs.schedule.outputs.exec-result).run_id }}
       run: |
