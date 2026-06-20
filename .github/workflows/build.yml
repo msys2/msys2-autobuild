@@ -25,6 +25,7 @@ jobs:
 
   schedule:
     if: ${{ github.ref == 'refs/heads/main' }}
+    timeout-minutes: 4320
     runs-on: ubuntu-24.04
 
     environment:
@@ -34,12 +35,6 @@ jobs:
     permissions:
       contents: write
       actions: write
-
-    concurrency: autobuild-maint
-
-    outputs:
-      build-plan: ${{ steps.check.outputs.build-plan }}
-      exec-result: ${{ steps.exec.outputs.exec-result }}
 
     steps:
 
@@ -106,48 +101,11 @@ jobs:
         execResult="$(cat exec_result.json)"
         echo "exec-result=$execResult" >> $GITHUB_OUTPUT
 
-  supervise:
-    timeout-minutes: 4320
-    needs: schedule
-
-    environment:
-      name: build
-      deployment: false
-
-    permissions:
-      contents: write
-      actions: write
-
-    if: ${{ needs.schedule.outputs.build-plan != '[]' && github.ref == 'refs/heads/main' }}
-    runs-on: ubuntu-24.04
-
-    steps:
-
-    - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-      with:
-        persist-credentials: false
-
-    - name: Cache pip dependencies
-      uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
-      with:
-        path: ~/.cache/pip
-        key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
-        restore-keys: |
-          ${{ runner.os }}-pip-
-
-    - name: Install deps
-      env:
-        PIP_DISABLE_PIP_VERSION_CHECK: 1
-      run: |
-        python3 -m venv .venv
-        source .venv/bin/activate
-        python3 -m pip install -r requirements.txt
-        echo "$VIRTUAL_ENV/bin" >> $GITHUB_PATH
-
     - name: Supervise build
+      if: steps.check.outputs.build-plan != '[]'
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         JOB_CHECK_RUN_ID: ${{ job.check_run_id }}
-        TARGET_WORKFLOW_RUN_ID: ${{ fromJson(needs.schedule.outputs.exec-result).run_id }}
+        TARGET_WORKFLOW_RUN_ID: ${{ fromJson(steps.exec.outputs.exec-result).run_id }}
       run: |
         python -m msys2_autobuild supervise --workflow-run-id "$TARGET_WORKFLOW_RUN_ID"

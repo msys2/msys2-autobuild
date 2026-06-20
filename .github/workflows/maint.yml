@@ -21,8 +21,6 @@ on:
 
 permissions: {}
 
-concurrency: autobuild-maint
-
 jobs:
 
   schedule:
