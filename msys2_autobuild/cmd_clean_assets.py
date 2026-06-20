@@ -1,7 +1,9 @@
-import re
 import fnmatch
+import random
+import re
 from typing import Any
 
+from github.GithubException import GithubException
 from github.GitReleaseAsset import GitReleaseAsset
 from github.GitRelease import GitRelease
 
@@ -51,14 +53,34 @@ def get_assets_to_delete() -> list[GitReleaseAsset]:
 
 
 def clean_gha_assets(args: Any) -> None:
-    assets = get_assets_to_delete()
-
     print("Deleting assets...")
-    for asset in assets:
-        print(f"Deleting {get_asset_filename(asset)}...")
-        if not args.dry_run:
-            with make_writable(asset):
-                asset.delete_asset()
+    while True:
+        assets = get_assets_to_delete()
+        if not assets:
+            break
+
+        # Spread parallel cleanup jobs across different assets.
+        random.shuffle(assets)
+        stale_snapshot = False
+        for asset in assets:
+            print(f"Deleting {get_asset_filename(asset)}...")
+            if args.dry_run:
+                continue
+            try:
+                with make_writable(asset):
+                    asset.delete_asset()
+            except GithubException as e:
+                if e.status != 404:
+                    raise
+                # Another parallel cleanup job already removed an asset from this snapshot.
+                # Refresh the asset list so we stop working with stale objects.
+                stale_snapshot = True
+                break
+
+        if args.dry_run:
+            break
+        if not stale_snapshot:
+            continue
 
 
 def add_parser(subparsers: Any) -> None:
