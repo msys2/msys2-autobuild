@@ -1,5 +1,7 @@
 from typing import Any
 
+from github.GithubException import GithubException
+
 from .gh import (get_asset_filename, get_current_repo, get_release,
                  get_release_assets, make_writable)
 from .queue import get_buildqueue_with_status
@@ -33,8 +35,12 @@ def clear_failed_state(args: Any) -> None:
                 asset = failed_map[name]
                 print(f"Deleting {get_asset_filename(asset)}...")
                 if not args.dry_run:
-                    with make_writable(asset):
-                        asset.delete_asset()
+                    try:
+                        with make_writable(asset):
+                            asset.delete_asset()
+                    except GithubException as e:
+                        if e.status != 404:
+                            raise
 
 
 def add_parser(subparsers: Any) -> None:
