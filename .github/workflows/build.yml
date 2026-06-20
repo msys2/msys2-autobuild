@@ -98,14 +98,14 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
         python -m msys2_autobuild exec-build-plan --target-branch "build-branch" build_plan.json exec_result.json
-        execResult="$(cat exec_result.json)"
-        echo "exec-result=$execResult" >> $GITHUB_OUTPUT
+        runId="$(python -c 'import json; print(json.load(open("exec_result.json"))["run_id"])')"
+        echo "run_id=$runId" >> $GITHUB_OUTPUT
 
     - name: Supervise build
       if: steps.check.outputs.build-plan != '[]'
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         JOB_CHECK_RUN_ID: ${{ job.check_run_id }}
-        TARGET_WORKFLOW_RUN_ID: ${{ fromJson(steps.exec.outputs.exec-result).run_id }}
+        TARGET_WORKFLOW_RUN_ID: ${{ steps.exec.outputs.run_id }}
       run: |
         python -m msys2_autobuild supervise --workflow-run-id "$TARGET_WORKFLOW_RUN_ID"
