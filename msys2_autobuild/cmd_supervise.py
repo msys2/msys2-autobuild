@@ -69,19 +69,22 @@ def supervise(args: Any) -> None:
 
         return changed
 
-    run = repo.get_workflow_run(workflow_run_id)
-    print(run, run.status)
     jobs_status = []
     while True:
         wait_for_api_limit_reset()
 
-        is_any_job_running = False
-        print(list(run.jobs()))
+        run = repo.get_workflow_run(workflow_run_id)
+        has_jobs = False
+        all_jobs_done = True
         for job in run.jobs():
-            print(job, job.status)
-            if job.status not in ("completed", "failure"):
-                is_any_job_running = True
+            has_jobs = True
+            if not job.conclusion:
+                all_jobs_done = False
                 break
+
+        # Right after creation, the run is queued and has no jobs yet
+        if not has_jobs and not run.conclusion:
+            all_jobs_done = False
 
         try:
             artifacts = list(run.get_artifacts())
@@ -104,7 +107,7 @@ def supervise(args: Any) -> None:
             print("Error while supervising, will retry in 5 minutes...")
             time.sleep(300)
 
-        if is_any_job_running:
+        if not all_jobs_done:
             print("Build jobs are still running, checking again in 30 seconds...")
             time.sleep(30)
         else:
