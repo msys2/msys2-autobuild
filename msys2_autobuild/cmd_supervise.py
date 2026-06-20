@@ -70,12 +70,15 @@ def supervise(args: Any) -> None:
         return changed
 
     run = repo.get_workflow_run(workflow_run_id)
+    print(run, run.status)
     jobs_status = []
     while True:
         wait_for_api_limit_reset()
 
         is_any_job_running = False
+        print(list(run.jobs()))
         for job in run.jobs():
+            print(job, job.status)
             if job.status not in ("completed", "failure"):
                 is_any_job_running = True
                 break
