@@ -99,6 +99,7 @@ class Config:
     """Maximum number of jobs to spawn"""
 
     MANUAL_BUILD: list[tuple[str, list[BuildType]]] = [
+        ('mingw-w64-arm-none-eabi-gcc', []),
     ]
     """Packages that take too long to build, or can't be build and should be handled manually"""
 
