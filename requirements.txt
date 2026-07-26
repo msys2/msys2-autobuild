@@ -10,9 +10,9 @@ cattrs==26.1.0 \
     --hash=sha256:d1e0804c42639494d469d08d4f26d6b9de9b8ab26b446db7b5f8c2e97f7c3096 \
     --hash=sha256:fa239e0f0ec0715ba34852ce813986dfed1e12117e209b816ab87401271cdd40
     # via requests-cache
-certifi==2026.6.17 \
-    --hash=sha256:024c88eeec92ca068db80f02b8b07c9cef7b9fe261d1d535abfd5abd6f6af432 \
-    --hash=sha256:2227dcbaafe0d2f59279d1762ddddc37783ed4354594f194ffc31d20f41fc3db
+certifi==2026.7.22 \
+    --hash=sha256:62f22742b58a1a33014a2b6b706588a8d7e2a88ae7bd1a6ebe8c992928483775 \
+    --hash=sha256:741e2c3b351ddf169a738da9f2c048608ff7f2c5cc02f1ebc6b118bb090d5d55
     # via requests
 cffi==2.1.0 ; platform_python_implementation != 'PyPy' \
     --hash=sha256:0520e1f4c35f44e209cbbb421b67eec42e6a157f59444dfb6058874ff3610e5d \
@@ -199,9 +199,9 @@ cryptography==46.0.3 \
     # via
     #   msys2-autobuild
     #   pyjwt
-gha-artifact-client==0.2.1 \
-    --hash=sha256:26d15d3bb2cd6c57a6d6063ca8010f146233f8bd41b1551cf5dfb2f1ad87ca8b \
-    --hash=sha256:f34bbb4cad1155ade3125395b028e6dd18dbae9637cb0946e8b8bd0a4d7f1fb7
+gha-artifact-client==0.2.2 \
+    --hash=sha256:5dd23a738048eb26374b216232053b5ecb1ed58033b7aa288050277d499b696c \
+    --hash=sha256:a2bac317c1fa96750633cf798d92678216967c0b2786637f0bd6e34296293eb3
     # via msys2-autobuild
 idna==3.18 \
     --hash=sha256:7f952cbe720b688055e3f87de14f5c3e5fdaa8bc3928985c4077ca689de849a2 \
@@ -209,9 +209,9 @@ idna==3.18 \
     # via
     #   requests
     #   url-normalize
-platformdirs==4.10.0 \
-    --hash=sha256:31e761a6a0ca04faf7353ea759bdba55652be214725111e5aac52dfa29d4bef7 \
-    --hash=sha256:fb516cdb12eb0d857d0cd85a7c57cea4d060bee4578d6cf5a14dfdf8cbf8784a
+platformdirs==4.11.0 \
+    --hash=sha256:0555d18370482847566ffabcaa53ad7c6c1c29f195989ae1ed634a05f76ea1e0 \
+    --hash=sha256:360ccded2b7fce0af0ff80cc8f5942a1c5d99b0e856033acb030bfc634709e74
     # via requests-cache
 pycparser==3.0 ; implementation_name != 'PyPy' and platform_python_implementation != 'PyPy' \
     --hash=sha256:600f49d217304a5902ac3c37e1281c9fe94e4d0489de643a9504c5cdfdfc6b29 \
