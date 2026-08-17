@@ -5,7 +5,7 @@ from typing import Any
 
 from .config import BuildType, Config, build_type_is_src
 from .gh import get_current_repo
-from .queue import Package, PackageStatus
+from .queue import Package, PackageStatus, get_active_build_job_names
 
 
 def generate_jobs_for(build_type: BuildType, optional_deps: str, count: int) -> Iterator[dict[str, Any]]:
@@ -65,7 +65,8 @@ def roundrobin(*iterables: list[dict[str, Any]]) -> Iterator[dict[str, Any]]:
             nexts = itertools.cycle(itertools.islice(nexts, num_active))
 
 
-def create_build_plan(pkgs: list[Package], optional_deps: str) -> list[dict[str, Any]]:
+def create_build_plan(
+        pkgs: list[Package], optional_deps: str, force_create_jobs: bool) -> list[dict[str, Any]]:
     queued_build_types: dict[BuildType, int] = {}
     for pkg in pkgs:
         for build_type in pkg.get_build_types():
@@ -85,13 +86,20 @@ def create_build_plan(pkgs: list[Package], optional_deps: str) -> list[dict[str,
             count = 1
         return min(Config.RUNNER_CONFIG[build_type].get("max_jobs", count), count)
 
+    active_job_names = set() if force_create_jobs else get_active_build_job_names()
+
+    def filter_active_jobs(jobs: Iterator[dict[str, Any]]) -> list[dict[str, Any]]:
+        return [job for job in jobs if job["name"] not in active_job_names]
+
     # generate the build jobs
     job_lists = []
     for build_type, count in queued_build_types.items():
         if build_type_is_src(build_type):
             continue
         count = get_job_count(build_type)
-        job_lists.append(list(generate_jobs_for(build_type, optional_deps, count)))
+        jobs = filter_active_jobs(generate_jobs_for(build_type, optional_deps, count))
+        if jobs:
+            job_lists.append(jobs)
     jobs = list(roundrobin(*job_lists))[:Config.MAXIMUM_JOB_COUNT]
 
     # generate src build jobs
@@ -100,6 +108,6 @@ def create_build_plan(pkgs: list[Package], optional_deps: str) -> list[dict[str,
         if b in queued_build_types]
     if src_build_types:
         src_count = min(get_job_count(b) for b in src_build_types)
-        jobs.extend(list(generate_src_jobs(optional_deps, src_count)))
+        jobs.extend(filter_active_jobs(generate_src_jobs(optional_deps, src_count)))
 
     return jobs

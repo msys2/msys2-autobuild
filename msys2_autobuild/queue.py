@@ -4,9 +4,9 @@ import functools
 import io
 import json
 from concurrent.futures import ThreadPoolExecutor
+from datetime import UTC, datetime, timedelta
 from enum import Enum
 from typing import Any, cast
-import itertools
 
 import requests
 from github.GithubException import GithubException
@@ -399,43 +399,38 @@ def get_buildqueue_with_status(full_details: bool = False) -> list[Package]:
 
 
 def get_build_jobs_status(jobs: list[WorkflowJob]) -> list[dict[str, str]]:
-    jobs_status = []
-
-    def is_building(job: WorkflowJob) -> bool:
-        if job.status != "in_progress":
-            return False
-        for step in job.steps:
-            if step.name == "Process build queue":
-                return step.status != "completed"
-        else:
-            if len(job.steps) <= 1:
-                # When a job starts up it returns only the initial "Set up job" step
-                # for a short time
-                return False
-            raise Exception("No 'Process build queue' step found")
-
-    for job in jobs:
-        if is_building(job):
-            jobs_status.append({
-                "name": job.name,
-                "html_url": job.html_url,
-                "started_at": job.started_at.isoformat()
-            })
+    jobs_status = [{
+        "name": job.name,
+        "html_url": job.html_url,
+        "started_at": job.started_at.isoformat()
+    } for job in jobs if job.started_at]
     return sorted(jobs_status, key=lambda j: (j["started_at"], j["html_url"]))
+
+
+def get_active_build_jobs() -> list[WorkflowJob]:
+    repo = get_current_repo()
+    workflow = repo.get_workflow("build-jobs.yml")
+    # Jobs can queue for 6 hours and run for 6 hours; add an hour of buffer.
+    created = datetime.now(UTC) - timedelta(hours=13)
+    runs = workflow.get_runs(created=f">={created:%Y-%m-%dT%H:%M:%SZ}")
+
+    build_jobs = []
+    for run in runs:
+        if run.conclusion:
+            continue
+        build_jobs.extend(job for job in run.jobs("all") if not job.conclusion)
+    return build_jobs
+
+
+def get_active_build_job_names() -> set[str]:
+    return {job.name for job in get_active_build_jobs()}
 
 
 def get_status(pkgs: list[Package]) -> dict[str, Any]:
     status_object: dict[str, Any] = {}
 
     # All currently running jobs
-    repo = get_current_repo()
-    workflow = repo.get_workflow("build-jobs.yml")
-    workflow_runs_in_progress = workflow.get_runs(status="in_progress")
-    workflow_runs_pending = workflow.get_runs(status="pending")
-    build_jobs = []
-    for run in itertools.chain(workflow_runs_in_progress, workflow_runs_pending):
-        build_jobs.extend(run.jobs("all"))
-    status_object["jobs"] = get_build_jobs_status(build_jobs)
+    status_object["jobs"] = get_build_jobs_status(get_active_build_jobs())
 
     packages = []
     for pkg in pkgs:

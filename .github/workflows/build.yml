@@ -14,7 +14,7 @@ on:
         required: false
         type: string
   schedule:
-    - cron: '0 0/3 * * *'
+    - cron: '0 0/2 * * *'
 
 env:
   PYTHONUNBUFFERED: 1
@@ -25,7 +25,7 @@ jobs:
 
   schedule:
     if: ${{ github.ref == 'refs/heads/main' }}
-    timeout-minutes: 4320
+    timeout-minutes: 360
     runs-on: ubuntu-24.04
 
     environment:
@@ -71,4 +71,4 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         OPTIONAL_DEPS: ${{ github.event.inputs.optional_deps }}
       run: |
-        python -m msys2_autobuild supervise --optional-deps "$OPTIONAL_DEPS" --target-branch "build-branch"
+        python -m msys2_autobuild supervise --optional-deps "$OPTIONAL_DEPS" --target-branch "build-branch" ${{ case(github.event_name == 'workflow_dispatch', '--force-create-jobs', '') }}

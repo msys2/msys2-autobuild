@@ -15,7 +15,7 @@ permissions: {}
 
 jobs:
   build:
-    timeout-minutes: 4320
+    timeout-minutes: 360
 
     permissions:
       contents: read
