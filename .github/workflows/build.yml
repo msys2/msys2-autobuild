@@ -71,4 +71,4 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         OPTIONAL_DEPS: ${{ github.event.inputs.optional_deps }}
       run: |
-        python -m msys2_autobuild supervise --optional-deps "$OPTIONAL_DEPS" --target-branch "build-branch" ${{ case(github.event_name == 'workflow_dispatch', '--force-create-jobs', '') }}
+        python -m msys2_autobuild supervise --optional-deps "$OPTIONAL_DEPS" --target-branch "build-branch"

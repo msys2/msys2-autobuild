@@ -10,7 +10,7 @@ from .asset_cleanup import clean_assets
 from .build_plan import create_build_plan
 from .buildqueue_report import show_buildqueue
 from .gh import create_dispatch, download_artifact, get_artifact_filename, \
-    get_current_repo, get_release, make_writable, upload_asset, \
+    get_current_repo, get_release, get_workflow_run_id, make_writable, upload_asset, \
     wait_for_api_limit_reset
 from .queue import get_buildqueue_with_status, update_status, get_build_jobs_status
 from .utils import apply_optional_deps
@@ -28,7 +28,7 @@ def supervise(args: Any) -> None:
     pkgs = get_buildqueue_with_status(full_details=True)
     update_status(pkgs)
 
-    build_plan = create_build_plan(pkgs, optional_deps, args.force_create_jobs)
+    build_plan = create_build_plan(pkgs, optional_deps, bool(optional_deps))
     if not build_plan:
         print("No build jobs to dispatch.")
         return
@@ -36,10 +36,24 @@ def supervise(args: Any) -> None:
     clean_assets(dry_run=dry_run)
     show_buildqueue(get_buildqueue_with_status())
 
+    def wait_for_jobs(workflow_run_id: int) -> None:
+        while True:
+            run = repo.get_workflow_run(workflow_run_id)
+            if list(run.jobs()):
+                return
+            if run.conclusion:
+                print(f"Warning: dispatched workflow run {workflow_run_id} completed without any jobs")
+                return
+            print("Waiting for dispatched workflow jobs to appear...")
+            time.sleep(5)
+
     workflow = repo.get_workflow("build-jobs.yml")
     with make_writable(workflow):
-        workflow_run = create_dispatch(workflow, branch, inputs={"build-plan": json.dumps(build_plan)})
+        workflow_run = create_dispatch(
+            workflow, branch, inputs={"build-plan": json.dumps(build_plan)})
     workflow_run_id = workflow_run.id
+    next_supervisor_dispatched = False
+    wait_for_jobs(workflow_run_id)
 
     def deploy_artifacts(artifacts: list[Artifact]) -> bool:
         """Upload the artifacts to the releases and delete them from the workflow run.
@@ -100,23 +114,13 @@ def supervise(args: Any) -> None:
         wait_for_api_limit_reset()
 
         run = repo.get_workflow_run(workflow_run_id)
-        has_jobs = False
-        all_jobs_done = True
-        for job in run.jobs():
-            has_jobs = True
-            if not job.conclusion:
-                all_jobs_done = False
-                break
-
-        # Right after creation, the run is queued and has no jobs yet
-        if not has_jobs and not run.conclusion:
-            all_jobs_done = False
+        jobs = list(run.jobs())
+        all_jobs_done = all(job.conclusion for job in jobs)
 
         try:
             artifacts = list(run.get_artifacts())
             was_deployed = deploy_artifacts(artifacts)
 
-            jobs = list(run.jobs())
             new_jobs_status = get_build_jobs_status(jobs)
             status_changed = False
             if new_jobs_status != jobs_status:
@@ -128,10 +132,26 @@ def supervise(args: Any) -> None:
                 pkgs = get_buildqueue_with_status(full_details=True)
                 if not dry_run:
                     update_status(pkgs)
+
+                if not next_supervisor_dispatched:
+                    build_plan = create_build_plan(pkgs, optional_deps, False)
+                    if build_plan:
+                        supervisor_workflow = repo.get_workflow("build.yml")
+                        with make_writable(supervisor_workflow):
+                            supervisor_run = create_dispatch(
+                                supervisor_workflow,
+                                repo.default_branch,
+                                inputs={
+                                    "context": f"Started by supervisor run {get_workflow_run_id()}",
+                                },
+                            )
+                        wait_for_jobs(supervisor_run.id)
+                        next_supervisor_dispatched = True
         except Exception:
             traceback.print_exc()
             print("Error while supervising, will retry in 5 minutes...")
             time.sleep(300)
+            continue
 
         if not all_jobs_done:
             print("Build jobs are still running, checking again in 30 seconds...")
@@ -147,7 +167,6 @@ def add_parser(subparsers: Any) -> None:
     sub.add_argument(
         "--target-branch", type=str, help="Branch to build in", required=True)
     sub.add_argument("--optional-deps", action="store")
-    sub.add_argument("--force-create-jobs", action="store_true")
     sub.add_argument(
         "--dry-run", action="store_true", help="Only show what is going to be uploaded")
     sub.set_defaults(func=supervise)
