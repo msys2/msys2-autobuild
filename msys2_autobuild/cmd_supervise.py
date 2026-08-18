@@ -121,7 +121,8 @@ def supervise(args: Any) -> None:
             artifacts = list(run.get_artifacts())
             was_deployed = deploy_artifacts(artifacts)
 
-            new_jobs_status = get_build_jobs_status(jobs)
+            new_jobs_status = get_build_jobs_status(
+                [job for job in jobs if not job.conclusion])
             status_changed = False
             if new_jobs_status != jobs_status:
                 jobs_status = new_jobs_status
