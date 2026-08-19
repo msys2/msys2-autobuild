@@ -36,24 +36,12 @@ def supervise(args: Any) -> None:
     clean_assets(dry_run=dry_run)
     show_buildqueue(get_buildqueue_with_status())
 
-    def wait_for_jobs(workflow_run_id: int) -> None:
-        while True:
-            run = repo.get_workflow_run(workflow_run_id)
-            if list(run.jobs()):
-                return
-            if run.conclusion:
-                print(f"Warning: dispatched workflow run {workflow_run_id} completed without any jobs")
-                return
-            print("Waiting for dispatched workflow jobs to appear...")
-            time.sleep(5)
-
     workflow = repo.get_workflow("build-jobs.yml")
     with make_writable(workflow):
         workflow_run = create_dispatch(
             workflow, branch, inputs={"build-plan": json.dumps(build_plan)})
     workflow_run_id = workflow_run.id
     next_supervisor_dispatched = False
-    wait_for_jobs(workflow_run_id)
 
     def deploy_artifacts(artifacts: list[Artifact]) -> bool:
         """Upload the artifacts to the releases and delete them from the workflow run.
@@ -115,7 +103,12 @@ def supervise(args: Any) -> None:
 
         run = repo.get_workflow_run(workflow_run_id)
         jobs = list(run.jobs())
-        all_jobs_done = all(job.conclusion for job in jobs)
+        jobs_created = bool(jobs)
+        if jobs_created:
+            all_jobs_done = all(job.conclusion for job in jobs)
+        else:
+            # Right after creation, the run is queued and has no jobs yet
+            all_jobs_done = bool(run.conclusion)
 
         try:
             artifacts = list(run.get_artifacts())
@@ -134,19 +127,18 @@ def supervise(args: Any) -> None:
                 if not dry_run:
                     update_status(pkgs)
 
-                if not next_supervisor_dispatched:
+                if not next_supervisor_dispatched and jobs_created:
                     build_plan = create_build_plan(pkgs, optional_deps, False)
                     if build_plan:
                         supervisor_workflow = repo.get_workflow("build.yml")
                         with make_writable(supervisor_workflow):
-                            supervisor_run = create_dispatch(
+                            create_dispatch(
                                 supervisor_workflow,
                                 repo.default_branch,
                                 inputs={
                                     "context": f"Started by supervisor run {get_workflow_run_id()}",
                                 },
                             )
-                        wait_for_jobs(supervisor_run.id)
                         next_supervisor_dispatched = True
         except Exception:
             traceback.print_exc()
