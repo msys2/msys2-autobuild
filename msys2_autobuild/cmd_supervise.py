@@ -28,7 +28,7 @@ def supervise(args: Any) -> None:
     pkgs = get_buildqueue_with_status(full_details=True)
     update_status(pkgs)
 
-    build_plan = create_build_plan(pkgs, optional_deps, bool(optional_deps))
+    build_plan = create_build_plan(pkgs, optional_deps, args.force_create_jobs)
     if not build_plan:
         print("No build jobs to dispatch.")
         return
@@ -137,6 +137,8 @@ def supervise(args: Any) -> None:
                                 repo.default_branch,
                                 inputs={
                                     "context": f"Started by supervisor run {get_workflow_run_id()}",
+                                    "optional_deps": optional_deps,
+                                    "force_create_jobs": "false",
                                 },
                             )
                         next_supervisor_dispatched = True
@@ -160,6 +162,7 @@ def add_parser(subparsers: Any) -> None:
     sub.add_argument(
         "--target-branch", type=str, help="Branch to build in", required=True)
     sub.add_argument("--optional-deps", action="store")
+    sub.add_argument("--force-create-jobs", action="store_true")
     sub.add_argument(
         "--dry-run", action="store_true", help="Only show what is going to be uploaded")
     sub.set_defaults(func=supervise)

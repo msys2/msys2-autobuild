@@ -13,6 +13,11 @@ on:
         default: ''
         required: false
         type: string
+      force_create_jobs:
+        description: 'Create jobs even when matching jobs are active'
+        default: true
+        required: false
+        type: boolean
   schedule:
     - cron: '0 0/2 * * *'
 
@@ -70,5 +75,10 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         OPTIONAL_DEPS: ${{ github.event.inputs.optional_deps }}
+        FORCE_CREATE_JOBS: ${{ github.event_name == 'workflow_dispatch' && inputs.force_create_jobs }}
       run: |
-        python -m msys2_autobuild supervise --optional-deps "$OPTIONAL_DEPS" --target-branch "build-branch"
+        ARGS=()
+        if [[ "$FORCE_CREATE_JOBS" == "true" ]]; then
+          ARGS+=(--force-create-jobs)
+        fi
+        python -m msys2_autobuild supervise --optional-deps "$OPTIONAL_DEPS" --target-branch "build-branch" "${ARGS[@]}"
