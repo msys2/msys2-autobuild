@@ -5,6 +5,8 @@ import traceback
 from typing import Any
 
 from github.Artifact import Artifact
+from github.Workflow import Workflow
+from github.WorkflowRun import WorkflowRun
 
 from .asset_cleanup import clean_assets
 from .build_plan import create_build_plan
@@ -14,6 +16,17 @@ from .gh import create_dispatch, download_artifact, get_artifact_filename, \
     wait_for_api_limit_reset
 from .queue import get_buildqueue_with_status, update_status, get_build_jobs_status
 from .utils import apply_optional_deps
+
+
+def has_active_newer_run(workflow: Workflow, current_run: WorkflowRun) -> bool:
+    """Return whether a newer run of the workflow has no conclusion yet."""
+
+    created_at = current_run.created_at
+    runs = workflow.get_runs(created=f">={created_at:%Y-%m-%dT%H:%M:%SZ}")
+    for run in runs:
+        if (run.created_at, run.id) > (created_at, current_run.id) and run.conclusion is None:
+            return True
+    return False
 
 
 def supervise(args: Any) -> None:
@@ -41,7 +54,6 @@ def supervise(args: Any) -> None:
         workflow_run = create_dispatch(
             workflow, branch, inputs={"build-plan": json.dumps(build_plan)})
     workflow_run_id = workflow_run.id
-    next_supervisor_dispatched = False
 
     def deploy_artifacts(artifacts: list[Artifact]) -> bool:
         """Upload the artifacts to the releases and delete them from the workflow run.
@@ -97,6 +109,7 @@ def supervise(args: Any) -> None:
 
         return changed
 
+    current_run = repo.get_workflow_run(get_workflow_run_id())
     jobs_status = []
     while True:
         wait_for_api_limit_reset()
@@ -127,21 +140,23 @@ def supervise(args: Any) -> None:
                 if not dry_run:
                     update_status(pkgs)
 
-                if not next_supervisor_dispatched and jobs_created:
-                    build_plan = create_build_plan(pkgs, optional_deps, False)
-                    if build_plan:
-                        supervisor_workflow = repo.get_workflow("build.yml")
-                        with make_writable(supervisor_workflow):
-                            create_dispatch(
-                                supervisor_workflow,
-                                repo.default_branch,
-                                inputs={
-                                    "context": f"Started by supervisor run {get_workflow_run_id()}",
-                                    "optional_deps": optional_deps,
-                                    "force_create_jobs": "false",
-                                },
-                            )
-                        next_supervisor_dispatched = True
+                if jobs_created:
+                    supervisor_workflow = repo.get_workflow("build.yml")
+                    if has_active_newer_run(supervisor_workflow, current_run):
+                        print("A newer supervisor run is active, not dispatching another one.")
+                    else:
+                        build_plan = create_build_plan(pkgs, optional_deps, False)
+                        if build_plan:
+                            with make_writable(supervisor_workflow):
+                                create_dispatch(
+                                    supervisor_workflow,
+                                    repo.default_branch,
+                                    inputs={
+                                        "context": f"Started by supervisor run {current_run.id}",
+                                        "optional_deps": optional_deps,
+                                        "force_create_jobs": "false",
+                                    },
+                                )
         except Exception:
             traceback.print_exc()
             print("Error while supervising, will retry in 5 minutes...")
