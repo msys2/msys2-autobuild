@@ -22,8 +22,6 @@ from github.GitRelease import GitRelease
 from github.GitReleaseAsset import GitReleaseAsset
 from github.Artifact import Artifact
 from github.Repository import Repository
-from github.Workflow import Workflow
-from github.WorkflowRun import WorkflowRun
 from github import GithubRetry
 from gha_artifact_client import ArtifactClientApi
 
@@ -127,22 +125,6 @@ def get_current_run_urls() -> dict[str, str] | None:
     commit = repo.get_commit(run.head_sha)
     raw = commit.html_url + "/checks/" + str(run.id) + "/logs"
     return {"html": html, "raw": raw}
-
-
-def create_dispatch(workflow: Workflow, ref: str, inputs={}) -> WorkflowRun:
-    """Similar to Workflow.create_dispatch, but returns a WorkflowRun with the details
-    of the created run."""
-
-    # https://github.com/PyGithub/PyGithub/issues/3474
-    _, data = workflow.requester.requestJsonAndCheck(
-        "POST", f"{workflow.url}/dispatches", input={
-            "ref": ref, "inputs": inputs, "return_run_details": True
-    })
-    return WorkflowRun(workflow.requester, attributes={
-        "id": data["workflow_run_id"],
-        "url": data["run_url"],
-        "html_url": data["html_url"],
-    })
 
 
 def wait_for_api_limit_reset(

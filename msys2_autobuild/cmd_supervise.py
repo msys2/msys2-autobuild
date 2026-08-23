@@ -11,7 +11,7 @@ from github.WorkflowRun import WorkflowRun
 from .asset_cleanup import clean_assets
 from .build_plan import create_build_plan
 from .buildqueue_report import show_buildqueue
-from .gh import create_dispatch, download_artifact, get_artifact_filename, \
+from .gh import download_artifact, get_artifact_filename, \
     get_current_repo, get_release, get_workflow_run_id, make_writable, upload_asset, \
     wait_for_api_limit_reset
 from .queue import get_buildqueue_with_status, update_status, get_build_jobs_status
@@ -51,8 +51,10 @@ def supervise(args: Any) -> None:
 
     workflow = repo.get_workflow("build-jobs.yml")
     with make_writable(workflow):
-        workflow_run = create_dispatch(
-            workflow, branch, inputs={"build-plan": json.dumps(build_plan)})
+        workflow_run = workflow.create_dispatch(
+            branch, inputs={"build-plan": json.dumps(build_plan)},
+            throw=True,
+            return_run_details=True)
     workflow_run_id = workflow_run.id
 
     def deploy_artifacts(artifacts: list[Artifact]) -> bool:
@@ -148,14 +150,14 @@ def supervise(args: Any) -> None:
                         build_plan = create_build_plan(pkgs, optional_deps, False)
                         if build_plan:
                             with make_writable(supervisor_workflow):
-                                create_dispatch(
-                                    supervisor_workflow,
+                                supervisor_workflow.create_dispatch(
                                     repo.default_branch,
                                     inputs={
                                         "context": f"Started by supervisor run {current_run.id}",
                                         "optional_deps": optional_deps,
                                         "force_create_jobs": "false",
                                     },
+                                    throw=True,
                                 )
         except Exception:
             traceback.print_exc()
