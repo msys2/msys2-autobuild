@@ -1,5 +1,7 @@
 import fnmatch
 import os
+import io
+import hashlib
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any
@@ -25,6 +27,21 @@ def get_repo_subdir(build_type: BuildType) -> Path:
         return Path("mingw") / build_type
     else:
         raise Exception("unknown type")
+
+
+def file_matches_digest(path: str, asset: GitReleaseAsset) -> bool:
+    digest = asset.digest
+    if digest is None:
+        raise Exception(f"Asset {get_asset_filename(asset)} has no digest")
+    type_, value = digest.split(":", 1)
+    h = hashlib.new(type_)
+    with open(path, "rb") as f:
+        while True:
+            chunk = f.read(io.DEFAULT_BUFFER_SIZE)
+            if not chunk:
+                break
+            h.update(chunk)
+    return h.hexdigest().lower() == value.lower()
 
 
 def fetch_assets(args: Any) -> None:
@@ -89,6 +106,8 @@ def fetch_assets(args: Any) -> None:
         if asset_path.stat().st_size != asset.size:
             return False
         if get_asset_mtime_ns(asset) != asset_path.stat().st_mtime_ns:
+            return False
+        if not file_matches_digest(path, asset):
             return False
         return True
 
