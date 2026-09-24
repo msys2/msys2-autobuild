@@ -359,6 +359,8 @@ def build_package(build_type: BuildType, pkg: Package, msys2_root: PathLike, bui
         validpgpkeys = to_pure_posix_path(os.path.join(SCRIPT_DIR, 'fetch-validpgpkeys.sh'))
         run_cmd(msys2_root, ['bash', validpgpkeys], cwd=pkg_dir)
 
+        buildsrc = to_pure_posix_path(os.path.join(SCRIPT_DIR, 'build-src.sh'))
+
         with staging_dependencies(build_type, pkg, msys2_root, builddir) as temp_pacman:
             try:
                 env = get_build_environ(build_type)
@@ -371,6 +373,7 @@ def build_package(build_type: BuildType, pkg: Package, msys2_root: PathLike, bui
 
                         env['MINGW_ARCH'] = Config.MINGW_SRC_ARCH
                         run_cmd(msys2_root, [
+                            buildsrc,
                             'makepkg-mingw',
                             '--noconfirm',
                             '--noprogressbar',
@@ -382,6 +385,7 @@ def build_package(build_type: BuildType, pkg: Package, msys2_root: PathLike, bui
                             h.write("COMPRESSZST=(zstd -c -T0 --ultra -22 -)\n")
 
                         run_cmd(msys2_root, [
+                            buildsrc,
                             'makepkg',
                             '--noconfirm',
                             '--noprogressbar',

@@ -30,7 +30,7 @@ def generate_jobs_for(build_type: BuildType, optional_deps: str, count: int) -> 
 
 def generate_src_jobs(optional_deps: str, count: int) -> Iterator[dict[str, Any]]:
     name = "src"
-    packages = " ".join(["base-devel", "VCS"])
+    packages = " ".join(["base-devel"])
     build_types = [Config.MINGW_SRC_BUILD_TYPE, Config.MSYS_SRC_BUILD_TYPE]
     runner = Config.RUNNER_CONFIG[build_types[0]]["labels"]
     hosted = Config.RUNNER_CONFIG[build_types[0]]["hosted"]
