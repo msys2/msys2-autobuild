@@ -17,7 +17,9 @@ from .utils import ask_yes_no
 
 
 def get_repo_subdir(build_type: BuildType) -> Path:
-    if build_type in Config.MSYS_ARCH_LIST:
+    if build_type in ["msys-cross-aarch64"]:
+        return Path("msys") / "aarch64"
+    elif build_type in Config.MSYS_ARCH_LIST:
         return Path("msys") / "x86_64"
     elif build_type == Config.MSYS_SRC_BUILD_TYPE:
         return Path("msys") / "sources"

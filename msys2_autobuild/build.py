@@ -411,15 +411,49 @@ def build_package(build_type: BuildType, pkg: Package, msys2_root: PathLike, bui
                         with open(makepkg_conf, "w", encoding="utf-8") as h:
                             h.write("COMPRESSZST=(zstd -c -T0 --ultra -20 -)\n")
 
-                        run_cmd(msys2_root, [
-                            'makepkg',
-                            '--noconfirm',
-                            '--noprogressbar',
-                            '--nocheck',
-                            '--syncdeps',
-                            '--rmdeps',
-                            '--cleanbuild'
-                        ], env=env, cwd=pkg_dir)
+                        if build_type in ["msys-cross-aarch64"]:
+                            env["MSYS2_ARM64_CROSS"] = "1"
+                            env["PACMAN"] = (
+                                "pacman --root /usr/aarch64-pc-cygwin "
+                                "--cachedir /usr/aarch64-pc-cygwin/var/cache/pacman/pkg "
+                                "--arch aarch64"
+                            )
+
+                            cross_root = Path(msys2_root) / 'usr/aarch64-pc-cygwin'
+                            (cross_root / 'var/cache/pacman/pkg').mkdir(
+                                parents=True, exist_ok=True
+                            )
+                            (cross_root / 'lib/cache').mkdir(
+                                parents=True, exist_ok=True
+                            )
+                            shutil.copyfile(
+                                Path(msys2_root) / 'etc/pacman.conf',
+                                cross_root / 'pacman.conf'
+                            )
+                            run_cmd(msys2_root, [
+                                env['PACMAN'],
+                                '-Sy'
+                            ], env=env, cwd=pkg_dir)
+                            run_cmd(msys2_root, [
+                                'makepkg',
+                                '--noconfirm',
+                                '--noprogressbar',
+                                '--nocheck',
+                                '--syncdeps',
+                                '--rmdeps',
+                                '--cleanbuild',
+                                '--config', '/etc/makepkg_aarch64_cross.conf'
+                            ], env=env, cwd=pkg_dir)
+                        else:
+                            run_cmd(msys2_root, [
+                                'makepkg',
+                                '--noconfirm',
+                                '--noprogressbar',
+                                '--nocheck',
+                                '--syncdeps',
+                                '--rmdeps',
+                                '--cleanbuild'
+                            ], env=env, cwd=pkg_dir)
                 else:
                     assert 0
 
