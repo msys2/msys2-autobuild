@@ -269,9 +269,9 @@ cryptography==46.0.3 \
     # via
     #   msys2-autobuild
     #   pyjwt
-gha-artifact-client==0.2.3 \
-    --hash=sha256:ab210b51df15729cf85d72b34c154982770d4253271299fdc5cf866bacef60c0 \
-    --hash=sha256:c0f58da5664e6e3ee9ec7a77764c00d1f6e55ce165fd94128009e7d3ea8b7d59
+gha-artifact-client==0.2.4 \
+    --hash=sha256:4572c2065282de16a368d8dc10141c04b77936497e8d1be0c30d1b8a7eef6a79 \
+    --hash=sha256:92ce6047ba392ae147b3b1946da6f3130643bd0e49cdfe9bb92fe8144acf6587
     # via msys2-autobuild
 idna==3.20 \
     --hash=sha256:a7db850025b95ded1eae8a46181a1a6c56c92c96f0e2b005d9ff8dc0210cab44 \

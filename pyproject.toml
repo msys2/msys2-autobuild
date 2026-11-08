@@ -22,6 +22,7 @@ msys2-autobuild = "msys2_autobuild.main:run"
 
 [tool.uv]
 exclude-newer = "3 days"
+exclude-newer-package = { gha-artifact-client = false }
 
 [tool.uv.build-backend]
 module-root = ""

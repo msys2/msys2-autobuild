@@ -6,6 +6,9 @@ requires-python = ">=3.12.0, <4.0"
 exclude-newer = "0001-01-01T00:00:00Z" # This has no effect and is included for backwards compatibility when using relative exclude-newer values.
 exclude-newer-span = "P3D"
 
+[options.exclude-newer-package]
+gha-artifact-client = false
+
 [[package]]
 name = "attrs"
 version = "26.1.0"
@@ -320,11 +323,11 @@ wheels = [
 
 [[package]]
 name = "gha-artifact-client"
-version = "0.2.3"
+version = "0.2.4"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/b4/c9/b7357c956d4570af92b50a79fe1d847a7d77fd3b6b83701957b56cc77d15/gha_artifact_client-0.2.3.tar.gz", hash = "sha256:ab210b51df15729cf85d72b34c154982770d4253271299fdc5cf866bacef60c0", size = 384932, upload-time = "2026-08-27T07:21:32.411Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/a0/36/b6e08185ebf391134bc1e5bb03f70afc1dd6ecb599a2eece4db5d4c89bed/gha_artifact_client-0.2.4.tar.gz", hash = "sha256:92ce6047ba392ae147b3b1946da6f3130643bd0e49cdfe9bb92fe8144acf6587", size = 399519, upload-time = "2026-11-08T08:40:45.221Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/df/51/ee521e7c6f809a0863fcdfbaca5eccf1c351b25087b4f9bad31d35c54f87/gha_artifact_client-0.2.3-py3-none-any.whl", hash = "sha256:c0f58da5664e6e3ee9ec7a77764c00d1f6e55ce165fd94128009e7d3ea8b7d59", size = 310432, upload-time = "2026-08-27T07:21:30.811Z" },
+    { url = "https://files.pythonhosted.org/packages/91/c1/1f788b00a8e12f7d325a628055e3d1885452914983ccb8f9d2a43bd9ced1/gha_artifact_client-0.2.4-py3-none-any.whl", hash = "sha256:4572c2065282de16a368d8dc10141c04b77936497e8d1be0c30d1b8a7eef6a79", size = 313675, upload-time = "2026-11-08T08:40:43.535Z" },
 ]
 
 [[package]]
