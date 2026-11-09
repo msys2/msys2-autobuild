@@ -11,6 +11,8 @@ from .queue import Package, PackageStatus, get_active_build_job_names
 def generate_jobs_for(build_type: BuildType, optional_deps: str, count: int) -> Iterator[dict[str, Any]]:
     name = build_type
     packages = " ".join(["base-devel"])
+    if name in ["msys-cross-aarch64"]:
+        packages += " ".join(["cross-msysarm64-gcc", "cross-msysarm64-binutils"])
     runner = Config.RUNNER_CONFIG[build_type]["labels"]
     hosted = Config.RUNNER_CONFIG[build_type]["hosted"]
     build_from = itertools.cycle(["start", "end", "middle"])

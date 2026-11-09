@@ -2,7 +2,7 @@ from typing import Literal, TypeAlias
 
 from urllib3.util import Retry
 
-ArchType = Literal["mingw32", "mingw64", "ucrt64", "clang64", "clangarm64", "msys"]
+ArchType = Literal["mingw32", "mingw64", "ucrt64", "clang64", "clangarm64", "msys", "msys-cross-aarch64"]
 SourceType = Literal["mingw-src", "msys-src"]
 BuildType: TypeAlias = ArchType | SourceType
 
@@ -40,7 +40,7 @@ class Config:
 
     MINGW_SRC_BUILD_TYPE: BuildType = "mingw-src"
 
-    MSYS_ARCH_LIST: list[ArchType] = ["msys"]
+    MSYS_ARCH_LIST: list[ArchType] = ["msys", "msys-cross-aarch64"]
 
     MSYS_SRC_ARCH: ArchType = "msys"
 
@@ -54,6 +54,11 @@ class Config:
             "max_jobs": 1,
         },
         "msys": {
+            "repo": "msys2/msys2-autobuild",
+            "labels": ["windows-2022"],
+            "hosted": True,
+        },
+        "msys-cross-aarch64": {
             "repo": "msys2/msys2-autobuild",
             "labels": ["windows-2022"],
             "hosted": True,
