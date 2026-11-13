@@ -117,6 +117,7 @@ def supervise(args: Any) -> None:
         wait_for_api_limit_reset()
 
         run = repo.get_workflow_run(workflow_run_id)
+        run.complete()
         jobs = list(run.jobs())
         jobs_created = bool(jobs)
         if jobs_created:
