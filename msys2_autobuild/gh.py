@@ -112,8 +112,6 @@ def get_workflow_run_id() -> int:
 
 def get_jobs(run: WorkflowRun, _filter: Opt[str] = NotSet) -> list[WorkflowJob]:
     """Fetch jobs, treating a missing jobs listing for an existing run as empty."""
-    # Verify the run exists before treating a 404 from the jobs endpoint as empty.
-    run.complete()
     try:
         # PaginatedList fetches lazily, so catch errors during iteration too.
         return list(run.jobs(_filter))
