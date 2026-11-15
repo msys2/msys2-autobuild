@@ -15,7 +15,7 @@ from github.WorkflowJob import WorkflowJob
 from .config import (REQUESTS_TIMEOUT, ArchType, BuildType, Config,
                      build_type_is_src, get_all_build_types)
 from .gh import (CachedAssets, download_text_asset, get_asset_filename,
-                 get_current_repo, get_release, make_writable,
+                 get_current_repo, get_jobs, get_release, make_writable,
                  asset_is_complete)
 from .utils import get_requests_session, queue_website_update
 
@@ -418,7 +418,7 @@ def get_active_build_jobs() -> list[WorkflowJob]:
     for run in runs:
         if run.conclusion:
             continue
-        build_jobs.extend(job for job in run.jobs("all") if not job.conclusion)
+        build_jobs.extend(job for job in get_jobs(run, "all") if not job.conclusion)
     return build_jobs
 
 

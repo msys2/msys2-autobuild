@@ -12,7 +12,7 @@ from .asset_cleanup import clean_assets
 from .build_plan import create_build_plan
 from .buildqueue_report import show_buildqueue
 from .gh import download_artifact, get_artifact_filename, \
-    get_current_repo, get_release, get_workflow_run_id, make_writable, upload_asset, \
+    get_current_repo, get_jobs, get_release, get_workflow_run_id, make_writable, upload_asset, \
     wait_for_api_limit_reset
 from .queue import get_buildqueue_with_status, update_status, get_build_jobs_status
 from .utils import apply_optional_deps
@@ -117,8 +117,7 @@ def supervise(args: Any) -> None:
         wait_for_api_limit_reset()
 
         run = repo.get_workflow_run(workflow_run_id)
-        run.complete()
-        jobs = list(run.jobs())
+        jobs = get_jobs(run)
         jobs_created = bool(jobs)
         if jobs_created:
             all_jobs_done = all(job.conclusion for job in jobs)

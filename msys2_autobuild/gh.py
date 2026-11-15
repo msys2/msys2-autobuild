@@ -17,10 +17,12 @@ import requests
 from github import Github
 from github.Auth import Auth, Token
 from github.GithubException import GithubException, UnknownObjectException
-from github.GithubObject import GithubObject
+from github.GithubObject import GithubObject, NotSet, Opt
 from github.GitRelease import GitRelease
 from github.GitReleaseAsset import GitReleaseAsset
 from github.Artifact import Artifact
+from github.WorkflowJob import WorkflowJob
+from github.WorkflowRun import WorkflowRun
 from github.Repository import Repository
 from github import GithubRetry
 from gha_artifact_client import ArtifactClientApi
@@ -106,6 +108,19 @@ def get_workflow_run_id() -> int:
     if "GITHUB_RUN_ID" not in os.environ:
         raise RuntimeError("GITHUB_RUN_ID env var not set")
     return int(os.environ["GITHUB_RUN_ID"])
+
+
+def get_jobs(run: WorkflowRun, _filter: Opt[str] = NotSet) -> list[WorkflowJob]:
+    """Fetch jobs, treating a missing jobs listing for an existing run as empty."""
+    # Verify the run exists before treating a 404 from the jobs endpoint as empty.
+    run.complete()
+    try:
+        # PaginatedList fetches lazily, so catch errors during iteration too.
+        return list(run.jobs(_filter))
+    except UnknownObjectException:
+        # The jobs endpoint can return 404 before jobs exist, even when the run exists.
+        # Treat this as no jobs yet and let the caller poll again later.
+        return []
 
 
 def get_job_check_run_id() -> int:
